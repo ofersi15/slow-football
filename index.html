@@ -1,0 +1,1800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ SLOW Football Analytics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- LOADING -->
+  <div v-if="!loaded && !corsError" class="loading">
+    <div style="font-size:20px;font-weight:700">⚽ SLOW Football Analytics</div>
+    <div class="progress-bar"><div class="progress-fill" :style="{width:progress+'%'}"></div></div>
+    <div class="c-gray" style="font-size:12px">{{loadMsg}}</div>
+  </div>
+
+  <!-- CORS ERROR -->
+  <div v-if="corsError" class="loading">
+    <div class="cors-warning">
+      <div style="font-size:16px;font-weight:700;color:#ff7b72;margin-bottom:10px">⚠ Cannot reach SLOW Football API</div>
+      <div class="c-gray" style="margin-bottom:12px;line-height:1.6">
+        Open the file via a local server instead of directly from disk.<br><br>
+        <strong style="color:#e6edf3">Double-click <code>start-server.bat</code> in this folder</strong><br>
+        or drag the button below to your bookmarks bar and click it on slowfootball.club
+      </div>
+      <a :href="bookmarkletHref" class="bookmarklet-link" title="Drag to bookmarks bar">📊 SLOW Analytics</a>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div v-if="loaded" class="layout">
+
+    <!-- SIDEBAR FILTERS -->
+    <div class="sidebar" v-show="activeTab==='scout'">
+      <div>
+        <span class="label">Search</span>
+        <input type="text" v-model="search" placeholder="Name, club, nation…">
+      </div>
+      <div>
+        <span class="label">Position</span>
+        <div style="display:flex;flex-wrap:wrap;gap:3px">
+          <span v-for="p in allPositions" :key="p"
+            :class="['pos','pos-'+p]"
+            :style="{opacity:posFilter.has(p)?1:.25,cursor:'pointer'}"
+            @click="togglePos(p)">{{p}}</span>
+        </div>
+      </div>
+      <!-- Per-Position Rating Filters -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:4px"
+             @click="posRatingsOpen=!posRatingsOpen">
+          <span class="label" style="margin-bottom:0">⭐ Min Rating by Position</span>
+          <span class="c-gray" style="font-size:10px">{{posRatingsOpen?'▲':'▼'}}</span>
+        </div>
+        <div v-if="posRatingsOpen" style="display:flex;flex-direction:column;gap:5px">
+          <!-- Weighted toggle + global max -->
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+            <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#8b949e;cursor:pointer;flex:1">
+              <input type="checkbox" v-model="posRatingUseWeighted" style="accent-color:#1f6feb">
+              Use <span :style="{color:posRatingUseWeighted?'#d2a8ff':'#8b949e',fontWeight:posRatingUseWeighted?'700':'400'}">Weighted Rtg</span>
+            </label>
+          </div>
+          <!-- Per-position min sliders -->
+          <div v-for="pos in allPositions" :key="pos" style="display:flex;align-items:center;gap:5px">
+            <span :class="'pos pos-'+pos" style="min-width:28px;text-align:center;flex-shrink:0">{{pos}}</span>
+            <span style="font-size:9px;color:#6e7681;flex-shrink:0">min</span>
+            <input type="range" min="60" max="99" step="1" :value="posRatingFilters[pos]"
+                   @input="posRatingFilters[pos]=+$event.target.value"
+                   style="flex:1;min-width:0">
+            <span style="font-size:11px;font-weight:700;min-width:20px;text-align:right;flex-shrink:0"
+                  :style="{color:posRatingFilters[pos]>=80?'#7ee787':posRatingFilters[pos]>=70?'#ffa657':'#8b949e'}">
+              {{posRatingFilters[pos]}}
+            </span>
+          </div>
+          <!-- Global max -->
+          <div style="display:flex;align-items:center;gap:5px;border-top:1px solid #21262d;padding-top:4px;margin-top:2px">
+            <span style="font-size:10px;color:#8b949e;flex-shrink:0;width:28px">max</span>
+            <input type="range" min="60" max="99" step="1" v-model.number="posRatingMax"
+                   style="flex:1;min-width:0">
+            <span style="font-size:11px;font-weight:700;min-width:20px;text-align:right;flex-shrink:0"
+                  :style="{color:posRatingMax<=80?'#ff7b72':posRatingMax<=90?'#ffa657':'#8b949e'}">
+              {{posRatingMax>=99?'—':posRatingMax}}
+            </span>
+          </div>
+          <button class="btn" style="width:100%;font-size:10px"
+                  @click="Object.keys(posRatingFilters).forEach(k=>posRatingFilters[k]=60);posRatingMax=99">Reset</button>
+        </div>
+        <div v-else>
+          <div style="display:flex;flex-wrap:wrap;gap:3px">
+            <span v-for="pos in allPositions" :key="pos"
+                  :class="'pos pos-'+pos"
+                  :style="{opacity:posRatingFilters[pos]>60?1:.5,cursor:'pointer'}"
+                  @click="posRatingsOpen=true"
+                  :title="pos+' min: '+posRatingFilters[pos]">{{pos}}{{posRatingFilters[pos]>60?' '+posRatingFilters[pos]:''}}</span>
+          </div>
+          <div v-if="posRatingMax<99||posRatingUseWeighted" style="margin-top:4px;font-size:10px;color:#8b949e">
+            <span v-if="posRatingMax<99" style="color:#ffa657">max {{posRatingMax}} </span>
+            <span v-if="posRatingUseWeighted" style="color:#d2a8ff">· weighted</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="label">Max Age: <b style="color:#e6edf3">{{maxAge>=40?'Any':maxAge}}</b></span>
+        <input type="range" min="16" max="40" v-model.number="maxAge">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;border-top:1px solid #21262d;padding-top:8px">
+        <label class="check-row"><input type="checkbox" v-model="hideOwn"> Hide my team ({{myClub}})</label>
+        <label class="check-row"><input type="checkbox" v-model="hideVacant"> Hide vacant clubs</label>
+        <label class="check-row"><input type="checkbox" v-model="managedOnly"> Managed clubs only</label>
+        <label class="check-row"><input type="checkbox" v-model="forSaleOnly"> Available to sign (excl. NFS)</label>
+        <label class="check-row" title="Players currently on the transfer list (/api/transfer-list)"><input type="checkbox" v-model="transferListedOnly"> Transfer listed</label>
+        <label class="check-row"><input type="checkbox" v-model="injuredOnly"> Injured / suspended</label>
+      </div>
+      <!-- Attribute Filters -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:6px"
+             @click="attrFiltersOpen=!attrFiltersOpen">
+          <span class="label" style="margin-bottom:0">🎯 Attr Filters
+            <span v-if="activeAttrFilterCount>0" style="background:#1f6feb;color:#fff;border-radius:8px;padding:0 5px;font-size:9px;margin-left:3px">{{activeAttrFilterCount}}</span>
+          </span>
+          <span class="c-gray" style="font-size:10px">{{attrFiltersOpen?'▲':'▼'}}</span>
+        </div>
+        <div v-if="attrFiltersOpen">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div v-for="attr in filterableAttrs" :key="attr.k"
+                 style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:10px;color:#8b949e;width:46px;flex-shrink:0">{{attr.l}}</span>
+              <div style="display:flex;gap:2px">
+                <button v-for="thresh in [70,75,80,85,90]" :key="thresh"
+                        :class="['attr-btn',{active:(attrFilters[attr.k]||0)===thresh}]"
+                        @click="toggleAttrFilter(attr.k, thresh)">
+                  {{thresh}}+
+                </button>
+              </div>
+            </div>
+          </div>
+          <button class="btn" style="width:100%;margin-top:6px;font-size:10px" @click="clearAttrFilters">Clear all</button>
+        </div>
+      </div>
+      <!-- Weighted Rating Config -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:4px" @click="mentalCfgOpen=!mentalCfgOpen">
+          <span class="label" style="margin-bottom:0">⚖ Weighted Rating</span>
+          <span class="c-gray" style="font-size:10px">{{mentalWeightPct}}% mental {{mentalCfgOpen?'▲':'▼'}}</span>
+        </div>
+        <div v-if="mentalCfgOpen">
+          <div style="margin-bottom:6px">
+            <span class="label" style="font-size:10px">Mental weight: <b style="color:#e6edf3">{{mentalWeightPct}}%</b></span>
+            <input type="range" min="0" max="50" step="5" v-model.number="mentalWeightPct">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <label v-for="attr in ['Mentality','Experience','Leadership','Work rate','Adaptability']" :key="attr" class="check-row" style="font-size:11px">
+              <input type="checkbox" :checked="mentalCfgAttrs.includes(attr)" @change="toggleMentalAttr(attr)">
+              {{attr}}
+            </label>
+          </div>
+        </div>
+      </div>
+      <div style="border-top:1px solid #21262d;padding-top:8px;font-size:11px;color:#8b949e">
+        <div>{{filteredPlayers.length}} players · {{filteredClubs}} clubs</div>
+        <div style="margin-top:3px">Wk {{asOfWeek}} · <span :class="playersRefreshing?'c-orange':''">{{playersRefreshing?'⟳ refreshing…':playersCacheDate?'cached '+playersCacheDate:'live'}}</span></div>
+        <!-- Stats enrichment progress -->
+        <div v-if="statsEnriching" style="margin-top:5px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="color:#79c0ff;font-size:10px">📊 Loading full stats…</span>
+            <span style="color:#79c0ff;font-size:10px">{{statsProgress}}%</span>
+          </div>
+          <div style="height:3px;background:#21262d;border-radius:2px;overflow:hidden">
+            <div :style="{width:statsProgress+'%',height:'100%',background:'#1f6feb',borderRadius:'2px',transition:'width .3s'}"></div>
+          </div>
+        </div>
+        <div v-else-if="statsEnriched" style="margin-top:3px;color:#7ee787;font-size:10px">📊 Full stats loaded ✓</div>
+        <div v-if="!cacheWorking" style="margin-top:5px;padding:4px 6px;background:#3a1a1a;border:1px solid #da3633;border-radius:4px;font-size:10px;color:#ff7b72">
+          ⚠ Cache not saving — squads will fetch on every load. Run via <b>start-analytics-server.bat</b> to fix.
+        </div>
+        <button v-if="!playersRefreshing" class="btn" style="width:100%;margin-top:6px;font-size:10px" @click="clearPlayersCache()">⟳ Force Refresh</button>
+        <div v-if="playersRefreshing" style="margin-top:6px;text-align:center;color:#ffa657;font-size:10px">Refreshing in background…</div>
+      </div>
+    </div>
+
+    <!-- MAIN AREA -->
+    <div class="main">
+      <!-- TABS -->
+      <div class="header">
+        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id">{{t.label}}</button>
+        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+      </div>
+
+      <!-- ── SCOUT TAB ── -->
+      <div v-if="activeTab==='scout'" class="content">
+        <table>
+          <thead>
+            <tr>
+              <th v-for="c in tableCols" :key="c.key" @click="sortBy(c.key)" :style="{minWidth:c.w+'px'}" :title="c.full||c.label">
+                {{c.label}}<span v-if="sortCol===c.key" class="sort-arrow"> {{sortDir>0?'▲':'▼'}}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(p,i) in pagedPlayers" :key="p.Player+p.Club+i" class="clickable" @click="openModal(p)">
+              <td><span style="color:#e6edf3;font-weight:500">{{p.Player}}</span></td>
+              <td>
+                <span :class="'league-tag lg-'+(p._league||'other')" style="font-size:9px;padding:1px 5px;margin-right:3px">{{p._league||'?'}}</span>
+                {{p.Club}}<span v-if="!p._managed" title="No manager" style="margin-left:3px">🔴</span>
+              </td>
+              <td><span :class="'pos pos-'+p.Position">{{p.Position}}</span></td>
+              <td>{{p.Age||'—'}}</td>
+              <td :class="ratingClass(p._gameRating)">{{p._gameRating?p._gameRating.toFixed(1):'—'}}</td>
+              <td :class="ratingClass(p._weightedRating)" :title="p._weightedRating&&p._gameRating?'Δ '+(p._weightedRating-p._gameRating).toFixed(1)+' vs game rating':''">{{p._weightedRating?p._weightedRating.toFixed(1):'—'}}</td>
+              <td>{{fmtVal(p.Value)}}</td>
+              <td class="c-gray">{{fmtVal(p._estValue)}}</td>
+              <td>{{p.Games||0}}</td>
+              <td>{{p.Minutes||0}}</td>
+              <td :class="ratingClass(p['Average Rating'])">{{p['Average Rating']?p['Average Rating'].toFixed(1):'—'}}</td>
+              <td class="c-green">{{p.Goals||0}}</td>
+              <td class="c-orange">{{p.xG!=null?p.xG.toFixed(2):'—'}}</td>
+              <td class="c-blue">{{p.Assists||0}}</td>
+              <td>{{p.xA!=null?p.xA.toFixed(2):'—'}}</td>
+              <td class="c-green">{{p._g90!=null?p._g90.toFixed(2):'—'}}</td>
+              <td class="c-blue">{{p._a90!=null?p._a90.toFixed(2):'—'}}</td>
+              <td class="c-orange">{{p._xG90!=null?p._xG90.toFixed(2):'—'}}</td>
+              <td>{{p._xA90!=null?p._xA90.toFixed(2):'—'}}</td>
+              <td :class="(p.Yellow||0)>=3?'c-red':(p.Yellow||0)>=2?'c-orange':''">{{p.Yellow||''}}</td>
+              <td :class="(p.Red||0)>=1?'c-red':''">{{p.Red||''}}</td>
+              <td>{{p['Tackle %']!=null?p['Tackle %'].toFixed(0)+'%':'—'}}</td>
+              <td>{{p['Pass %']!=null?p['Pass %'].toFixed(0)+'%':'—'}}</td>
+              <td>{{p.Steals||0}}</td>
+              <td :class="p.Mistakes>2?'c-red':''">{{p.Mistakes||0}}</td>
+              <td>{{p.Form?p.Form.toFixed(1):'—'}}</td>
+              <td :class="p.fitnessPct<70?'c-red':p.fitnessPct<85?'c-orange':'c-green'">{{p.fitnessPct!=null?p.fitnessPct+'%':'—'}}</td>
+              <td :class="p.injuryRiskLabel==='High'?'c-red':p.injuryRiskLabel==='Moderate'?'c-orange':'c-gray'">{{p.injuryRiskLabel||'—'}}</td>
+              <td>{{p.injured?'🤕':''}}</td><td>{{p.suspended?'🚫':''}}</td>
+              <td>{{p.Speed||'—'}}</td><td>{{p.Stamina||'—'}}</td><td>{{p.Vision||'—'}}</td>
+              <td>{{p.Dribbling||'—'}}</td><td>{{p.Passing||'—'}}</td><td>{{p.Shooting||'—'}}</td>
+              <td>{{p.Tackling||'—'}}</td><td>{{p.Marking||'—'}}</td><td>{{p.Heading||'—'}}</td>
+              <td>{{p.Handling||'—'}}</td><td>{{p.Reflexes||'—'}}</td>
+              <td>{{p['Free kicks']!=null?p['Free kicks'].toFixed(0):'—'}}</td>
+              <td>{{p.Penalties!=null?p.Penalties.toFixed(0):'—'}}</td>
+              <td>{{p.Corners!=null?p.Corners.toFixed(0):'—'}}</td>
+              <td>{{p.Mentality!=null?p.Mentality.toFixed(0):'—'}}</td>
+              <td>{{p.Leadership!=null?p.Leadership.toFixed(0):'—'}}</td>
+              <td>{{p.Experience!=null?p.Experience.toFixed(0):'—'}}</td>
+              <td>{{p.Confidence!=null?p.Confidence.toFixed(0):'—'}}</td>
+              <td>{{p['Work rate']!=null?p['Work rate'].toFixed(0):'—'}}</td>
+              <td>{{p.Morale!=null?p.Morale.toFixed(0):'—'}}</td>
+              <td class="c-gray" style="font-size:10px">{{p.Nationality}}</td>
+              <td class="c-gray" style="font-size:10px">{{p.PreferredFoot||'—'}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="totalPages>1" style="padding:8px 12px;border-top:1px solid #21262d;display:flex;gap:6px;align-items:center;background:#0d1117">
+          <button class="btn" @click="page=Math.max(0,page-1)" :disabled="page===0">←</button>
+          <span class="c-gray">{{page+1}} / {{totalPages}}</span>
+          <button class="btn" @click="page=Math.min(totalPages-1,page+1)" :disabled="page===totalPages-1">→</button>
+          <span class="c-gray" style="margin-left:8px;font-size:11px">{{filteredPlayers.length}} total · click row for profile</span>
+        </div>
+      </div>
+
+      <!-- ── MY SQUAD TAB ── -->
+      <div v-if="activeTab==='squad'" class="content" style="padding:14px">
+
+        <!-- ── SAVED LINEUP ── -->
+        <div v-if="lineupWithStats" class="card" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">📋 Saved Lineup</span>
+            <span style="background:#1f2d3d;color:#79c0ff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:700">{{lineupWithStats.formation}}</span>
+            <span :style="{background:lineupWithStats.runs==='on'?'#1a4a2e':'#2d2d2d',color:lineupWithStats.runs==='on'?'#7ee787':'#8b949e',borderRadius:'10px',padding:'2px 10px',fontSize:'11px',fontWeight:'700'}">
+              RUNS {{(lineupWithStats.runs||'on').toUpperCase()}}
+            </span>
+            <span class="c-gray" style="font-size:11px;margin-left:auto">
+              {{lineupWithStats.createdAt ? new Date(lineupWithStats.createdAt).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}}
+            </span>
+            <button class="btn" style="font-size:10px;padding:2px 7px" @click="loadSavedLineup()">↻</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <!-- Starting XI -->
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px">Starting XI</div>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div v-for="slot in lineupWithStats.xi" :key="slot.order"
+                     style="display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:5px;background:#0d1117;cursor:pointer"
+                     :style="{borderLeft:'2px solid '+(slot.player?.injured?'#da3633':slot.player?.suspended?'#d29922':'#21262d')}"
+                     @click="slot.player && openModal(slot.player)">
+                  <span :class="'pos pos-'+slot.slot" style="font-size:9px;min-width:26px;text-align:center">{{slot.slot}}</span>
+                  <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{slot.name}}</span>
+                  <span v-if="slot.player?.injured" title="Injured" style="font-size:10px">🤕</span>
+                  <span v-if="slot.player?.suspended" title="Suspended" style="font-size:10px">🚫</span>
+                  <span v-if="slot.player" :class="ratingClass(slot.player._gameRating)" style="font-size:11px;font-weight:700;min-width:28px;text-align:right">
+                    {{slot.player._gameRating ? slot.player._gameRating.toFixed(1) : '—'}}
+                  </span>
+                  <span v-if="slot.player?.fitnessPct!=null" :class="slot.player.fitnessPct<70?'c-red':slot.player.fitnessPct<85?'c-orange':'c-green'" style="font-size:10px;min-width:32px;text-align:right">
+                    {{slot.player.fitnessPct}}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            <!-- Subs -->
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px">Substitutions</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div v-for="sub in lineupWithStats.subs" :key="sub.order"
+                     style="background:#0d1117;border-radius:5px;padding:6px 9px">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                    <span style="font-size:10px;font-weight:700;color:#7ee787">IN</span>
+                    <span style="font-weight:600;font-size:12px;color:#e6edf3;cursor:pointer" @click="sub.player && openModal(sub.player)">{{sub.name}}</span>
+                    <span v-if="sub.player" :class="ratingClass(sub.player._gameRating)" style="font-size:10px;font-weight:700">
+                      {{sub.player._gameRating ? sub.player._gameRating.toFixed(1) : ''}}
+                    </span>
+                  </div>
+                  <div style="font-size:10px;color:#8b949e">
+                    <span style="color:#ff7b72;font-weight:700">OUT</span> {{sub.off}}
+                    <span style="margin-left:8px;background:#1f2d3d;color:#79c0ff;border-radius:8px;padding:1px 6px">{{sub.plan}}</span>
+                    <span style="margin-left:6px">{{sub.time}}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!lineupWithStats.subs || !lineupWithStats.subs.length" class="c-gray" style="font-size:11px;font-style:italic">No subs configured</div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="activeTab==='squad'" class="card" style="margin-bottom:20px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">📋</span>
+          <div>
+            <div style="font-weight:600;font-size:13px">No saved lineup found</div>
+            <div class="c-gray" style="font-size:11px">Submit a lineup at <a href="https://slowfootball.club/submit-team-v2" target="_blank" style="color:#79c0ff">slowfootball.club/submit-team-v2</a> to see it here.</div>
+          </div>
+        </div>
+
+        <!-- Squad Summary -->
+        <!-- Best XI per Formation -->
+        <div v-if="mySquadPlayers.length" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">⭐ Best XI</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button v-for="f in formationKeys" :key="f"
+                      :class="['btn',{active:mySquadFormation===f}]"
+                      @click="mySquadFormation=f"
+                      style="font-size:11px;padding:3px 9px">{{f}}</button>
+            </div>
+            <span v-if="bestXIPlayers.some(s=>s.player)" class="c-gray" style="font-size:11px">
+              avg slot rtg <b style="color:#e6edf3">{{(bestXIPlayers.filter(s=>s.slotRating).reduce((sum,s)=>sum+(s.slotRating||0),0)/Math.max(1,bestXIPlayers.filter(s=>s.slotRating).length)).toFixed(1)}}</b>
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px">
+            <div v-for="slot in bestXIPlayers" :key="slot.idx"
+                 class="card"
+                 :style="{padding:'8px 10px',display:'flex',alignItems:'center',gap:'8px',cursor:slot.player?'pointer':'default',opacity:slot.player?1:.6}"
+                 @click="slot.player && openModal(slot.player)">
+              <span :class="'pos pos-'+slot.slot" style="font-size:10px;min-width:28px;text-align:center;flex-shrink:0">{{slot.slot}}</span>
+              <div style="flex:1;min-width:0">
+                <div v-if="slot.player">
+                  <div style="font-size:12px;font-weight:600;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{slot.player.Player}}</div>
+                  <div style="font-size:10px;color:#8b949e;display:flex;gap:4px;align-items:center">
+                    <span :class="'pos pos-'+slot.player.Position" style="font-size:9px">{{slot.player.Position}}</span>
+                    <span>Age {{slot.player.Age}}</span>
+                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position'">⚠ OOP</span>
+                  </div>
+                </div>
+                <div v-else class="c-gray" style="font-size:11px;font-style:italic">— no player —</div>
+              </div>
+              <div v-if="slot.player" style="text-align:center;flex-shrink:0">
+                <div :class="ratingClass(slot.slotRating)" style="font-size:16px;font-weight:700;line-height:1">{{slot.slotRating?slot.slotRating.toFixed(1):'—'}}</div>
+                <div class="c-gray" style="font-size:9px" :title="'Natural position rating: '+( slot.player._gameRating?slot.player._gameRating.toFixed(1):'—')">slot rtg</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Captain Candidates -->
+        <div v-if="mySquadCaptainList.length" style="margin-bottom:20px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px">🎖 Captain Candidates <span class="c-gray" style="font-size:11px;font-weight:400">sorted by Leadership</span></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">
+            <div v-for="(p,i) in mySquadCaptainList" :key="p.Player"
+                 class="card" style="padding:8px 10px;display:flex;align-items:center;gap:8px;cursor:pointer"
+                 @click="openModal(p)">
+              <span style="font-size:13px;font-weight:700;color:#8b949e;min-width:18px;text-align:center">{{i===0?'🏅':i+1}}</span>
+              <span :class="'pos pos-'+p.Position" style="font-size:9px;flex-shrink:0">{{p.Position}}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:12px;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.Player}}</div>
+                <div style="font-size:10px;color:#8b949e">Age {{p.Age}} · Exp <b style="color:#79c0ff">{{p.Experience!=null?p.Experience.toFixed(0):'—'}}</b></div>
+              </div>
+              <div style="text-align:center;flex-shrink:0">
+                <div style="font-size:18px;font-weight:700;color:#ffa657;line-height:1">{{p.Leadership!=null?p.Leadership.toFixed(0):'—'}}</div>
+                <div class="c-gray" style="font-size:9px">Leader</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Set Pieces -->
+        <div v-if="mySquadPlayers.length && mySquadSetPieces.some(sp=>sp.players.length>0)" style="margin-bottom:20px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px">🔵 Set Pieces</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+            <div v-for="sp in mySquadSetPieces" :key="sp.title" class="card">
+              <div style="font-weight:700;margin-bottom:8px;font-size:12px">{{sp.title}}</div>
+              <div v-if="sp.players.length===0" class="c-gray" style="font-size:11px;font-style:italic">No data loaded — open squad view</div>
+              <div v-for="(p,i) in sp.players" :key="i" class="mb-list-item" @click="openModal(p)">
+                <span class="c-gray" style="font-size:10px;width:16px">{{i+1}}</span>
+                <span :class="'pos pos-'+p.Position" style="font-size:9px">{{p.Position}}</span>
+                <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px">{{p.Player}}</span>
+                <span style="font-weight:700;font-size:13px;color:#ffa657">{{(p[sp.key]||0).toFixed(0)}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="mySquadPlayers.length" style="margin-bottom:16px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#e6edf3">{{mySquadPlayers.length}}</div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Players</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div :class="['pos-rating-num',ratingClass(mySquadPlayers.reduce((s,p)=>s+(p._gameRating||0),0)/mySquadPlayers.filter(p=>p._gameRating).length)]"
+                   style="font-size:22px">
+                {{(mySquadPlayers.reduce((s,p)=>s+(p._gameRating||0),0)/mySquadPlayers.filter(p=>p._gameRating).length).toFixed(1)}}
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Avg Rating</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#ffa657">
+                {{(mySquadPlayers.reduce((s,p)=>s+(p.Age||0),0)/mySquadPlayers.filter(p=>p.Age).length).toFixed(1)}}
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Avg Age</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#79c0ff">
+                {{fmtVal(mySquadPlayers.reduce((s,p)=>s+(p.weeklyWage||0),0))}}/w
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Wage Bill</div>
+            </div>
+          </div>
+
+          <!-- Squad by Position -->
+          <div v-for="group in mySquadByPosition" :key="group.pos" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span :class="'pos pos-'+group.pos" style="font-size:11px">{{group.pos}}</span>
+              <span style="font-size:11px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">
+                {{{GK:'Goalkeeper',FB:'Full Back',CB:'Centre Back',DM:'Defensive Mid',CM:'Central Mid',AM:'Attacking Mid',WF:'Wide Forward',CF:'Centre Forward'}[group.pos]||group.pos}}
+              </span>
+              <span class="c-gray" style="font-size:10px">({{group.players.length}})</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px">
+              <div v-for="p in group.players" :key="p.Player"
+                   class="card" style="padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:8px"
+                   @click="openModal(p)"
+                   :style="{borderColor:p.injured||p.suspended?'#da3633':p.contractWeeks<20?'#d29922':'#21262d'}">
+                <!-- Name + flags -->
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+                    <span style="font-weight:600;color:#e6edf3;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.Player}}</span>
+                    <span v-if="p.injured" title="Injured" style="font-size:11px">🤕</span>
+                    <span v-if="p.suspended" title="Suspended" style="font-size:11px">🚫</span>
+                    <span v-if="p._transferListed" title="Transfer listed" style="font-size:10px;background:#238636;color:#fff;padding:0 4px;border-radius:8px">FOR SALE</span>
+                    <span v-if="p.contractWeeks<20" :title="p.contractWeeks+' wks left'" style="font-size:10px;background:#6e3a0b;color:#ffa657;padding:0 4px;border-radius:8px">⚠ {{p.contractWeeks}}w</span>
+                    <span v-if="p._incompleteStats" title="Only partial attribute data available — likely a newly promoted youth player" style="font-size:10px;background:#1f2d3d;color:#79c0ff;padding:0 4px;border-radius:8px">🌱 youth</span>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:10px;color:#8b949e">
+                    <span>Age {{p.Age||'?'}}</span>
+                    <span>{{fmtWage(p.weeklyWage)}}</span>
+                    <span v-if="p.Games>0">{{p.Games}}G · {{p.Goals||0}} gls</span>
+                  </div>
+                </div>
+                <!-- Ratings -->
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                  <div style="text-align:center">
+                    <div :class="ratingClass(p._gameRating)" style="font-size:16px;font-weight:700">{{p._gameRating?p._gameRating.toFixed(1):'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">GmRtg</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div :class="p.fitnessPct<70?'c-red':p.fitnessPct<85?'c-orange':'c-green'" style="font-size:13px;font-weight:600">{{p.fitnessPct!=null?p.fitnessPct+'%':'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">Fit</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div :class="ratingClass(p.Form)" style="font-size:13px;font-weight:600">{{p.Form?p.Form.toFixed(1):'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">Form</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="c-gray" style="padding:40px;text-align:center">No squad data for {{myClub}} — ensure data is loaded.</div>
+      </div>
+
+      <!-- ── MONEYBALL TAB ── -->
+      <div v-if="activeTab==='moneyball'" class="content">
+        <div style="padding:10px 14px;border-bottom:1px solid #21262d;display:flex;gap:6px;flex-wrap:wrap">
+          <button v-for="c in mbCharts" :key="c.id" :class="['btn',{active:mbChart===c.id}]" @click="mbChart=c.id">{{c.label}}</button>
+        </div>
+
+        <!-- Top lists -->
+        <div v-if="mbChart==='top-lists'" class="top-list-grid">
+          <div v-for="list in topLists" :key="list.title" class="card">
+            <div style="font-weight:700;margin-bottom:10px">{{list.title}}</div>
+            <div v-for="(p,i) in list.data" :key="i" class="mb-list-item" @click="openModal(p)">
+              <span class="c-gray" style="font-size:10px;width:16px">{{i+1}}</span>
+              <span :class="'pos pos-'+p.Position">{{p.Position}}</span>
+              <span style="flex:1;font-size:12px">{{p.Player}}</span>
+              <span class="c-gray" style="font-size:10px">{{p.Club}}</span>
+              <span :style="{color:list.color,fontWeight:700,minWidth:36,textAlign:'right',fontSize:'12px'}">
+                {{typeof p[list.key]==='number'?p[list.key].toFixed(list.dec||1):p[list.key]||'—'}}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scatter charts with mini-list -->
+        <div v-else style="display:grid;grid-template-columns:1fr 300px;gap:0;height:calc(100vh - 100px)">
+          <div style="padding:14px;overflow:auto">
+            <div class="card" style="height:100%;min-height:400px">
+              <div style="font-weight:700;margin-bottom:4px">{{activeChartDef.title}}</div>
+              <div class="c-gray" style="font-size:11px;margin-bottom:12px">{{activeChartDef.desc}} · click a dot to see profile</div>
+              <canvas :id="'chart-'+mbChart" style="max-height:calc(100% - 60px)"></canvas>
+            </div>
+          </div>
+          <div style="border-left:1px solid #21262d;overflow-y:auto;padding:14px">
+            <div class="label" style="margin-bottom:8px">{{activeChartDef.listLabel||'Top Players'}}</div>
+            <div v-for="(p,i) in activeChartList" :key="i" class="mb-list-item" @click="openModal(p)">
+              <span class="c-gray" style="font-size:10px;width:16px">{{i+1}}</span>
+              <span :class="'pos pos-'+p.Position" style="font-size:9px">{{p.Position}}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{p.Player}}</div>
+                <div class="c-gray" style="font-size:10px">{{p.Club}}</div>
+              </div>
+              <span :style="{color:activeChartDef.listColor||'#ffa657',fontWeight:700,fontSize:'11px'}">{{activeChartDef.listFmt(p)}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TACTICS TAB ── -->
+      <div v-if="activeTab==='tactics'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+        <div v-if="!tacticsLoaded && !tacticsLoading" class="card" style="max-width:500px">
+          <div style="font-size:15px;font-weight:700;margin-bottom:8px">🧠 Tactics & Formation Analysis</div>
+          <div class="c-gray" style="margin-bottom:16px;line-height:1.7;font-size:12px">
+            Fetches last 8 matches per club, loads each individual match report,<br>
+            and parses formations from pre-match events and play-by-play text.<br>
+            Results are <strong style="color:#e6edf3">cached locally</strong> for 7 days — subsequent loads are instant.
+            <span v-if="tacticsCacheDate" style="display:block;margin-top:6px;color:#7ee787">✓ Cached data from {{tacticsCacheDate}}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn green" @click="loadTactics(false)">{{tacticsCacheDate?'Load from cache':'Load Match Data'}}</button>
+            <button v-if="tacticsCacheDate" class="btn red" @click="loadTactics(true)">Force Refresh</button>
+          </div>
+        </div>
+        <div v-if="tacticsLoading" class="card" style="max-width:500px;text-align:center;padding:40px">
+          <div class="progress-bar" style="margin:0 auto 12px"><div class="progress-fill" :style="{width:tacticsProgress+'%'}"></div></div>
+          <div class="c-gray">{{tacticsMsg}}</div>
+        </div>
+        <div v-if="tacticsLoaded" style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="c-gray" style="font-size:12px">{{tacticsData.fixturesAnalysed}} fixtures · {{tacticsData.withFormation}} lineups · cached {{tacticsCacheDate}}</span>
+            <button class="btn red" @click="loadTactics(true)" style="margin-left:auto">🔄 Refresh</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="card">
+              <div style="font-weight:700;margin-bottom:12px">Formation Win Rates</div>
+              <canvas id="chart-formations" style="max-height:320px"></canvas>
+            </div>
+            <div class="card">
+              <div style="font-weight:700;margin-bottom:10px">Most Used Formations</div>
+              <canvas id="chart-form-pop" style="max-height:320px"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:10px">Formation Breakdown</div>
+            <table>
+              <thead><tr>
+                <th>Formation</th><th>Common Style</th><th>Played</th><th>W</th><th>D</th><th>L</th>
+                <th>Win%</th><th>PPG</th><th>Avg GF</th><th>Avg GA</th><th>GD/g</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="f in tacticsData.formations" :key="f.formation">
+                  <td style="font-weight:700;color:#ffa657">{{f.formation}}</td>
+                  <td class="c-gray" style="font-size:11px;text-transform:capitalize">{{f.topStyle||'—'}}</td>
+                  <td>{{f.n}}</td>
+                  <td class="c-green">{{f.W}}</td><td class="c-orange">{{f.D}}</td><td class="c-red">{{f.L}}</td>
+                  <td><span :class="f.winPct>=50?'c-green':'c-red'" style="font-weight:700">{{f.winPct}}%</span></td>
+                  <td>{{f.ppg}}</td>
+                  <td class="c-blue">{{f.avgGF}}</td>
+                  <td class="c-red">{{f.avgGA}}</td>
+                  <td :class="(f.gf-f.ga)>0?'c-green':'c-red'">{{((f.gf-f.ga)/f.n).toFixed(2)}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ── MY CLUB PANEL ── -->
+          <div v-if="tacticsData.myClubData" class="card">
+            <div style="font-weight:700;margin-bottom:12px">⭐ {{myClub}} — Formation &amp; Style History</div>
+            <div style="display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start">
+              <!-- Overall record bubble -->
+              <div style="min-width:130px;background:#161b22;border-radius:8px;padding:12px 14px;text-align:center;flex-shrink:0">
+                <div style="font-size:11px;color:#8b949e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Season Record</div>
+                <div style="font-size:24px;font-weight:700;color:#e6edf3;letter-spacing:1px">
+                  {{tacticsData.myClubData.record.W}}-{{tacticsData.myClubData.record.D}}-{{tacticsData.myClubData.record.L}}
+                </div>
+                <div style="font-size:11px;margin-top:5px">
+                  <span :class="Math.round(100*tacticsData.myClubData.record.W/tacticsData.myClubData.record.n)>=50?'c-green':'c-red'" style="font-weight:700">
+                    {{Math.round(100*tacticsData.myClubData.record.W/tacticsData.myClubData.record.n)}}% wins
+                  </span>
+                  <span class="c-gray"> · {{tacticsData.myClubData.record.n}} played</span>
+                </div>
+                <div style="font-size:11px;color:#8b949e;margin-top:4px">
+                  GF: <span class="c-blue" style="font-weight:700">{{(tacticsData.myClubData.record.gf/tacticsData.myClubData.record.n).toFixed(1)}}</span>
+                  &nbsp;GA: <span class="c-red" style="font-weight:700">{{(tacticsData.myClubData.record.ga/tacticsData.myClubData.record.n).toFixed(1)}}</span>
+                </div>
+                <div v-if="tacticsData.myClubData.topStyle" style="margin-top:8px;background:#0d1117;border-radius:4px;padding:4px 6px;font-size:10px;color:#ffa657">
+                  🎨 {{tacticsData.myClubData.topStyle}}
+                </div>
+              </div>
+              <!-- Formation history table -->
+              <div>
+                <table style="font-size:12px;width:100%">
+                  <thead><tr>
+                    <th>Formation</th><th>P</th><th>W</th><th>D</th><th>L</th>
+                    <th>Win%</th><th>GF/g</th><th>GA/g</th><th>GD/g</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr v-for="f in tacticsData.myClubData.forms" :key="f.formation">
+                      <td style="font-weight:700;color:#ffa657">{{f.formation}}</td>
+                      <td>{{f.n}}</td>
+                      <td class="c-green">{{f.W}}</td><td class="c-orange">{{f.D}}</td><td class="c-red">{{f.L}}</td>
+                      <td><span :class="f.winPct>=50?'c-green':'c-red'" style="font-weight:700">{{f.winPct}}%</span></td>
+                      <td class="c-blue">{{(f.gf/f.n).toFixed(1)}}</td>
+                      <td class="c-red">{{(f.ga/f.n).toFixed(1)}}</td>
+                      <td :class="(f.gf-f.ga)>0?'c-green':'c-red'">{{((f.gf-f.ga)/f.n).toFixed(2)}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <!-- Style usage breakdown if more than one style -->
+                <div v-if="Object.keys(tacticsData.myClubData.styleBreakdown).length>1" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+                  <span class="c-gray" style="font-size:11px;width:100%;margin-bottom:2px">Style breakdown:</span>
+                  <span v-for="(count, style) in tacticsData.myClubData.styleBreakdown" :key="style"
+                    style="background:#1f2937;border-radius:10px;padding:2px 8px;font-size:11px;color:#e6edf3">
+                    {{style}} <span class="c-gray">×{{count}}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── STYLE BREAKDOWN ── -->
+          <div v-if="tacticsData.styles && tacticsData.styles.length" class="card">
+            <div style="font-weight:700;margin-bottom:10px">🎨 Style of Play Breakdown
+              <span class="c-gray" style="font-size:11px;font-weight:400"> — league-wide · min 3 matches · parsed from match reports</span>
+            </div>
+            <table>
+              <thead><tr>
+                <th>Style</th><th>Played</th><th>W</th><th>D</th><th>L</th>
+                <th>Win%</th><th>PPG</th><th>Avg GF</th><th>Avg GA</th><th>GD/g</th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="s in tacticsData.styles" :key="s.style">
+                  <td style="font-weight:700;color:#79c0ff;text-transform:capitalize">{{s.style}}</td>
+                  <td>{{s.n}}</td>
+                  <td class="c-green">{{s.W}}</td><td class="c-orange">{{s.D}}</td><td class="c-red">{{s.L}}</td>
+                  <td><span :class="s.winPct>=50?'c-green':'c-red'" style="font-weight:700">{{s.winPct}}%</span></td>
+                  <td>{{s.ppg}}</td>
+                  <td class="c-blue">{{s.avgGF}}</td>
+                  <td class="c-red">{{s.avgGA}}</td>
+                  <td :class="(s.gf-s.ga)>0?'c-green':'c-red'">{{((s.gf-s.ga)/s.n).toFixed(2)}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ── TACTICS REFERENCE ── -->
+          <div class="card">
+            <div style="font-weight:700;margin-bottom:12px">📋 Tactics Reference
+              <span class="c-gray" style="font-size:11px;font-weight:400"> — all 7 dimensions &amp; valid options from game source</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;font-size:12px">
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Mentality</div>
+                <div class="c-gray" style="line-height:2">Very Defensive · Defensive · Balanced · Attacking · Very Attacking</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Style of Play</div>
+                <div class="c-gray" style="line-height:2">Tiki-taka · Counter Attack · Attacking · Defensive · Balanced · Pressing · Direct</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Structure</div>
+                <div class="c-gray" style="line-height:2">Fluid · Balanced · Rigid</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Defensive Line</div>
+                <div class="c-gray" style="line-height:2">Deep · Low · Medium · High · Very High</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Attacking Focus</div>
+                <div class="c-gray" style="line-height:2">Left Wing · Central · Right Wing · Mixed</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Pressing Intensity</div>
+                <div class="c-gray" style="line-height:2">None · Low · Medium · High · Relentless</div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:10px">
+                <div style="font-weight:700;color:#ffa657;margin-bottom:6px">Transition Speed</div>
+                <div class="c-gray" style="line-height:2">Slow · Balanced · Fast</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+  <!-- ── YOUTH TAB ── -->
+      <div v-if="activeTab==='youth'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading state -->
+    <div v-if="youthLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🌱</div>
+      <div class="c-gray">{{youthMsg||'Loading youth data…'}}</div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="youthMsg && !youthLoaded" class="card" style="text-align:center;padding:30px;color:#ff7b72">⚠ {{youthMsg}}</div>
+
+    <!-- Initial state (watcher fires next tick — show spinner immediately) -->
+    <div v-else-if="!youthLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🌱</div>
+      <div class="c-gray">Initializing youth data…</div>
+    </div>
+
+    <!-- Loaded -->
+    <div v-if="youthLoaded">
+
+      <!-- Sub-tab bar -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #21262d;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <button v-for="t in [{id:'scouts',label:'🔭 Active Scouts',count:youthScouts.length},{id:'academy',label:'🏟 Academy',count:youthAcademy.length},{id:'history',label:'📋 League History',count:youthHistLoaded?youthAllHistoryJobs.length:(youthHistLoading?null:youthRejected.length)}]"
+          :key="t.id" @click="youthSubTab=t.id"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:9px 16px;cursor:pointer;font-size:13px;margin-bottom:-1px;transition:all .1s"
+          :style="youthSubTab===t.id?{borderBottomColor:'#f78166',color:'#e6edf3',fontWeight:'600'}:{color:'#8b949e'}">
+          {{t.label}}<span v-if="t.count!==null" style="margin-left:5px;background:#21262d;border-radius:8px;padding:1px 6px;font-size:11px">{{t.count}}</span>
+          <span v-if="t.id==='history'&&youthHistLoading" style="margin-left:4px;font-size:10px;color:#ffa657">⟳</span>
+        </button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span v-if="youthBgLastRefresh" class="c-gray" style="font-size:10px" title="Last background scout refresh">⟳ {{youthBgLastRefresh}}</span>
+          <button class="btn" style="font-size:11px" @click="loadYouth(true)">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <!-- ─── SCOUTS ─── -->
+      <div v-if="youthSubTab==='scouts'">
+        <!-- Capacity bar -->
+        <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px">
+          <div>
+            <span style="font-weight:700">Scouting Level {{youthCap.scoutingLevel||'?'}}</span>
+            <span class="c-gray" style="font-size:11px;margin-left:8px">{{youthCap.activeCount||0}}/{{youthCap.maxActive||'?'}} active slots used</span>
+          </div>
+          <div style="display:flex;gap:5px">
+            <div v-for="i in (youthCap.maxActive||4)" :key="i"
+              :style="{width:'20px',height:'20px',borderRadius:'4px',background:i<=(youthCap.activeCount||0)?'#238636':'#21262d',border:'1px solid #30363d'}"></div>
+          </div>
+          <div class="c-gray" style="font-size:11px">
+            Staff: <span class="c-orange">+{{youthStaff.scouting?.qualityBump||0}} rating bump</span>
+            · <span class="c-blue">{{youthStaff.scouting?.weeklyProspects||0}} prospects/week</span>
+          </div>
+        </div>
+
+        <div v-if="!youthScouts.length" class="card" style="text-align:center;padding:40px;color:#8b949e">
+          <div style="font-size:28px;margin-bottom:8px">🔭</div>
+          <div>No active scouting jobs. Start a scout in-game to see players here with full stats.</div>
+        </div>
+
+        <div v-for="job in youthScouts" :key="job.id" class="card" style="cursor:pointer;margin-bottom:10px"
+          @click="openModal({...job.player,...(job.player.stats||{})}, job)">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                <span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span>
+                <span style="font-size:16px;font-weight:700">{{job.player.name||job.player.Player}}</span>
+                <span class="c-gray" style="font-size:11px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</span>
+                <span v-if="job.player.Archetype||job.player.archetype" style="background:#1f2937;border-radius:10px;padding:1px 8px;font-size:10px;color:#d2a8ff">{{job.player.Archetype||job.player.archetype}}</span>
+              </div>
+              <div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px;flex-wrap:wrap">
+                <span>Age <b>{{job.player.age||job.player.Age}}</b></span>
+                <span v-if="job.player.DOB||job.player.dob">DOB <b>{{job.player.DOB||job.player.dob}}</b></span>
+                <span>Best: <span class="c-orange">{{job.player.bestKey}}</span></span>
+              </div>
+              <!-- Key position attrs -->
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <div v-for="attr in gameAttrsFor(job.player.position||job.player.Position)" :key="attr"
+                  style="background:#0d1117;border:1px solid #ffa65760;border-radius:5px;padding:3px 8px;font-size:11px">
+                  <span class="c-gray">{{attr}}</span>
+                  <span class="c-orange" style="font-weight:700;margin-left:4px">{{getYouthAttr(job.player, attr)||'—'}}</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:right;min-width:120px">
+              <div :class="ratingClass(job.player.rating||job.player.Rating)" style="font-size:28px">{{(job.player.rating||job.player.Rating||0).toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Actual Rating</div>
+              <div v-if="job.buyNow" style="font-size:11px;margin-top:6px">
+                <span class="c-gray">Buy now: </span><span class="c-orange" style="font-weight:700">{{fmtVal(job.buyNow)}}</span>
+              </div>
+              <div v-else class="c-gray" style="font-size:10px;margin-top:6px">negotiate to buy</div>
+              <div class="c-blue" style="font-size:11px">{{fmtVal(job.player.value||job.player.Value)}}</div>
+            </div>
+          </div>
+          <!-- Stage + insight row -->
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #21262d;padding-top:8px;margin-top:8px">
+            <div>
+              <div class="c-gray" style="font-size:10px;margin-bottom:3px">SCOUT STAGE</div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <div v-for="i in 7" :key="i"
+                  :style="{width:'8px',height:'8px',borderRadius:'50%',background:i<=job.stage?(job.stage>=7?'#7ee787':'#ffa657'):'#21262d'}"></div>
+                <span v-if="job.stage>=7" style="font-size:10px;color:#7ee787;font-weight:700;margin-left:5px">✓ FULLY REVEALED</span>
+                <span v-else class="c-gray" style="font-size:10px;margin-left:4px">{{job.stage}}/7 — {{7-job.stage}} stages left</span>
+              </div>
+            </div>
+            <div>
+              <div class="c-gray" style="font-size:10px;margin-bottom:3px">GAME SHOWS</div>
+              <span style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:12px;padding:2px 9px;font-size:11px;color:#79c0ff;font-weight:600">{{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}} range</span>
+              <span class="c-gray" style="font-size:11px;margin-left:8px">Strength: <span class="c-orange">{{job.hints?.strength?.key}} {{job.hints?.strength?.value}}</span></span>
+            </div>
+            <div style="font-size:10px;background:#0d1117;border-radius:4px;padding:4px 8px;color:#8b949e">
+              💡 Tool sees <span class="c-green" style="font-weight:700">full stats</span> — actual
+              <span :class="ratingClass(job.player.rating||job.player.Rating)" style="font-weight:700">{{job.player.rating||job.player.Rating}}</span>
+              vs hint {{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}}
+            </div>
+            <button class="btn" style="margin-left:auto;font-size:11px" @click.stop="openModal({...job.player,...(job.player.stats||{})},job)">Full Stats →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── ACADEMY ─── -->
+      <div v-if="youthSubTab==='academy'">
+        <div v-if="!youthAcademy.length" class="card" style="text-align:center;padding:40px;color:#8b949e">
+          <div style="font-size:28px;margin-bottom:8px">🏟</div>
+          <div>No youth academy players. Upgrade your academy facility to build your pipeline.</div>
+        </div>
+        <div v-else>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div style="font-size:20px;font-weight:700">{{youthAcademy.length}}</div>
+              <div class="c-gray" style="font-size:10px">Players</div>
+            </div>
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div :class="ratingClass(youthAcademyAvgRating)" style="font-size:20px">{{youthAcademyAvgRating.toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Avg Rating</div>
+            </div>
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div :class="ratingClass(youthAcademyTopRating)" style="font-size:20px">{{youthAcademyTopRating.toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Top Rating</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">
+            <div v-for="p in youthAcademySorted" :key="p.id||p.Player"
+              class="card" style="cursor:pointer;padding:10px"
+              :style="{borderColor:p._partial?'#388bfd40':'#21262d'}"
+              @click="openModal(p, null)">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+                <div>
+                  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                    <span :class="'pos pos-'+(p.Position||p.position)">{{p.Position||p.position}}</span>
+                    <span style="font-weight:600">{{p.Player||p.name}}</span>
+                    <span v-if="p._partial" style="background:#1f2d3d;color:#79c0ff;font-size:9px;padding:0 5px;border-radius:8px">partial data</span>
+                  </div>
+                  <div class="c-gray" style="font-size:10px;margin-top:2px">
+                    {{p.Nationality||p.nationality}} · Age {{p.Age||p.age}}
+                    <span v-if="p.Archetype||p.archetype"> · <span style="color:#d2a8ff">{{p.Archetype||p.archetype}}</span></span>
+                  </div>
+                </div>
+                <div style="text-align:right">
+                  <div :class="ratingClass(p.Rating||p.rating)" style="font-size:18px">{{(p.Rating||p.rating||0).toFixed(1)}}</div>
+                  <div class="c-blue" style="font-size:10px">{{fmtVal(p.Value||p.value)}}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+                <div v-for="attr in gameAttrsFor(p.Position||p.position)" :key="attr"
+                  style="font-size:10px;background:#0d1117;border-radius:4px;padding:2px 5px">
+                  <span class="c-gray">{{attr.substring(0,3)}}</span>
+                  <span class="c-orange" style="font-weight:700;margin-left:2px">{{getYouthAttr(p,attr)||'—'}}</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+                <span v-if="p.contractWeeks!=null" :class="p.contractWeeks<20?'c-red':p.contractWeeks<40?'c-orange':'c-gray'">{{p.contractWeeks}}w contract</span>
+                <span v-if="p.injured" class="c-red">🤕 injured</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── HISTORY (ALL CLUBS) ─── -->
+      <div v-if="youthSubTab==='history'" style="display:flex;flex-direction:column;gap:10px">
+
+        <!-- Loading history -->
+        <div v-if="youthHistLoading" class="card" style="text-align:center;padding:30px">
+          <div style="max-width:360px;margin:0 auto 10px">
+            <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+              <div :style="{width:youthHistProgress+'%',height:'100%',background:'#238636',borderRadius:'4px',transition:'width .3s'}"></div>
+            </div>
+          </div>
+          <div class="c-gray" style="font-size:12px">{{youthHistMsg||'Scanning all clubs…'}}</div>
+          <div class="c-gray" style="font-size:11px;margin-top:5px">First load takes 1–2 min · cached 24h after that</div>
+        </div>
+
+        <!-- Not yet loaded — show my club's history + load button -->
+        <template v-else-if="!youthHistLoaded">
+          <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 16px">
+            <div>
+              <div style="font-weight:700;margin-bottom:3px">📋 League-wide Scout History</div>
+              <div class="c-gray" style="font-size:12px">Fetches rejected scouts from all managed clubs + their facilities. Cached 24h.</div>
+              <div v-if="youthHistMsg" style="color:#ff7b72;font-size:12px;margin-top:4px">⚠ {{youthHistMsg}}</div>
+            </div>
+            <button class="btn green" style="font-size:12px;padding:7px 18px" @click="loadYouthHistory(false)">Load All History</button>
+          </div>
+          <!-- Show my club's own history while waiting -->
+          <div v-if="youthRejected.length">
+            <div style="font-size:11px;color:#8b949e;margin-bottom:6px">My scouts ({{youthRejected.length}}) — load league history for all clubs</div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <table>
+                <thead><tr>
+                  <th>Player</th><th>Pos</th><th>Age</th><th>Rating</th><th>Value</th><th>Buy Now</th><th>Best Attr</th><th>Scouted</th><th></th>
+                </tr></thead>
+                <tbody>
+                  <tr v-for="job in youthFilteredHistory" :key="job.id" class="clickable" @click="openModal({...job.player,...(job.player.stats||{})},job)">
+                    <td><div style="font-weight:600">{{job.player.name||job.player.Player}}</div><div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}}</div></td>
+                    <td><span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span></td>
+                    <td>{{job.player.age||job.player.Age}}</td>
+                    <td><span :class="ratingClass(job.player.rating||job.player.Rating)">{{job.player.rating||job.player.Rating}}</span></td>
+                    <td class="c-blue">{{fmtVal(job.player.value||job.player.Value)}}</td>
+                    <td class="c-orange">{{fmtVal(job.buyNow)}}</td>
+                    <td style="font-size:11px"><span class="c-orange">{{job.player.bestKey}}</span></td>
+                    <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—'}}</td>
+                    <td @click.stop><button class="btn" style="font-size:10px;padding:2px 7px" :disabled="job._refreshing" @click="refreshYouthJob(job)">{{job._refreshing?'…':job._refreshed?'✓':job._refreshFailed?'✗':'↻'}}</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No scouting history yet for {{myClub}}.</div>
+        </template>
+
+        <!-- Loaded all-clubs history -->
+        <template v-else>
+          <!-- Filters + cache info -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" v-model="youthHistSearch" placeholder="Search player, club…" style="width:190px">
+            <select v-model="youthHistPos" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All positions</option>
+              <option v-for="p in youthHistAllPositions" :key="p" :value="p">{{p}}</option>
+            </select>
+            <select v-model="youthHistClubFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All clubs</option>
+              <option v-for="c in youthHistClubs" :key="c" :value="c">{{c}}</option>
+            </select>
+            <select v-model="youthHistSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="date">Latest first</option>
+              <option value="rating_d">Rating ↓</option>
+              <option value="rating_a">Rating ↑</option>
+              <option value="age_a">Age ↑</option>
+              <option value="value_d">Value ↓</option>
+            </select>
+            <span class="c-gray" style="font-size:11px">{{youthHistFiltered.length}} scouts · {{youthHistClubs.length}} clubs</span>
+            <span v-if="youthHistCacheDate" class="c-gray" style="font-size:10px">cached {{youthHistCacheDate}}</span>
+            <button class="btn" style="margin-left:auto;font-size:11px" @click="loadYouthHistory(true)">🔄 Refresh (clears cache)</button>
+          </div>
+
+          <!-- Club summary cards (clickable to filter) -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div v-for="(info, club) in youthClubInfoMap" :key="club"
+              class="card" style="padding:6px 10px;font-size:11px;cursor:pointer;min-width:150px"
+              :style="{borderColor:club===myClub?'#238636':'#21262d',opacity:youthHistClubFilter&&youthHistClubFilter!==club?0.5:1}"
+              @click="youthHistClubFilter=youthHistClubFilter===club?'':club">
+              <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
+              <div class="c-gray">
+                Scout Lv <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span>
+                · Bump <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span>
+                · <span class="c-blue">{{youthAllHistoryJobs.filter(j=>j._club===club).length}} scouts</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- History table -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <table>
+              <thead><tr>
+                <th>Player</th><th>Pos</th><th>Age</th><th>Rating</th>
+                <th>Value</th><th>Buy Now</th><th>Best Attr</th>
+                <th>Scouting Club</th><th>Scouted</th><th></th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="job in youthHistFiltered" :key="job.id" class="clickable"
+                  @click="openModal({...job.player,...(job.player.stats||{})},job)">
+                  <td>
+                    <div style="font-weight:600">{{job.player.name||job.player.Player}}</div>
+                    <div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</div>
+                  </td>
+                  <td><span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span></td>
+                  <td>{{job.player.age||job.player.Age}}</td>
+                  <td><span :class="ratingClass(job.player.rating||job.player.Rating)">{{job.player.rating||job.player.Rating}}</span></td>
+                  <td class="c-blue">{{fmtVal(job.player.value||job.player.Value)}}</td>
+                  <td class="c-orange">{{fmtVal(job.buyNow)}}</td>
+                  <td style="font-size:11px">
+                    <span class="c-orange">{{job.player.bestKey}}</span>
+                    <span class="c-gray"> {{job.hints?.strength?.value}}</span>
+                  </td>
+                  <td>
+                    <div style="background:#1f2d3d;color:#79c0ff;border:1px solid #388bfd40;border-radius:10px;display:inline-block;padding:1px 7px;font-size:10px;font-weight:600">{{job._club}}</div>
+                    <div v-if="youthClubInfoMap[job._club]" style="font-size:10px;margin-top:2px;color:#8b949e">
+                      Lv{{youthClubInfoMap[job._club].facilities?.levels?.scouting||'?'}}
+                      +{{youthClubInfoMap[job._club].staff?.scouting?.qualityBump||0}}
+                    </div>
+                  </td>
+                  <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'}}</td>
+                  <td @click.stop>
+                    <button class="btn" style="font-size:10px;padding:2px 7px" :disabled="job._refreshing" @click="refreshYouthJob(job)">
+                      {{job._refreshing?'…':job._refreshed?'✓':job._refreshFailed?'✗':'↻'}}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Rating ceiling by club -->
+          <div class="card" style="border-color:#388bfd40">
+            <div style="font-weight:700;margin-bottom:10px">📊 Rating Ceiling by Club</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div v-for="(info, club) in youthClubInfoMap" :key="club"
+                style="background:#0d1117;border-radius:6px;padding:8px 12px;min-width:150px;font-size:11px;line-height:1.8">
+                <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
+                <div>Scout Lv: <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span></div>
+                <div>Quality bump: <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span></div>
+                <div>Academy Lv: <span class="c-orange">{{info.facilities?.levels?.academy||'?'}}</span></div>
+                <div>Prospects/wk: <span class="c-blue">{{info.staff?.scouting?.weeklyProspects||0}}</span></div>
+                <div style="border-top:1px solid #21262d;margin-top:3px;padding-top:3px">
+                  History: <span :class="ratingClass(youthClubMaxRating(club))" style="font-weight:700">max {{youthClubMaxRating(club)||'—'}}</span>
+                  · avg {{youthClubAvgRating(club).toFixed(1)}}
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+
+    </div>
+      </div>
+
+  <!-- ── CLUB TAB (Facilities + Staff) ── -->
+      <div v-if="activeTab==='club'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading -->
+    <div v-if="clubLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">{{clubMsg||'Loading club data…'}}</div>
+    </div>
+    <!-- Error -->
+    <div v-else-if="clubMsg && !clubLoaded" class="card" style="text-align:center;padding:30px;color:#ff7b72">⚠ {{clubMsg}}</div>
+    <!-- Initial -->
+    <div v-else-if="!clubLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">Initializing…</div>
+    </div>
+
+    <!-- Loaded -->
+    <div v-if="clubLoaded">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700">🏟 {{myClub}}</div>
+        <button class="btn" style="font-size:11px" @click="loadClub(true)">🔄 Refresh</button>
+      </div>
+
+      <!-- Active project banner -->
+      <div v-if="clubFacData && clubFacData.project" class="card" style="border-left:3px solid #ffa657;padding:10px 14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:18px">🔨</span>
+          <div>
+            <span style="font-weight:700;color:#ffa657">{{facTitle(clubFacData.project.key)}} upgrade in progress</span>
+            <span class="c-gray" style="font-size:11px;margin-left:8px">Lv {{clubFacData.project.from}} → {{clubFacData.project.to}}</span>
+          </div>
+          <div class="c-gray" style="font-size:11px;margin-left:auto">Complete: {{new Date(clubFacData.project.completeAt).toLocaleDateString()}}</div>
+        </div>
+      </div>
+
+      <!-- ── FACILITIES ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facilities</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;margin-bottom:16px">
+        <div v-for="key in ['training','scouting','academy','medical','analytics','stadium']" :key="key"
+          class="card" style="position:relative;padding:11px">
+
+          <!-- Upgrading badge -->
+          <div v-if="clubFacData && clubFacData.project && clubFacData.project.key===key"
+            style="position:absolute;top:9px;right:9px;background:#ffa657;color:#0d1117;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px">UPGRADING</div>
+
+          <!-- Header -->
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+            <span style="font-size:17px">{{facEmoji(key)}}</span>
+            <span style="font-weight:700;font-size:13px">{{facTitle(key)}}</span>
+            <span style="margin-left:auto;font-size:13px;font-weight:700"
+              :class="(clubFacData&&clubFacData.levels&&clubFacData.levels[key]||0)>=4?'c-green':(clubFacData&&clubFacData.levels&&clubFacData.levels[key]||0)>=3?'c-orange':'c-gray'">
+              Lv {{clubFacData&&clubFacData.levels?clubFacData.levels[key]:'?'}}
+            </span>
+          </div>
+
+          <!-- Level dots -->
+          <div style="display:flex;gap:3px;margin-bottom:6px">
+            <div v-for="i in 5" :key="i"
+              :style="{width:'26px',height:'5px',borderRadius:'3px',
+                background:i<=(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)?'#238636':'#21262d',
+                border:'1px solid #30363d'}"></div>
+          </div>
+
+          <!-- Flavor text -->
+          <div style="font-style:italic;color:#8b949e;font-size:11px;margin-bottom:6px">
+            "{{facDescription(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}"
+          </div>
+
+          <!-- Bonus -->
+          <div style="background:#161b22;border-radius:5px;padding:5px 9px;font-size:11px;color:#79c0ff;margin-bottom:5px">
+            📈 {{facBonus(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}
+          </div>
+
+          <!-- Live effects: medical -->
+          <div v-if="key==='medical' && clubStaffEffects && clubStaffEffects.medical"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">Injury risk: <b :class="(clubStaffEffects.medical.injuryRiskMult||1)<1?'c-green':'c-gray'">
+              {{(clubStaffEffects.medical.injuryRiskMult||1)<1?'-'+Math.round((1-(clubStaffEffects.medical.injuryRiskMult||1))*100)+'%':'No bonus'}}
+            </b></span>
+            <span class="c-gray">Recovery: <b :class="(clubStaffEffects.medical.recoverySpeedMult||1)>1?'c-green':'c-gray'">
+              +{{Math.round(((clubStaffEffects.medical.recoverySpeedMult||1)-1)*100)}}%
+            </b></span>
+          </div>
+
+          <!-- Live effects: analytics (automation) -->
+          <div v-if="key==='analytics' && clubStaffEffects && clubStaffEffects.automation"
+            style="font-size:11px;color:#d2a8ff;padding:3px 2px">
+            Auto: {{Object.entries(clubStaffEffects.automation||{}).filter(([k,v])=>v).map(([k])=>k.replace(/([A-Z])/g,' $1')).join(', ')||'None enabled'}}
+          </div>
+
+          <!-- Live effects: stadium (CEO/finances) -->
+          <div v-if="key==='stadium' && clubStaffEffects && clubStaffEffects.finances"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">CEO discount: <b :class="(clubStaffEffects.finances.facilityDiscount||0)>0?'c-green':'c-gray'">
+              {{Math.round((clubStaffEffects.finances.facilityDiscount||0)*100)}}%
+            </b></span>
+            <span class="c-gray">Sponsorship: <b class="c-blue">£{{((clubStaffEffects.finances.weeklySponsorship||0)/1000).toFixed(0)}}k/wk</b></span>
+          </div>
+
+          <!-- Upgrade quote -->
+          <div v-if="clubFacQuotes[key] && clubFacQuotes[key].ok !== false"
+            style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px;font-size:11px">
+            <div v-if="clubFacData && clubFacData.project && clubFacData.project.key===key" class="c-orange">
+              Upgrade already in progress ({{clubFacData.project.days}} days total)
+            </div>
+            <div v-else style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+              <span class="c-gray">Next: Lv {{clubFacQuotes[key].to}} · {{clubFacQuotes[key].days}} days
+                <span v-if="clubFacQuotes[key].discountPct" class="c-green"> ({{clubFacQuotes[key].discountPct}}% off)</span>
+              </span>
+              <span style="font-weight:700" :class="clubFacQuotes[key].canAfford?'c-green':'c-red'">
+                £{{(clubFacQuotes[key].finalCost/1e6).toFixed(2)}}m
+              </span>
+            </div>
+          </div>
+          <div v-else-if="(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)>=5"
+            style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px;font-size:11px;color:#238636">✓ Max level</div>
+        </div>
+      </div>
+
+      <!-- ── STAFF ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Staff</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+
+        <!-- Roster + Responsibilities -->
+        <div class="card" style="flex:1;min-width:260px">
+          <div style="font-weight:700;margin-bottom:10px">👥 Roster</div>
+          <div v-if="clubStaff && clubStaff.current && Object.keys(clubStaff.current).length">
+            <table>
+              <thead><tr><th>Role</th><th>Name</th><th>Rtg</th><th>Wage</th><th>Wks</th></tr></thead>
+              <tbody>
+                <tr v-for="(person, role) in (clubStaff.current||{})" :key="role">
+                  <td style="font-weight:700;color:#79c0ff">{{role}}</td>
+                  <td>{{person.name}}</td>
+                  <td :class="person.rating>=80?'c-green':person.rating>=70?'c-orange':'c-gray'" style="font-weight:700">{{person.rating||'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{person.weeklyWage?'£'+Math.round(person.weeklyWage/1000)+'k':'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{person.contractWeeks!=null?person.contractWeeks:'—'}}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="clubStaff.openAds && clubStaff.openAds.length" class="c-orange" style="font-size:11px;margin-top:7px">
+              ⚡ {{clubStaff.openAds.length}} open ad(s) posted
+            </div>
+          </div>
+          <div v-else class="c-gray" style="padding:12px;text-align:center">No staff data</div>
+
+          <!-- Responsibilities -->
+          <div v-if="clubStaff && clubStaff.responsibilities" style="border-top:1px solid #21262d;margin-top:10px;padding-top:9px">
+            <div style="font-size:11px;font-weight:700;color:#8b949e;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Responsibilities</div>
+            <div style="font-size:11px;color:#8b949e;line-height:1.9">
+              <span v-for="(section, sKey) in (clubStaff.responsibilities||{})" :key="sKey">
+                <span v-for="(who, task) in section" :key="task">
+                  <b style="color:#e6edf3;text-transform:capitalize">{{task.replace(/([A-Z])/g,' $1')}}:</b>
+                  <span :style="{color:who==='User'?'#79c0ff':'#7ee787'}"> {{who}}</span> &nbsp;
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Effects grid -->
+        <div class="card" style="flex:1.5;min-width:300px">
+          <div style="font-weight:700;margin-bottom:10px">📈 Staff Effects</div>
+          <div v-if="clubStaffEffects && Object.keys(clubStaffEffects).length"
+            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px">
+
+            <!-- Training -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">⚽ Training</div>
+              <div v-if="clubStaffEffects.training" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">XP bonus</span>
+                  <span :class="(clubStaffEffects.training.xpMult||1)>1?'c-green':'c-gray'" style="font-weight:700">+{{Math.round(((clubStaffEffects.training.xpMult||1)-1)*100)}}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Fatigue recovery</span>
+                  <span :class="(clubStaffEffects.training.fatigueRecovery||0)>0?'c-green':'c-gray'" style="font-weight:700">+{{Math.round((clubStaffEffects.training.fatigueRecovery||0)*100)}}%</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No coach hired</div>
+            </div>
+
+            <!-- Technical Director / Scouting -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🔭 Technical Director</div>
+              <div v-if="clubStaffEffects.scouting" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Weekly prospects</span>
+                  <span class="c-blue" style="font-weight:700">+{{clubStaffEffects.scouting.weeklyProspects||0}}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Quality bump</span>
+                  <span :class="(clubStaffEffects.scouting.qualityBump||0)>0?'c-green':'c-gray'" style="font-weight:700">+{{clubStaffEffects.scouting.qualityBump||0}}</span>
+                </div>
+                <div v-if="clubStaffEffects.scouting.biasToAdverts" style="color:#d2a8ff;font-size:10px;margin-top:2px">✓ Bias toward advertised positions</div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No Technical Director hired</div>
+            </div>
+
+            <!-- Medical -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🏥 Medical</div>
+              <div v-if="clubStaffEffects.medical" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Injury risk</span>
+                  <span :class="(clubStaffEffects.medical.injuryRiskMult||1)<1?'c-green':'c-gray'" style="font-weight:700">
+                    {{(clubStaffEffects.medical.injuryRiskMult||1)<1?'-'+Math.round((1-(clubStaffEffects.medical.injuryRiskMult||1))*100)+'%':'No bonus'}}
+                  </span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Recovery speed</span>
+                  <span :class="(clubStaffEffects.medical.recoverySpeedMult||1)>1?'c-green':'c-gray'" style="font-weight:700">+{{Math.round(((clubStaffEffects.medical.recoverySpeedMult||1)-1)*100)}}%</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No physio hired</div>
+            </div>
+
+            <!-- CEO / Finances -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">💰 CEO</div>
+              <div v-if="clubStaffEffects.finances" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Facility discount</span>
+                  <span :class="(clubStaffEffects.finances.facilityDiscount||0)>0?'c-green':'c-gray'" style="font-weight:700">{{Math.round((clubStaffEffects.finances.facilityDiscount||0)*100)}}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Weekly sponsorship</span>
+                  <span class="c-blue" style="font-weight:700">£{{((clubStaffEffects.finances.weeklySponsorship||0)/1000).toFixed(0)}}k/wk</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No CEO hired</div>
+            </div>
+
+            <!-- Automation -->
+            <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubStaffEffects.automation">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🤖 Automation</div>
+              <div style="font-size:11px;display:flex;flex-direction:column;gap:3px">
+                <div v-for="(val, k) in (clubStaffEffects.automation||{})" :key="k" style="display:flex;justify-content:space-between">
+                  <span class="c-gray" style="text-transform:capitalize">{{k.replace(/([A-Z])/g,' $1')}}</span>
+                  <span :class="val?'c-green':'c-gray'">{{val?'✓':'—'}}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div v-else class="c-gray" style="padding:12px;text-align:center">No effects data</div>
+        </div>
+
+      </div>
+
+      <!-- ── GENERATE APPLICANTS ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:4px">Staff Recruitment</div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-weight:700;font-size:13px">📣 Generate Applicants</span>
+          <span class="c-gray" style="font-size:11px">Posts ads + generates candidates for all 4 roles · reads current game week automatically</span>
+          <button class="btn green" style="margin-left:auto;font-size:11px" :disabled="staffGenLoading" @click="generateApplicants()">
+            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate Now'}}
+          </button>
+        </div>
+        <div v-if="staffGenMsg" :style="{color:staffGenMsg.startsWith('⚠')?'#ff7b72':'#ffa657',fontSize:'12px',marginBottom:'8px'}">{{staffGenMsg}}</div>
+        <div v-if="staffGenResults">
+          <div style="font-size:10px;color:#8b949e;margin-bottom:8px">Week {{staffGenResults.week}} · candidates will appear in-game after the week transition</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
+            <div v-for="(cands, role) in staffGenResults.byRole" :key="role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
+              <div style="font-weight:700;color:#79c0ff;font-size:11px;margin-bottom:6px">{{role}}</div>
+              <div v-for="(c, i) in cands" :key="i" style="display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px solid #21262d">
+                <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
+                <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || c.Name || '?'}}</span>
+                <span :class="ratingClass(c.rating||c.r)" style="font-size:11px;font-weight:700">r{{c.rating||c.r||'?'}}</span>
+              </div>
+              <div v-if="!cands.length" class="c-gray" style="font-size:11px;font-style:italic">No candidates</div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="!staffGenLoading" class="c-gray" style="font-size:11px">Hit "Generate Now" to preview upcoming staff candidates before the week turns over.</div>
+      </div>
+
+      <!-- ── FACILITY LEVEL REFERENCE ── -->
+      <div style="margin-top:20px">
+        <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facility Level Reference</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="color:#8b949e;border-bottom:1px solid #21262d">
+                <th style="text-align:left;padding:5px 8px;font-weight:600">Lv</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏋️ Training</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🔭 Scouting</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🎓 Academy</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏥 Medical</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">📊 Analytics</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏟️ Stadium</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="lv in [1,2,3,4,5]" :key="lv"
+                  :style="{borderBottom:'1px solid #21262d', background: clubFacilities && ([clubFacilities.training,clubFacilities.academy,clubFacilities.scouting,clubFacilities.medical,clubFacilities.analytics,clubFacilities.stadium].some(f=>(f&&(f.current===lv||(f.upgrading&&f.level===lv-1)))) ? '#1c2128' : 'transparent')}">
+                <td style="padding:5px 8px;font-weight:700;color:#e6edf3">{{lv}}</td>
+                <td style="padding:5px 8px;color:#7ee787">
+                  <span v-if="lv===1" class="c-gray">Base</span>
+                  <span v-else>+{{(lv-1)*20}}%</span>
+                </td>
+                <td style="padding:5px 8px;color:#79c0ff">
+                  {{lv>=5?5:lv>=4?4:3}} slots<span v-if="lv>=3"> · +{{lv>=5?2:1}} rating</span>
+                </td>
+                <td style="padding:5px 8px;color:#d2a8ff">
+                  {{['15.0','17.5','19.8','22.0','24.1'][lv-1]}}% big-jump
+                </td>
+                <td style="padding:5px 8px;color:#ffa657">
+                  Physio {{lv}}/5
+                </td>
+                <td style="padding:5px 8px;color:#ffa657">
+                  Asst. {{lv}}/5
+                </td>
+                <td style="padding:5px 8px;color:#8b949e">
+                  {{['~30k','~40k','~50k','~60k','max'][lv-1]}} seats
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:10px;color:#6e7681;margin-top:5px">
+          Training = XP gain multiplier · Scouting = weekly scout slots &amp; prospect rating boost · Academy = big-jump training chance · Medical = Physio tier cap → injury &amp; recovery · Analytics = Assistant tier cap → automation features · Stadium = matchday capacity &amp; CEO quality
+        </div>
+      </div>
+
+    </div>
+      </div>
+
+  <!-- ── ESPIONAGE TAB ── -->
+      <div v-if="activeTab==='espionage'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading -->
+    <div v-if="espionageLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🕵</div>
+      <div class="c-gray" style="margin-bottom:12px">{{espionageMsg||'Loading all clubs…'}}</div>
+      <div style="width:260px;margin:0 auto">
+        <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+          <div :style="{width:espionageProgress+'%',height:'100%',background:'linear-gradient(90deg,#1f6feb,#8957e5)',borderRadius:'4px',transition:'width .3s'}"></div>
+        </div>
+      </div>
+      <div class="c-gray" style="font-size:11px;margin-top:8px">{{espionageProgress}}% · first load ~30 seconds · cached 30 min</div>
+    </div>
+
+    <!-- Auto-loading spinner (tab watcher triggers loadEspionage automatically) -->
+    <div v-else-if="!espionageLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🕵</div>
+      <div class="c-gray">Loading espionage data…</div>
+      <div class="c-gray" style="font-size:11px;margin-top:6px">First load ~30 seconds · cached 30 min</div>
+    </div>
+
+    <!-- Loaded -->
+    <template v-if="espionageLoaded">
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #21262d;flex-wrap:wrap;align-items:center">
+        <button v-for="t in [{id:'clubs',label:'🏟 All Clubs'},{id:'negos',label:'💰 Negotiations'}]" :key="t.id"
+          @click="espionageSubTab=t.id"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:9px 16px;cursor:pointer;font-size:13px;margin-bottom:-1px;transition:all .1s"
+          :style="espionageSubTab===t.id?{borderBottomColor:'#79c0ff',color:'#e6edf3',fontWeight:'600'}:{color:'#8b949e'}">
+          {{t.label}}
+        </button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span v-if="espionageCacheDate" class="c-gray" style="font-size:10px">cached {{espionageCacheDate}}</span>
+          <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <!-- ALL CLUBS sub-tab -->
+      <div v-if="espionageSubTab==='clubs'">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="text" v-model="espionageSearch" placeholder="Search club…" style="width:180px">
+          <select v-model="espionageSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+            <option value="club">Club A→Z</option>
+            <option value="ceo_d">CEO rating ↓</option>
+            <option value="td_d">TD rating ↓</option>
+            <option value="asst_d">Assistant ↓</option>
+            <option value="physio_d">Physio ↓</option>
+            <option value="training_d">Training Lv ↓</option>
+            <option value="scouting_d">Scouting Lv ↓</option>
+            <option value="academy_d">Academy Lv ↓</option>
+          </select>
+          <span class="c-gray" style="font-size:11px">{{espionageFiltered.length}} clubs</span>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table style="font-size:11px">
+            <thead>
+              <tr>
+                <th style="min-width:120px">Club</th>
+                <th title="CEO rating">CEO</th>
+                <th title="Technical Director rating">TD</th>
+                <th title="Assistant rating">Asst</th>
+                <th title="Physio rating">Physio</th>
+                <th title="Training facility level">Trn</th>
+                <th title="Scouting facility level">Sct</th>
+                <th title="Academy facility level">Aca</th>
+                <th title="Medical facility level">Med</th>
+                <th title="Analytics facility level">Ana</th>
+                <th title="Stadium facility level">Std</th>
+                <th title="Active open job ads">Ads</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in espionageFiltered" :key="c.club"
+                  :style="{background:c.club===myClub?'#1f3a1f':'transparent'}">
+                <td style="font-weight:600">
+                  {{c.club}}
+                  <span v-if="c.club===myClub" style="color:#ffa657;font-size:10px"> ★</span>
+                  <span v-if="c.project" class="c-orange" style="font-size:10px" :title="'Upgrading '+c.project.key+' Lv'+c.project.from+'→'+c.project.to"> 🔨</span>
+                </td>
+                <td :class="espRatingClass(c.current?.CEO?.rating)">{{c.current?.CEO?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.['Technical Director']?.rating)">{{c.current?.['Technical Director']?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Assistant?.rating)">{{c.current?.Assistant?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Physio?.rating)">{{c.current?.Physio?.rating||'—'}}</td>
+                <td :class="espFacClass(c.levels?.training)" style="text-align:center">{{c.levels?.training||'—'}}</td>
+                <td :class="espFacClass(c.levels?.scouting)" style="text-align:center">{{c.levels?.scouting||'—'}}</td>
+                <td :class="espFacClass(c.levels?.academy)" style="text-align:center">{{c.levels?.academy||'—'}}</td>
+                <td :class="espFacClass(c.levels?.medical)" style="text-align:center">{{c.levels?.medical||'—'}}</td>
+                <td :class="espFacClass(c.levels?.analytics)" style="text-align:center">{{c.levels?.analytics||'—'}}</td>
+                <td :class="espFacClass(c.levels?.stadium)" style="text-align:center">{{c.levels?.stadium||'—'}}</td>
+                <td style="text-align:center">
+                  <span v-if="c.ads && c.ads.length" class="c-orange" style="font-size:10px;font-weight:700">{{c.ads.length}}</span>
+                  <span v-else class="c-gray">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NEGOTIATIONS sub-tab -->
+      <div v-if="espionageSubTab==='negos'">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="text" v-model="espionageNegoSearch" placeholder="Search player, club…" style="width:200px">
+          <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} negotiations · last 2 weeks</span>
+        </div>
+        <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
+          <table style="font-size:11px">
+            <thead>
+              <tr>
+                <th style="min-width:110px">Player</th>
+                <th>Seller → Buyer</th>
+                <th>Amount</th>
+                <th>State</th>
+                <th style="min-width:80px">Outcome</th>
+                <th>Updated</th>
+                <th style="width:28px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="n in espionageNegoFiltered" :key="n.id">
+                <tr :style="{cursor:n.history&&n.history.length>1?'pointer':'default',background:negoExpandedId===n.id?'#161b22':'transparent'}"
+                    @click="n.history&&n.history.length>1 && (negoExpandedId = negoExpandedId===n.id ? null : n.id)">
+                  <!-- Player — click opens profile -->
+                  <td style="font-weight:600">
+                    <span @click.stop="openPlayerByName(n.playerName)"
+                          style="cursor:pointer;color:#79c0ff;border-bottom:1px dotted #79c0ff40">
+                      {{n.playerName||'?'}}
+                    </span>
+                  </td>
+                  <!-- Seller → Buyer -->
+                  <td style="white-space:nowrap">
+                    <span :style="{color:n.seller===myClub?'#ffa657':'#e6edf3'}">{{n.seller||'?'}}</span>
+                    <span class="c-gray"> → </span>
+                    <span :style="{color:n.buyer===myClub?'#7ee787':'#e6edf3'}">{{n.buyer||'?'}}</span>
+                  </td>
+                  <!-- Amount -->
+                  <td style="font-weight:700">{{n.amount&&n.amount>1?fmtVal(n.amount):'—'}}</td>
+                  <!-- State: pending = offer sent, counter = back-and-forth in progress -->
+                  <td style="white-space:nowrap">
+                    <span v-if="n.status==='pending'" :style="{background:'#1f3a5a',color:'#79c0ff',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">📨 Offer out</span>
+                    <span v-else-if="n.status==='counter'||n.status==='countered'" :style="{background:'#4a3a10',color:'#ffa657',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">
+                      🔄 {{n.lastActionBy==='buyer'?'Buyer':'Seller'}} countered
+                    </span>
+                    <span v-else-if="n.status==='accepted'" :style="{background:'#1a4a2e',color:'#7ee787',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✓ Accepted</span>
+                    <span v-else-if="n.status==='rejected'" :style="{background:'#3a1212',color:'#ff7b72',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✗ Rejected</span>
+                    <span v-else :style="negoStatusStyle(n.status)">{{n.status||'—'}}</span>
+                  </td>
+                  <!-- Outcome / sub-status -->
+                  <td style="font-size:10px;white-space:nowrap">
+                    <span v-if="n.subStatus" :style="negoSubStatusStyle(n.subStatus)">{{fmtSubStatus(n.subStatus)}}</span>
+                    <span v-else-if="n.via" class="c-gray">via {{n.via}}</span>
+                    <span v-else class="c-gray">—</span>
+                  </td>
+                  <!-- Last activity -->
+                  <td class="c-gray" style="font-size:10px;white-space:nowrap">{{fmtNegoDate(n.updatedAt)}}</td>
+                  <!-- History toggle — only show if >1 bid so it's actually useful -->
+                  <td style="text-align:center;color:#8b949e;font-size:10px">
+                    <span v-if="n.history&&n.history.length>1" style="cursor:pointer">
+                      {{negoExpandedId===n.id?'▲':'▼'}}{{n.history.length}}
+                    </span>
+                  </td>
+                </tr>
+                <!-- Bid history expansion — shows the back-and-forth -->
+                <tr v-if="negoExpandedId===n.id&&n.history&&n.history.length>1" :key="'h-'+n.id">
+                  <td colspan="7" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
+                    <div style="font-size:10px;font-weight:600;color:#8b949e;margin-bottom:6px">Bid history ({{n.history.length}} rounds)</div>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      <div v-for="(h,hi) in n.history" :key="hi"
+                           style="display:flex;align-items:center;gap:10px">
+                        <span class="c-gray" style="font-size:9px;min-width:55px">{{fmtNegoDate(h.ts)}}</span>
+                        <span :style="{
+                          color: h.type==='counter'?'#ffa657': h.type==='offer'?'#79c0ff':'#8b949e',
+                          fontSize:'10px', fontWeight:'700', minWidth:'55px'
+                        }">{{h.type==='counter'?'↩ Counter':h.type==='offer'?'📨 Offer':h.type||'—'}}</span>
+                        <span style="font-weight:700;font-size:11px">{{h.amount&&h.amount>1?fmtVal(h.amount):'—'}}</span>
+                        <span v-if="h.by" class="c-gray" style="font-size:9px">by {{h.by}}</span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found in the last 2 weeks.</div>
+      </div>
+    </template>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAYER PROFILE MODAL -->
+  <div v-if="selectedPlayer" class="modal-overlay" @click.self="closeModal()">
+    <div class="modal">
+      <button class="modal-close" @click="closeModal()">✕</button>
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span :class="'pos pos-'+selectedPlayer.Position" style="font-size:12px">{{selectedPlayer.Position}}</span>
+            <span style="font-size:20px;font-weight:700;color:#e6edf3">{{selectedPlayer.Player}}</span>
+            <span v-if="selectedPlayer._transferListed" style="background:#238636;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">FOR SALE <span v-if="selectedPlayer._listingAsk" style="opacity:.85">· ask {{fmtVal(selectedPlayer._listingAsk)}}</span><span v-if="selectedPlayer._listingBids" style="opacity:.7"> · {{selectedPlayer._listingBids}} bid{{selectedPlayer._listingBids!==1?'s':''}}</span></span>
+            <span v-if="selectedPlayer.notForSale" style="background:#6e3a0b;color:#ffa657;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">NOT FOR SALE</span>
+          </div>
+          <div class="c-gray" style="font-size:12px">
+            <span :class="'league-tag lg-'+(selectedPlayer._league||'other')" style="cursor:default;font-size:10px">{{selectedPlayer._league||'?'}}</span>
+            {{selectedPlayer.Club}}
+            <span v-if="!selectedPlayer._managed" class="c-red"> · No manager 🔴</span>
+            <span v-if="selectedPlayer.Club===myClub" class="c-orange"> · My team ★</span>
+          </div>
+          <div class="c-gray" style="font-size:11px;margin-top:4px">
+            {{selectedPlayer.Nationality}} · Age {{selectedPlayer.Age}} · {{selectedPlayer.PreferredFoot||'?'}} footed · DOB {{selectedPlayer.DOB||'?'}}
+          </div>
+        </div>
+        <!-- Overall rating -->
+        <div style="text-align:center;min-width:64px">
+          <div :class="['pos-rating-num',ratingClass(selectedPlayer._gameRating||selectedPlayer.Rating)]">{{(selectedPlayer._gameRating||selectedPlayer.Rating)?(selectedPlayer._gameRating||selectedPlayer.Rating).toFixed(1):'—'}}</div>
+          <div class="c-gray" style="font-size:10px">Overall</div>
+        </div>
+      </div>
+
+      <!-- Incomplete stats banner -->
+      <div v-if="selectedPlayer._incompleteStats" style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">🌱</span>
+        <span style="color:#79c0ff">Partial attribute data — this player was likely recently promoted from the youth team. Only their primary position attributes are loaded; other stats will populate over time.</span>
+      </div>
+
+      <!-- Scout job context (shown when opened from Youth tab) -->
+      <div v-if="selectedJobCtx" style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px 12px;margin-bottom:14px;font-size:12px">
+        <div style="font-size:10px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
+          🔭 Scouting Job Info
+          <span v-if="selectedJobCtx._club" style="background:#1f2d3d;color:#79c0ff;border:1px solid #388bfd40;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;text-transform:none;margin-left:8px">{{selectedJobCtx._club}}</span>
+          <span v-if="selectedJobCtx._club && youthClubInfoMap[selectedJobCtx._club]" style="font-size:10px;color:#8b949e;font-weight:400;text-transform:none;margin-left:4px">Scout Lv {{youthClubInfoMap[selectedJobCtx._club].facilities?.levels?.scouting||'?'}} · Bump +{{youthClubInfoMap[selectedJobCtx._club].staff?.scouting?.qualityBump||0}}</span>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+          <div>
+            <span class="c-gray">Stage: </span>
+            <span style="display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle">
+              <span v-for="i in 7" :key="i" :style="{width:'8px',height:'8px',borderRadius:'50%',display:'inline-block',background:i<=selectedJobCtx.stage?(selectedJobCtx.stage>=7?'#7ee787':'#ffa657'):'#21262d'}"></span>
+            </span>
+            <span v-if="selectedJobCtx.stage>=7" style="font-size:10px;color:#7ee787;font-weight:700;margin-left:5px">✓ FULLY REVEALED</span>
+            <span v-else class="c-gray" style="font-size:10px;margin-left:4px">{{selectedJobCtx.stage}}/7</span>
+          </div>
+          <div>
+            <span class="c-gray">Game hint: </span>
+            <span style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:12px;padding:2px 9px;font-size:11px;color:#79c0ff;font-weight:600">{{selectedJobCtx.hints?.ratingBand?.min}}–{{selectedJobCtx.hints?.ratingBand?.max}}</span>
+          </div>
+          <div>
+            <span class="c-gray">Strength hint: </span>
+            <span class="c-orange">{{selectedJobCtx.hints?.strength?.key}} {{selectedJobCtx.hints?.strength?.value}}</span>
+          </div>
+          <div v-if="selectedJobCtx.buyNow">
+            <span class="c-gray">Buy now: </span>
+            <span class="c-orange" style="font-weight:700">{{fmtVal(selectedJobCtx.buyNow)}}</span>
+          </div>
+          <div v-if="selectedJobCtx.status==='rejected'" style="font-size:11px;color:#8b949e">
+            ⚠ Stats from scouting date — may be outdated
+            <button class="btn" style="font-size:10px;padding:2px 7px;margin-left:8px" @click="refreshYouthJob(selectedJobCtx)">
+              {{selectedJobCtx._refreshing?'…':selectedJobCtx._refreshed?'✓ Refreshed':selectedJobCtx._refreshFailed?'✗ Not found':'↻ Refresh Stats'}}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Position ratings by position -->
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">
+          Position Ratings
+          <span class="c-gray" style="font-size:10px;font-weight:400;text-transform:none">GmRtg = avg of 4 key attrs · WRtg = +{{mentalWeightPct}}% mental · click row to highlight attrs</span>
+        </div>
+        <table style="width:100%;font-size:11px;border-collapse:collapse">
+          <thead>
+            <tr style="background:#0d1117">
+              <th style="text-align:left;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">Pos</th>
+              <th style="text-align:left;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">Key Attributes</th>
+              <th style="text-align:right;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">GmRtg</th>
+              <th style="text-align:right;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">WRtg</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in allPosRatings(selectedPlayer)" :key="row.pos"
+                :style="{background: row.pos===highlightedPos?'#1a2f5a':row.isNative?'#1f3a1f':'transparent', borderBottom:'1px solid #21262d', cursor:'pointer'}"
+                :title="row.pos===highlightedPos?'Click to clear highlight':'Click to highlight '+row.pos+' key attrs'"
+                @click="highlightedPos = highlightedPos===row.pos ? null : row.pos">
+              <td style="padding:4px 6px">
+                <span :class="'pos pos-'+row.pos" style="font-size:10px">{{row.pos}}</span>
+                <span v-if="row.isNative" style="font-size:9px;color:#7ee787;margin-left:4px">★</span>
+                <span v-if="row.pos===highlightedPos" style="font-size:9px;color:#79c0ff;margin-left:3px">◀</span>
+              </td>
+              <td style="padding:4px 6px;color:#8b949e;font-size:10px">{{row.attrs}}</td>
+              <td style="padding:4px 6px;text-align:right;font-weight:700" :class="ratingClass(row.game)">{{row.game?row.game.toFixed(1):'—'}}</td>
+              <td style="padding:4px 6px;text-align:right" :class="ratingClass(row.weighted)">
+                <span style="font-weight:700">{{row.weighted?row.weighted.toFixed(1):'—'}}</span>
+                <span v-if="row.weighted&&row.game&&row.weighted!==row.game" style="font-size:9px;margin-left:2px" :class="row.weighted>row.game?'c-green':'c-red'">{{row.weighted>row.game?'▲':'▼'}}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Value + contract block -->
+      <div style="margin-bottom:16px">
+        <div class="pos-rating-block" style="flex-direction:column;align-items:flex-start;gap:4px">
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="c-gray" style="font-size:11px">In-game value</span>
+            <span style="font-weight:700">{{fmtVal(selectedPlayer.Value)}}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="c-gray" style="font-size:11px" :title="selectedPlayer._lastTransfer?'Based on last real transfer':'Formula estimate (no transfer history)'">
+              {{selectedPlayer._lastTransfer?'Last transfer fee':'Est. true value'}}
+            </span>
+            <span style="font-weight:700;color:#ffa657">{{fmtVal(selectedPlayer._estValue)||'—'}}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="c-gray" style="font-size:11px">Weekly wage</span>
+            <span>{{fmtWage(selectedPlayer.weeklyWage)}}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="c-gray" style="font-size:11px">Contract</span>
+            <span>{{selectedPlayer.contractWeeks}} wks</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer history -->
+      <template v-if="selectedPlayer._transferHistory && selectedPlayer._transferHistory.length">
+        <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Transfer History <span class="c-gray" style="font-size:10px;font-weight:400;text-transform:none">(dimmed = Saudi/Tamaguchi; excluded from true value)</span></div>
+        <div style="margin-bottom:16px">
+          <div v-for="(tx,i) in selectedPlayer._transferHistory" :key="i" class="attr-row" style="margin-bottom:4px;padding:5px 8px"
+               :style="tx.isReal?{}:{opacity:'0.55'}">
+            <div style="display:flex;justify-content:space-between;width:100%;gap:8px;align-items:center">
+              <span :style="{fontWeight:700,color:tx.isReal?'#ffa657':'#8b949e',minWidth:'72px'}">{{fmtVal(tx.amount)}}</span>
+              <span class="c-gray" style="flex:1;font-size:11px">{{tx.seller||'?'}} → {{tx.buyer||'?'}}</span>
+              <span style="font-size:10px;text-transform:capitalize" :class="tx.isReal?'c-gray':'c-red'">{{tx.via}}</span>
+              <span class="c-gray" style="font-size:10px;min-width:60px;text-align:right">{{tx.date?new Date(tx.date).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):''}}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Season stats -->
+      <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Season Stats</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:16px">
+        <div class="attr-row"><span class="c-gray">Games</span><span style="font-weight:700">{{selectedPlayer.Games||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">Minutes</span><span style="font-weight:700">{{selectedPlayer.Minutes||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">Avg Rtg</span><span :class="ratingClass(selectedPlayer['Average Rating'])">{{selectedPlayer['Average Rating']?selectedPlayer['Average Rating'].toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Goals</span><span class="c-green" style="font-weight:700">{{selectedPlayer.Goals||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">xG</span><span class="c-orange">{{selectedPlayer.xG!=null?selectedPlayer.xG.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Assists</span><span class="c-blue" style="font-weight:700">{{selectedPlayer.Assists||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">xA</span><span>{{selectedPlayer.xA!=null?selectedPlayer.xA.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">G/90</span><span class="c-green">{{selectedPlayer._g90!=null?selectedPlayer._g90.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">A/90</span><span class="c-blue">{{selectedPlayer._a90!=null?selectedPlayer._a90.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">xG/90</span><span class="c-orange">{{selectedPlayer._xG90!=null?selectedPlayer._xG90.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">xA/90</span><span>{{selectedPlayer._xA90!=null?selectedPlayer._xA90.toFixed(2):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Yellow</span><span :class="(selectedPlayer.Yellow||0)>=2?'c-orange':''">{{selectedPlayer.Yellow||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">Red</span><span :class="(selectedPlayer.Red||0)>=1?'c-red':''">{{selectedPlayer.Red||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">Tackle%</span><span>{{selectedPlayer['Tackle %']!=null?selectedPlayer['Tackle %'].toFixed(0)+'%':'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Pass%</span><span>{{selectedPlayer['Pass %']!=null?selectedPlayer['Pass %'].toFixed(0)+'%':'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Steals</span><span>{{selectedPlayer.Steals||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">Errors</span><span :class="(selectedPlayer.Mistakes||0)>2?'c-red':''">{{selectedPlayer.Mistakes||0}}</span></div>
+        <div class="attr-row"><span class="c-gray">POTM</span><span class="c-orange">{{selectedPlayer.POTM||0}}</span></div>
+      </div>
+
+      <!-- Physical + Mental -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div>
+          <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Physical & Technical</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div v-for="attr in physicalAttrs" :key="attr.k"
+                 :style="{background:isKeyAttr(attr.k,selectedPlayer.Position)?'#0f2a14':'#0d1117',borderRadius:'5px',padding:'5px 8px',outline:isKeyAttr(attr.k,selectedPlayer.Position)?'1px solid #238636':'none'}">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:11px;color:#8b949e">
+                  {{attr.l}}<span v-if="isKeyAttr(attr.k,selectedPlayer.Position)" style="color:#7ee787;font-size:9px;margin-left:3px">★</span>
+                </span>
+                <span :style="{color:attrBarColor(selectedPlayer[attr.k]),fontWeight:'700',fontSize:'13px'}">
+                  {{selectedPlayer[attr.k]!=null?Math.round(selectedPlayer[attr.k]):'—'}}
+                </span>
+              </div>
+              <div style="height:5px;background:#21262d;border-radius:3px;overflow:hidden">
+                <div :style="{width:Math.min(100,selectedPlayer[attr.k]||0)+'%',height:'100%',background:attrBarColor(selectedPlayer[attr.k]),borderRadius:'3px',transition:'width .3s'}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Mental & Set Pieces</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div v-for="attr in mentalAttrs" :key="attr.k"
+                 style="background:#0d1117;border-radius:5px;padding:5px 8px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:11px;color:#8b949e">{{attr.l}}</span>
+                <span :style="{color:attrBarColor(selectedPlayer[attr.k]),fontWeight:'700',fontSize:'13px'}">
+                  {{selectedPlayer[attr.k]!=null?Math.round(selectedPlayer[attr.k]):'—'}}
+                </span>
+              </div>
+              <div style="height:5px;background:#21262d;border-radius:3px;overflow:hidden">
+                <div :style="{width:Math.min(100,selectedPlayer[attr.k]||0)+'%',height:'100%',background:attrBarColor(selectedPlayer[attr.k]),borderRadius:'3px',transition:'width .3s'}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fitness/form -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px">
+        <div class="attr-row"><span class="c-gray">Fitness</span><span :class="selectedPlayer.fitnessPct<70?'c-red':selectedPlayer.fitnessPct<85?'c-orange':'c-green'" style="font-weight:700">{{selectedPlayer.fitnessPct!=null?selectedPlayer.fitnessPct+'%':'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Form</span><span :class="ratingClass(selectedPlayer.Form)" style="font-weight:700">{{selectedPlayer.Form?selectedPlayer.Form.toFixed(1):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Confidence</span><span :style="{color:attrBarColor(selectedPlayer.Confidence),fontWeight:'700'}">{{selectedPlayer.Confidence!=null?Math.round(selectedPlayer.Confidence):'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Morale</span><span>{{selectedPlayer.moraleOverrideLabel||selectedPlayer.moraleLabel||'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Inj. Risk</span><span :class="selectedPlayer.injuryRiskLabel==='High'?'c-red':selectedPlayer.injuryRiskLabel==='Moderate'?'c-orange':'c-green'">{{selectedPlayer.injuryRiskLabel||'—'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Injured</span><span>{{selectedPlayer.injured?'🤕 Yes':'No'}}</span></div>
+        <div class="attr-row"><span class="c-gray">Suspended</span><span>{{selectedPlayer.suspended?'🚫 Yes':'No'}}</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
