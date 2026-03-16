@@ -57,7 +57,9 @@ const PLAYERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 // When running via server.py, these persist across browser cache clears and
 // are shared across all devices on the same network / Tailscale VPN.
 // All three fall back silently to localStorage if the server is unreachable.
-const SF_CACHE_BASE = '/sf-cache';
+const SF_CACHE_BASE = location.hostname === 'ofersi15.github.io'
+  ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
+  : '/sf-cache';
 async function serverCacheGet(key) {
   if (location.protocol === 'file:') return null;  // no server when opened from disk
   try {
@@ -206,7 +208,7 @@ createApp({
       posRatingsOpen: false,
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
-      activeTab: 'squad',
+      activeTab: localStorage.getItem('sf_activeTab') || 'squad',
       tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 Club'},{id:'espionage',label:'🕵 Espionage'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
@@ -239,6 +241,8 @@ createApp({
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
       // Generate applicants
       staffGenLoading: false, staffGenMsg: '', staffGenResults: null, staffGenWeek: '',
+      staffAdsLoading: false, staffAdsPosted: false, staffAdsMsg: '',
+      tblSort: {}, negoSort: 'date_d',
       // Saved lineup
       savedLineup: null,
       // Espionage tab
@@ -375,17 +379,41 @@ createApp({
       else if (s === 'training_d') list.sort((a,b) => getLvl(b,'training') - getLvl(a,'training'));
       else if (s === 'scouting_d') list.sort((a,b) => getLvl(b,'scouting') - getLvl(a,'scouting'));
       else if (s === 'academy_d') list.sort((a,b) => getLvl(b,'academy') - getLvl(a,'academy'));
+      else if (s === 'medical_d') list.sort((a,b) => getLvl(b,'medical') - getLvl(a,'medical'));
+      else if (s === 'analytics_d') list.sort((a,b) => getLvl(b,'analytics') - getLvl(a,'analytics'));
+      else if (s === 'stadium_d') list.sort((a,b) => getLvl(b,'stadium') - getLvl(a,'stadium'));
+      else if (s === 'ads_d') list.sort((a,b) => (b.openAds?.length||0) - (a.openAds?.length||0));
+      else if (s === 'club_d') list.sort((a,b) => b.club.localeCompare(a.club));
+      else if (s === 'ceo_a') list.sort((a,b) => getRating(a,'CEO') - getRating(b,'CEO'));
+      else if (s === 'td_a') list.sort((a,b) => getRating(a,'Technical Director') - getRating(b,'Technical Director'));
+      else if (s === 'asst_a') list.sort((a,b) => getRating(a,'Assistant') - getRating(b,'Assistant'));
+      else if (s === 'physio_a') list.sort((a,b) => getRating(a,'Physio') - getRating(b,'Physio'));
+      else if (s === 'training_a') list.sort((a,b) => getLvl(a,'training') - getLvl(b,'training'));
+      else if (s === 'scouting_a') list.sort((a,b) => getLvl(a,'scouting') - getLvl(b,'scouting'));
+      else if (s === 'academy_a') list.sort((a,b) => getLvl(a,'academy') - getLvl(b,'academy'));
+      else if (s === 'medical_a') list.sort((a,b) => getLvl(a,'medical') - getLvl(b,'medical'));
+      else if (s === 'analytics_a') list.sort((a,b) => getLvl(a,'analytics') - getLvl(b,'analytics'));
+      else if (s === 'stadium_a') list.sort((a,b) => getLvl(a,'stadium') - getLvl(b,'stadium'));
+      else if (s === 'ads_a') list.sort((a,b) => (a.openAds?.length||0) - (b.openAds?.length||0));
       else list.sort((a,b) => a.club.localeCompare(b.club));
       return list;
     },
     espionageNegoFiltered() {
-      if (!this.espionageNegoSearch.trim()) return this.espionageNegos;
-      const q = this.espionageNegoSearch.trim().toLowerCase();
-      return this.espionageNegos.filter(n =>
+      const q = (this.espionageNegoSearch||'').trim().toLowerCase();
+      let list = q ? this.espionageNegos.filter(n =>
         (n.playerName||'').toLowerCase().includes(q) ||
         (n.buyer||'').toLowerCase().includes(q) ||
         (n.seller||'').toLowerCase().includes(q)
-      );
+      ) : [...this.espionageNegos];
+      const ns = this.negoSort;
+      if (ns==='player_a') list.sort((a,b)=>(a.playerName||'').localeCompare(b.playerName||''));
+      else if (ns==='player_d') list.sort((a,b)=>(b.playerName||'').localeCompare(a.playerName||''));
+      else if (ns==='fee_d') list.sort((a,b)=>(b.fee||b.amount||0)-(a.fee||a.amount||0));
+      else if (ns==='fee_a') list.sort((a,b)=>(a.fee||a.amount||0)-(b.fee||b.amount||0));
+      else if (ns==='status_a') list.sort((a,b)=>(a.status||'').localeCompare(b.status||''));
+      else if (ns==='date_a') list.sort((a,b)=>new Date(a.updatedAt||0)-new Date(b.updatedAt||0));
+      else list.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)); // date_d default
+      return list;
     },
     mySquadByPosition() {
       const order = ['GK','FB','CB','DM','CM','AM','WF','CF'];
@@ -521,10 +549,19 @@ createApp({
       if (this.youthHistPos) items = items.filter(j=>(j.player.position||j.player.Position)===this.youthHistPos);
       const s = this.youthHistSort;
       if (s==='date') return [...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+      if (s==='date_a') return [...items].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
       if (s==='rating_d') return [...items].sort((a,b)=>(b.player.rating||b.player.Rating||0)-(a.player.rating||a.player.Rating||0));
       if (s==='rating_a') return [...items].sort((a,b)=>(a.player.rating||a.player.Rating||0)-(b.player.rating||b.player.Rating||0));
       if (s==='age_a') return [...items].sort((a,b)=>(a.player.age||a.player.Age||0)-(b.player.age||b.player.Age||0));
+      if (s==='age_d') return [...items].sort((a,b)=>(b.player.age||b.player.Age||0)-(a.player.age||a.player.Age||0));
       if (s==='value_d') return [...items].sort((a,b)=>(b.player.value||b.player.Value||0)-(a.player.value||a.player.Value||0));
+      if (s==='value_a') return [...items].sort((a,b)=>(a.player.value||a.player.Value||0)-(b.player.value||b.player.Value||0));
+      if (s==='name_a') return [...items].sort((a,b)=>(a.player.name||a.player.Player||'').localeCompare(b.player.name||b.player.Player||''));
+      if (s==='name_d') return [...items].sort((a,b)=>(b.player.name||b.player.Player||'').localeCompare(a.player.name||a.player.Player||''));
+      if (s==='pos_a') return [...items].sort((a,b)=>(a.player.position||a.player.Position||'').localeCompare(b.player.position||b.player.Position||''));
+      if (s==='pos_d') return [...items].sort((a,b)=>(b.player.position||b.player.Position||'').localeCompare(a.player.position||a.player.Position||''));
+      if (s==='buynow_d') return [...items].sort((a,b)=>(b.buyNow||0)-(a.buyNow||0));
+      if (s==='buynow_a') return [...items].sort((a,b)=>(a.buyNow||0)-(b.buyNow||0));
       return items;
     },
     youthHistMaxRating() {
@@ -550,10 +587,19 @@ createApp({
       if (this.youthHistClubFilter) items = items.filter(j=>j._club===this.youthHistClubFilter);
       const s = this.youthHistSort;
       if (s==='date')     return [...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+      if (s==='date_a')   return [...items].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
       if (s==='rating_d') return [...items].sort((a,b)=>(b.player?.rating||0)-(a.player?.rating||0));
       if (s==='rating_a') return [...items].sort((a,b)=>(a.player?.rating||0)-(b.player?.rating||0));
       if (s==='age_a')    return [...items].sort((a,b)=>(a.player?.age||0)-(b.player?.age||0));
+      if (s==='age_d')    return [...items].sort((a,b)=>(b.player?.age||0)-(a.player?.age||0));
       if (s==='value_d')  return [...items].sort((a,b)=>(b.player?.value||0)-(a.player?.value||0));
+      if (s==='value_a')  return [...items].sort((a,b)=>(a.player?.value||0)-(b.player?.value||0));
+      if (s==='name_a')   return [...items].sort((a,b)=>(a.player?.name||'').localeCompare(b.player?.name||''));
+      if (s==='name_d')   return [...items].sort((a,b)=>(b.player?.name||'').localeCompare(a.player?.name||''));
+      if (s==='pos_a')    return [...items].sort((a,b)=>(a.player?.position||'').localeCompare(b.player?.position||''));
+      if (s==='pos_d')    return [...items].sort((a,b)=>(b.player?.position||'').localeCompare(a.player?.position||''));
+      if (s==='buynow_d') return [...items].sort((a,b)=>(b.buyNow||0)-(a.buyNow||0));
+      if (s==='buynow_a') return [...items].sort((a,b)=>(a.buyNow||0)-(b.buyNow||0));
       return items;
     },
     youthDaysUntilUpgrade() {
@@ -592,6 +638,7 @@ createApp({
     },
     activeTab: {
       handler(v) {
+        localStorage.setItem('sf_activeTab', v);
         if (v === 'youth') {
           if (!this.youthLoaded && !this.youthLoading) this.loadYouth();
           if (!this.youthHistLoaded && !this.youthHistLoading) this.loadYouthHistory(false);
@@ -1283,6 +1330,19 @@ createApp({
         try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
 
         applyCache(newCache, rejRes.items);
+
+        // Enrich players with missing attributes from scouting job data
+        for (const job of [...(sjRes.items||[]), ...(rejRes.items||[])]) {
+          const jpStats = job.player?.stats;
+          if (!jpStats || !Object.keys(jpStats).length) continue;
+          const playerName = (job.player.name || job.player.Player || '').toLowerCase();
+          if (!playerName) continue;
+          const found = this.players.find(p => (p.Name||p.name||'').toLowerCase() === playerName);
+          if (found && found._incompleteStats) {
+            Object.assign(found, jpStats);
+            found._incompleteStats = FULL_ATTR_KEYS.filter(a=>found[a]!=null&&found[a]>0).length < 5;
+          }
+        }
       } catch(e) {
         this.youthMsg = 'Load failed: ' + (e.message || String(e));
       }
@@ -1335,7 +1395,7 @@ createApp({
 
     async loadYouthHistory(forceRefresh=false) {
       const HIST_CACHE_KEY = 'sf_youth_hist_v2';
-      const HIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+      const HIST_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
       // Check cache first
       if (!forceRefresh) {
@@ -1596,12 +1656,89 @@ createApp({
       } catch(e) { this.savedLineup = null; }
     },
 
+    // ── Generic table sort helpers ────────────────────────────────────────────
+    tblSortBy(tbl, col) {
+      const cur = this.tblSort[tbl];
+      this.tblSort = { ...this.tblSort, [tbl]: { col, dir: cur?.col === col && cur.dir === 'desc' ? 'asc' : 'desc' } };
+    },
+    tblSortIcon(tbl, col) {
+      const s = this.tblSort[tbl];
+      if (!s || s.col !== col) return '';
+      return s.dir === 'asc' ? ' ▲' : ' ▼';
+    },
+    tblSorted(arr, tbl) {
+      if (!arr) return [];
+      const s = this.tblSort[tbl];
+      if (!s || !s.col) return arr;
+      const { col, dir } = s;
+      const sign = dir === 'asc' ? 1 : -1;
+      const get = (item) => col.split('.').reduce((o, k) => o?.[k], item);
+      return [...arr].sort((a, b) => {
+        let av = get(a), bv = get(b);
+        if (av == null) return 1; if (bv == null) return -1;
+        const r = typeof av === 'string' ? av.localeCompare(bv) : Number(av) - Number(bv);
+        return sign * r;
+      });
+    },
+    // ── Youth table sort helpers ──────────────────────────────────────────────
+    youthSortBy(col) {
+      const keyMap = { name:'name_a', pos:'pos_a', age:'age_a', rating:'rating_d', value:'value_d', buyNow:'buynow_d', date:'date' };
+      const togMap = { name_a:'name_d', name_d:'name_a', pos_a:'pos_d', pos_d:'pos_a', age_a:'age_d', age_d:'age_a', rating_d:'rating_a', rating_a:'rating_d', value_d:'value_a', value_a:'value_d', buynow_d:'buynow_a', buynow_a:'buynow_d', date:'date_a', date_a:'date' };
+      const target = keyMap[col]; if (!target) return;
+      this.youthHistSort = this.youthHistSort === target ? (togMap[target] || target) : target;
+    },
+    youthSortIcon(col) {
+      const s = this.youthHistSort;
+      const asc = { name:'name_a', pos:'pos_a', age:'age_a', rating:'rating_a', value:'value_a', buyNow:'buynow_a', date:'date_a' };
+      const desc = { name:'name_d', pos:'pos_d', age:'age_d', rating:'rating_d', value:'value_d', buyNow:'buynow_d', date:'date' };
+      if (s === asc[col]) return ' ▲';
+      if (s === desc[col]) return ' ▼';
+      return '';
+    },
+    // ── Espionage table sort helpers ──────────────────────────────────────────
+    espSortBy(col) {
+      const keyMap = { club:'club', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
+      const togMap = { club:'club_d', club_d:'club', ceo_d:'ceo_a', ceo_a:'ceo_d', td_d:'td_a', td_a:'td_d', asst_d:'asst_a', asst_a:'asst_d', physio_d:'physio_a', physio_a:'physio_d', training_d:'training_a', training_a:'training_d', scouting_d:'scouting_a', scouting_a:'scouting_d', academy_d:'academy_a', academy_a:'academy_d', medical_d:'medical_a', medical_a:'medical_d', analytics_d:'analytics_a', analytics_a:'analytics_d', stadium_d:'stadium_a', stadium_a:'stadium_d', ads_d:'ads_a', ads_a:'ads_d' };
+      const target = keyMap[col]; if (!target) return;
+      this.espionageSort = this.espionageSort === target ? (togMap[target] || target) : target;
+    },
+    espSortIcon(col) {
+      const s = this.espionageSort;
+      const aKeys = { club:'club', ceo:'ceo_a', td:'td_a', asst:'asst_a', physio:'physio_a', training:'training_a', scouting:'scouting_a', academy:'academy_a', medical:'medical_a', analytics:'analytics_a', stadium:'stadium_a', ads:'ads_a' };
+      const dKeys = { club:'club_d', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
+      if (s === aKeys[col]) return ' ▲';
+      if (s === dKeys[col]) return ' ▼';
+      return '';
+    },
+    // ── Negotiations sort helpers ─────────────────────────────────────────────
+    negoSortBy(col) {
+      const keyMap = { player:'player_d', parties:'parties_d', fee:'fee_d', status:'status_a', date:'date_d' };
+      const togMap = { player_d:'player_a', player_a:'player_d', parties_d:'parties_a', parties_a:'parties_d', fee_d:'fee_a', fee_a:'fee_d', status_a:'status_d', status_d:'status_a', date_d:'date_a', date_a:'date_d' };
+      const target = keyMap[col]; if (!target) return;
+      this.negoSort = this.negoSort === target ? (togMap[target] || target) : target;
+    },
+    negoSortIcon(col) {
+      const s = this.negoSort;
+      const aKeys = { player:'player_a', parties:'parties_a', fee:'fee_a', status:'status_a', date:'date_a' };
+      const dKeys = { player:'player_d', parties:'parties_d', fee:'fee_d', status:'status_d', date:'date_d' };
+      if (s === aKeys[col]) return ' ▲';
+      if (s === dKeys[col]) return ' ▼';
+      return '';
+    },
+
     // ── Generate applicants ───────────────────────────────────────────────────
     async generateApplicants() {
       this.staffGenLoading = true;
       this.staffGenResults = null;
       try {
-        const week = this.staffGenWeek || this.asOfWeek;
+        let week = this.staffGenWeek;
+        if (!week) {
+          try {
+            const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(3000)}).then(r=>r.json());
+            if (gameRes?.week && Number.isInteger(gameRes.week)) week = gameRes.week;
+          } catch(e) {}
+        }
+        if (!week) week = this.asOfWeek;
         const token = localStorage.getItem('token') || '';
         const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
@@ -1641,6 +1778,34 @@ createApp({
       } finally {
         this.staffGenLoading = false;
       }
+    },
+
+    async postAdsOnly() {
+      this.staffAdsLoading = true;
+      this.staffAdsMsg = '';
+      this.staffAdsPosted = false;
+      try {
+        const token = localStorage.getItem('token') || '';
+        const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+        const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
+        for (const role of ROLES) {
+          await fetch(`${API}/staff/ads`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ club: MY_CLUB, role }),
+          }).catch(() => {});
+        }
+        this.staffAdsPosted = true;
+        this.staffAdsMsg = '✓ Ads posted for all 4 roles';
+      } catch(e) {
+        this.staffAdsMsg = '⚠ ' + e.message;
+      } finally {
+        this.staffAdsLoading = false;
+      }
+    },
+    rejectCandidate(role, idx) {
+      if (!this.staffGenResults) return;
+      this.staffGenResults.byRole[role].splice(idx, 1);
     },
 
     // ── Espionage ─────────────────────────────────────────────────────────────
