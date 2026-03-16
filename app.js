@@ -1602,11 +1602,29 @@ createApp({
       this.staffGenResults = null;
       try {
         const week = this.staffGenWeek || this.asOfWeek;
-        this.staffGenMsg = `Fetching week ${week} applicants…`;
-        const res = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}&week=${week}`);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const data = await res.json();
-        const candidates = Array.isArray(data) ? data : (data.applicants || []);
+        const token = localStorage.getItem('token') || '';
+        const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+        const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
+        this.staffGenMsg = `Week ${week} — posting ads…`;
+        for (const role of ROLES) {
+          await fetch(`${API}/staff/ads`, {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({ club: MY_CLUB, role }),
+          }).catch(() => {});
+        }
+        this.staffGenMsg = 'Generating candidates…';
+        const genRes = await fetch(`${API}/staff/generate`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ club: MY_CLUB, week }),
+        });
+        if (!genRes.ok) {
+          const txt = await genRes.text();
+          throw new Error(`${genRes.status} ${genRes.statusText} — ${txt.slice(0,120)}`);
+        }
+        const gen = await genRes.json();
+        const candidates = Array.isArray(gen) ? gen : (gen.applicants || []);
         const byRole = {};
         for (const c of candidates) {
           const role = c.role || c.Role || 'Unknown';
