@@ -1601,7 +1601,10 @@ createApp({
       this.staffGenLoading = true;
       this.staffGenResults = null;
       try {
-        const week = this.asOfWeek;
+        this.staffGenMsg = 'Fetching current week…';
+        const tablesRes = await fetch(`${API}/tables/from-fixtures`).then(r => r.json());
+        const week = tablesRes.meta?.asOfWeek || this.asOfWeek;
+        this.asOfWeek = week;
         this.staffGenMsg = `Fetching week ${week} applicants…`;
         const res = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}&week=${week}`);
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
