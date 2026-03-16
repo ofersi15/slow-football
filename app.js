@@ -1599,27 +1599,14 @@ createApp({
     // ── Generate applicants ───────────────────────────────────────────────────
     async generateApplicants() {
       this.staffGenLoading = true;
-      this.staffGenMsg = 'Fetching current week…';
       this.staffGenResults = null;
       try {
-        const game = await fetch(`${API}/game`).then(r => r.json());
-        const week = game.week;
-        this.staffGenMsg = `Week ${week} — posting ads…`;
-        const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
-        for (const role of ROLES) {
-          await fetch(`${API}/staff/ads`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ club: MY_CLUB, role }),
-          }).catch(() => {});
-        }
-        this.staffGenMsg = 'Generating candidates…';
-        const gen = await fetch(`${API}/staff/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ club: MY_CLUB, week }),
-        }).then(r => r.json());
-        const candidates = Array.isArray(gen) ? gen : (gen.applicants || []);
+        const week = this.asOfWeek;
+        this.staffGenMsg = `Fetching week ${week} applicants…`;
+        const res = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}&week=${week}`);
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const data = await res.json();
+        const candidates = Array.isArray(data) ? data : (data.applicants || []);
         const byRole = {};
         for (const c of candidates) {
           const role = c.role || c.Role || 'Unknown';
@@ -1631,8 +1618,6 @@ createApp({
         }
         this.staffGenResults = { week, byRole };
         this.staffGenMsg = '';
-        // Bust club cache so staff reloads fresh after next week
-        try { localStorage.removeItem('sf_club_v1'); } catch(e) {}
       } catch(e) {
         this.staffGenMsg = '⚠ Error: ' + e.message;
       } finally {
