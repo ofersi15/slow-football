@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,3 +25,8 @@ jobs:
           git pull origin main
           git merge --no-ff origin/${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into main"
           git push origin main
+
+      - name: Disable GitHub Pages (keep site unpublished)
+        run: gh api -X DELETE /repos/${{ github.repository }}/pages --silent 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
