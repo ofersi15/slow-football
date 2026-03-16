@@ -72,4 +72,18 @@ input[type=checkbox]{accent-color:#1f6feb;cursor:pointer}
 .mb-list-item{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #21262d;cursor:pointer}
 .mb-list-item:hover{background:#1c2128;margin:0 -4px;padding:3px 4px;border-radius:4px}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
-</style>
+@media(max-width:768px){
+  .layout{flex-direction:column;height:auto;min-height:100vh;overflow:auto}
+  .sidebar{width:100%;min-width:0;border-right:none;border-bottom:1px solid #21262d;padding:8px;gap:6px}
+  .main{height:auto;overflow:visible}
+  .content{overflow:visible}
+  .card{padding:10px}
+  .header{padding:6px 10px;flex-wrap:wrap;gap:6px}
+  .tab-bar{gap:3px;flex-wrap:wrap}
+  table{font-size:11px}
+  td{padding:3px 5px}
+  th{padding:4px 5px}
+  .btn{font-size:11px;padding:3px 7px}
+  .modal{padding:14px}
+  .league-grid,.top-list-grid{padding:8px;gap:8px}
+}

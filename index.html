@@ -566,13 +566,13 @@
           </div>
           <div class="card">
             <div style="font-weight:700;margin-bottom:10px">Formation Breakdown</div>
-            <table>
-              <thead><tr>
-                <th>Formation</th><th>Common Style</th><th>Played</th><th>W</th><th>D</th><th>L</th>
-                <th>Win%</th><th>PPG</th><th>Avg GF</th><th>Avg GA</th><th>GD/g</th>
+            <div style="overflow-x:auto"><table>
+              <thead><tr style="cursor:pointer">
+                <th @click="tblSortBy('fbd','formation')">Formation{{tblSortIcon('fbd','formation')}}</th><th @click="tblSortBy('fbd','topStyle')">Common Style{{tblSortIcon('fbd','topStyle')}}</th><th @click="tblSortBy('fbd','n')">Played{{tblSortIcon('fbd','n')}}</th><th @click="tblSortBy('fbd','W')">W{{tblSortIcon('fbd','W')}}</th><th @click="tblSortBy('fbd','D')">D{{tblSortIcon('fbd','D')}}</th><th @click="tblSortBy('fbd','L')">L{{tblSortIcon('fbd','L')}}</th>
+                <th @click="tblSortBy('fbd','winPct')">Win%{{tblSortIcon('fbd','winPct')}}</th><th @click="tblSortBy('fbd','ppg')">PPG{{tblSortIcon('fbd','ppg')}}</th><th @click="tblSortBy('fbd','avgGF')">Avg GF{{tblSortIcon('fbd','avgGF')}}</th><th @click="tblSortBy('fbd','avgGA')">Avg GA{{tblSortIcon('fbd','avgGA')}}</th><th>GD/g</th>
               </tr></thead>
               <tbody>
-                <tr v-for="f in tacticsData.formations" :key="f.formation">
+                <tr v-for="f in tblSorted(tacticsData.formations||[], 'fbd')" :key="f.formation">
                   <td style="font-weight:700;color:#ffa657">{{f.formation}}</td>
                   <td class="c-gray" style="font-size:11px;text-transform:capitalize">{{f.topStyle||'—'}}</td>
                   <td>{{f.n}}</td>
@@ -584,7 +584,7 @@
                   <td :class="(f.gf-f.ga)>0?'c-green':'c-red'">{{((f.gf-f.ga)/f.n).toFixed(2)}}</td>
                 </tr>
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <!-- ── MY CLUB PANEL ── -->
@@ -614,12 +614,12 @@
               <!-- Formation history table -->
               <div>
                 <table style="font-size:12px;width:100%">
-                  <thead><tr>
-                    <th>Formation</th><th>P</th><th>W</th><th>D</th><th>L</th>
-                    <th>Win%</th><th>GF/g</th><th>GA/g</th><th>GD/g</th>
+                  <thead><tr style="cursor:pointer">
+                    <th @click="tblSortBy('myf','formation')">Formation{{tblSortIcon('myf','formation')}}</th><th @click="tblSortBy('myf','n')">P{{tblSortIcon('myf','n')}}</th><th @click="tblSortBy('myf','W')">W{{tblSortIcon('myf','W')}}</th><th @click="tblSortBy('myf','D')">D{{tblSortIcon('myf','D')}}</th><th @click="tblSortBy('myf','L')">L{{tblSortIcon('myf','L')}}</th>
+                    <th @click="tblSortBy('myf','winPct')">Win%{{tblSortIcon('myf','winPct')}}</th><th @click="tblSortBy('myf','avgGF')">GF/g{{tblSortIcon('myf','avgGF')}}</th><th @click="tblSortBy('myf','avgGA')">GA/g{{tblSortIcon('myf','avgGA')}}</th><th>GD/g</th>
                   </tr></thead>
                   <tbody>
-                    <tr v-for="f in tacticsData.myClubData.forms" :key="f.formation">
+                    <tr v-for="f in tblSorted(tacticsData.myClubData.forms||[], 'myf')" :key="f.formation">
                       <td style="font-weight:700;color:#ffa657">{{f.formation}}</td>
                       <td>{{f.n}}</td>
                       <td class="c-green">{{f.W}}</td><td class="c-orange">{{f.D}}</td><td class="c-red">{{f.L}}</td>
@@ -647,13 +647,13 @@
             <div style="font-weight:700;margin-bottom:10px">🎨 Style of Play Breakdown
               <span class="c-gray" style="font-size:11px;font-weight:400"> — league-wide · min 3 matches · parsed from match reports</span>
             </div>
-            <table>
-              <thead><tr>
-                <th>Style</th><th>Played</th><th>W</th><th>D</th><th>L</th>
-                <th>Win%</th><th>PPG</th><th>Avg GF</th><th>Avg GA</th><th>GD/g</th>
+            <div style="overflow-x:auto"><table>
+              <thead><tr style="cursor:pointer">
+                <th @click="tblSortBy('sty','style')">Style{{tblSortIcon('sty','style')}}</th><th @click="tblSortBy('sty','n')">Played{{tblSortIcon('sty','n')}}</th><th @click="tblSortBy('sty','W')">W{{tblSortIcon('sty','W')}}</th><th @click="tblSortBy('sty','D')">D{{tblSortIcon('sty','D')}}</th><th @click="tblSortBy('sty','L')">L{{tblSortIcon('sty','L')}}</th>
+                <th @click="tblSortBy('sty','winPct')">Win%{{tblSortIcon('sty','winPct')}}</th><th @click="tblSortBy('sty','ppg')">PPG{{tblSortIcon('sty','ppg')}}</th><th @click="tblSortBy('sty','avgGF')">Avg GF{{tblSortIcon('sty','avgGF')}}</th><th @click="tblSortBy('sty','avgGA')">Avg GA{{tblSortIcon('sty','avgGA')}}</th><th>GD/g</th>
               </tr></thead>
               <tbody>
-                <tr v-for="s in tacticsData.styles" :key="s.style">
+                <tr v-for="s in tblSorted(tacticsData.styles||[], 'sty')" :key="s.style">
                   <td style="font-weight:700;color:#79c0ff;text-transform:capitalize">{{s.style}}</td>
                   <td>{{s.n}}</td>
                   <td class="c-green">{{s.W}}</td><td class="c-orange">{{s.D}}</td><td class="c-red">{{s.L}}</td>
@@ -664,7 +664,7 @@
                   <td :class="(s.gf-s.ga)>0?'c-green':'c-red'">{{((s.gf-s.ga)/s.n).toFixed(2)}}</td>
                 </tr>
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <!-- ── TACTICS REFERENCE ── -->
@@ -914,8 +914,8 @@
             <div style="font-size:11px;color:#8b949e;margin-bottom:6px">My scouts ({{youthRejected.length}}) — load league history for all clubs</div>
             <div class="card" style="padding:0;overflow:hidden">
               <table>
-                <thead><tr>
-                  <th>Player</th><th>Pos</th><th>Age</th><th>Rating</th><th>Value</th><th>Buy Now</th><th>Best Attr</th><th>Scouted</th><th></th>
+                <thead><tr style="cursor:pointer">
+                  <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th><th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th>Best Attr</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th></th>
                 </tr></thead>
                 <tbody>
                   <tr v-for="job in youthFilteredHistory" :key="job.id" class="clickable" @click="openModal({...job.player,...(job.player.stats||{})},job)">
@@ -979,10 +979,10 @@
           <!-- History table -->
           <div class="card" style="padding:0;overflow:hidden">
             <table>
-              <thead><tr>
-                <th>Player</th><th>Pos</th><th>Age</th><th>Rating</th>
-                <th>Value</th><th>Buy Now</th><th>Best Attr</th>
-                <th>Scouting Club</th><th>Scouted</th><th></th>
+              <thead><tr style="cursor:pointer">
+                <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th>
+                <th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th>Best Attr</th>
+                <th>Scouting Club</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th></th>
               </tr></thead>
               <tbody>
                 <tr v-for="job in youthHistFiltered" :key="job.id" class="clickable"
@@ -1171,18 +1171,18 @@
         <div class="card" style="flex:1;min-width:260px">
           <div style="font-weight:700;margin-bottom:10px">👥 Roster</div>
           <div v-if="clubStaff && clubStaff.current && Object.keys(clubStaff.current).length">
-            <table>
-              <thead><tr><th>Role</th><th>Name</th><th>Rtg</th><th>Wage</th><th>Wks</th></tr></thead>
+            <div style="overflow-x:auto"><table>
+              <thead><tr style="cursor:pointer"><th @click="tblSortBy('ros','role')">Role{{tblSortIcon('ros','role')}}</th><th @click="tblSortBy('ros','name')">Name{{tblSortIcon('ros','name')}}</th><th @click="tblSortBy('ros','rating')">Rtg{{tblSortIcon('ros','rating')}}</th><th @click="tblSortBy('ros','weeklyWage')">Wage{{tblSortIcon('ros','weeklyWage')}}</th><th @click="tblSortBy('ros','contractWeeks')">Wks{{tblSortIcon('ros','contractWeeks')}}</th></tr></thead>
               <tbody>
-                <tr v-for="(person, role) in (clubStaff.current||{})" :key="role">
-                  <td style="font-weight:700;color:#79c0ff">{{role}}</td>
-                  <td>{{person.name}}</td>
-                  <td :class="person.rating>=80?'c-green':person.rating>=70?'c-orange':'c-gray'" style="font-weight:700">{{person.rating||'—'}}</td>
-                  <td class="c-gray" style="font-size:11px">{{person.weeklyWage?'£'+Math.round(person.weeklyWage/1000)+'k':'—'}}</td>
-                  <td class="c-gray" style="font-size:11px">{{person.contractWeeks!=null?person.contractWeeks:'—'}}</td>
+                <tr v-for="item in tblSorted(Object.entries(clubStaff.current||{}).map(([role,p])=>({...p,role})), 'ros')" :key="item.role">
+                  <td style="font-weight:700;color:#79c0ff">{{item.role}}</td>
+                  <td>{{item.name}}</td>
+                  <td :class="item.rating>=80?'c-green':item.rating>=70?'c-orange':'c-gray'" style="font-weight:700">{{item.rating||'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{item.weeklyWage?'£'+Math.round(item.weeklyWage/1000)+'k':'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{item.contractWeeks!=null?item.contractWeeks:'—'}}</td>
                 </tr>
               </tbody>
-            </table>
+            </table></div>
             <div v-if="clubStaff.openAds && clubStaff.openAds.length" class="c-orange" style="font-size:11px;margin-top:7px">
               ⚡ {{clubStaff.openAds.length}} open ad(s) posted
             </div>
@@ -1296,14 +1296,17 @@
       <!-- ── GENERATE APPLICANTS ── -->
       <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:4px">Staff Recruitment</div>
       <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-          <span style="font-weight:700;font-size:13px">📣 Generate Applicants</span>
-          <span class="c-gray" style="font-size:11px">Posts ads + generates candidates for all 4 roles</span>
-          <label style="font-size:11px;color:#8b949e;display:flex;align-items:center;gap:4px;margin-left:auto">Week <input type="number" v-model.number="staffGenWeek" :placeholder="asOfWeek" min="1" max="99" style="width:48px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 5px;font-size:11px"></label>
-          <button class="btn green" style="font-size:11px" :disabled="staffGenLoading" @click="generateApplicants()">
-            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate Now'}}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-weight:700;font-size:13px">📣 Staff Recruitment</span>
+          <label style="font-size:11px;color:#8b949e;display:flex;align-items:center;gap:4px">Week <input type="number" v-model.number="staffGenWeek" :placeholder="asOfWeek" min="1" max="99" style="width:48px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 5px;font-size:11px"></label>
+          <button class="btn" style="font-size:11px" :disabled="staffAdsLoading || staffGenLoading" @click="postAdsOnly()">
+            {{staffAdsLoading ? '⟳ Posting…' : '📋 Post Ads'}}
+          </button>
+          <button class="btn green" style="font-size:11px;margin-left:auto" :disabled="staffGenLoading || staffAdsLoading" @click="generateApplicants()">
+            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate'}}
           </button>
         </div>
+        <div v-if="staffAdsMsg" :style="{color:staffAdsMsg.startsWith('⚠')?'#ff7b72':'#7ee787',fontSize:'12px',marginBottom:'6px'}">{{staffAdsMsg}}</div>
         <div v-if="staffGenMsg" :style="{color:staffGenMsg.startsWith('⚠')?'#ff7b72':'#ffa657',fontSize:'12px',marginBottom:'8px'}">{{staffGenMsg}}</div>
         <div v-if="staffGenResults">
           <div style="font-size:10px;color:#8b949e;margin-bottom:8px">Week {{staffGenResults.week}} · candidates will appear in-game after the week transition</div>
@@ -1314,12 +1317,13 @@
                 <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
                 <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || c.Name || '?'}}</span>
                 <span :class="ratingClass(c.rating||c.r)" style="font-size:11px;font-weight:700">r{{c.rating||c.r||'?'}}</span>
+                <button @click="rejectCandidate(role, i)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;hover:color:#ff7b72" title="Dismiss">×</button>
               </div>
               <div v-if="!cands.length" class="c-gray" style="font-size:11px;font-style:italic">No candidates</div>
             </div>
           </div>
         </div>
-        <div v-else-if="!staffGenLoading" class="c-gray" style="font-size:11px">Hit "Generate Now" to preview upcoming staff candidates before the week turns over.</div>
+        <div v-else-if="!staffGenLoading" class="c-gray" style="font-size:11px">Post ads first (optional), then hit Generate to preview upcoming staff candidates.</div>
       </div>
 
       <!-- ── FACILITY LEVEL REFERENCE ── -->
@@ -1430,19 +1434,19 @@
         <div class="card" style="padding:0;overflow:hidden">
           <table style="font-size:11px">
             <thead>
-              <tr>
-                <th style="min-width:120px">Club</th>
-                <th title="CEO rating">CEO</th>
-                <th title="Technical Director rating">TD</th>
-                <th title="Assistant rating">Asst</th>
-                <th title="Physio rating">Physio</th>
-                <th title="Training facility level">Trn</th>
-                <th title="Scouting facility level">Sct</th>
-                <th title="Academy facility level">Aca</th>
-                <th title="Medical facility level">Med</th>
-                <th title="Analytics facility level">Ana</th>
-                <th title="Stadium facility level">Std</th>
-                <th title="Active open job ads">Ads</th>
+              <tr style="cursor:pointer">
+                <th style="min-width:120px" @click="espSortBy('club')">Club{{espSortIcon('club')}}</th>
+                <th title="CEO rating" @click="espSortBy('ceo')">CEO{{espSortIcon('ceo')}}</th>
+                <th title="Technical Director rating" @click="espSortBy('td')">TD{{espSortIcon('td')}}</th>
+                <th title="Assistant rating" @click="espSortBy('asst')">Asst{{espSortIcon('asst')}}</th>
+                <th title="Physio rating" @click="espSortBy('physio')">Physio{{espSortIcon('physio')}}</th>
+                <th title="Training facility level" @click="espSortBy('training')">Trn{{espSortIcon('training')}}</th>
+                <th title="Scouting facility level" @click="espSortBy('scouting')">Sct{{espSortIcon('scouting')}}</th>
+                <th title="Academy facility level" @click="espSortBy('academy')">Aca{{espSortIcon('academy')}}</th>
+                <th title="Medical facility level" @click="espSortBy('medical')">Med{{espSortIcon('medical')}}</th>
+                <th title="Analytics facility level" @click="espSortBy('analytics')">Ana{{espSortIcon('analytics')}}</th>
+                <th title="Stadium facility level" @click="espSortBy('stadium')">Std{{espSortIcon('stadium')}}</th>
+                <th title="Active open job ads" @click="espSortBy('ads')">Ads{{espSortIcon('ads')}}</th>
               </tr>
             </thead>
             <tbody>
@@ -1482,13 +1486,13 @@
         <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
           <table style="font-size:11px">
             <thead>
-              <tr>
-                <th style="min-width:110px">Player</th>
-                <th>Seller → Buyer</th>
-                <th>Amount</th>
-                <th>State</th>
+              <tr style="cursor:pointer">
+                <th style="min-width:110px" @click="negoSortBy('player')">Player{{negoSortIcon('player')}}</th>
+                <th @click="negoSortBy('parties')">Seller → Buyer{{negoSortIcon('parties')}}</th>
+                <th @click="negoSortBy('fee')">Amount{{negoSortIcon('fee')}}</th>
+                <th @click="negoSortBy('status')">State{{negoSortIcon('status')}}</th>
                 <th style="min-width:80px">Outcome</th>
-                <th>Updated</th>
+                <th @click="negoSortBy('date')">Updated{{negoSortIcon('date')}}</th>
                 <th style="width:28px"></th>
               </tr>
             </thead>
