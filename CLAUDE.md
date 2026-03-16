@@ -6,23 +6,20 @@ This file gives Claude Code full context about this project. Read it at the star
 
 ## Game API Access (IMPORTANT)
 
-The game API at `https://slowfootball.club/api` requires a Bearer token for all requests.
-The token is stored at `/home/user/.sf_token` (gitignored, never commit it).
+The game API at `https://slowfootball.club/api` requires a Bearer token.
+The Claude Code sandbox cannot reach `slowfootball.club` directly (host blocked).
 
-To make authenticated API calls, always use curl via Bash:
-```bash
-TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/ENDPOINT"
-```
+**Solution: use the authenticated proxy worker at `https://sf-game-proxy.ofersi15.workers.dev`**
+This Worker (cf-game-proxy/index.js) forwards any request to the game, injecting SF_TOKEN automatically.
 
-Examples:
-```bash
-TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/game"
-TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/scouting/jobs?club=Leverkusen"
-TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/development"
-```
+To browse the game from Claude Code, use WebFetch with the proxy:
+- `https://sf-game-proxy.ofersi15.workers.dev/api/game`
+- `https://sf-game-proxy.ofersi15.workers.dev/api/scouting/jobs?club=Leverkusen`
+- `https://sf-game-proxy.ofersi15.workers.dev/development`
+- `https://sf-game-proxy.ofersi15.workers.dev/api/squads?club=Leverkusen`
 
-WebFetch cannot be used for the game (no header support → always 403). Use Bash+curl instead.
-The token may expire — if curl returns 401/403, ask the user to refresh it.
+The token is stored in Cloudflare as a secret `SF_TOKEN` on the sf-game-proxy worker.
+If responses return 401/403, the token has expired — ask the user to update `SF_TOKEN` in Cloudflare dashboard.
 
 ---
 
