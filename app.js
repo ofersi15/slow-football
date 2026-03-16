@@ -241,6 +241,7 @@ createApp({
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
       // Generate applicants
       staffGenLoading: false, staffGenMsg: '', staffGenResults: null, staffGenWeek: '',
+      currentGameWeek: null,
       staffAdsLoading: false, staffAdsPosted: false, staffAdsMsg: '',
       tblSort: {}, negoSort: 'date_d',
       // Saved lineup
@@ -1023,6 +1024,8 @@ createApp({
         this.playersCacheDate=new Date().toLocaleDateString();
         this.playersRefreshing=false;
         if (foreground) { this.progress=100; this.loadMsg='Done!'; this.loaded=true; this.buildBookmarklet(); this.checkTacticsCache(); }
+        // Refresh current game week now that asOfWeek is up to date
+        this.fetchCurrentGameWeek();
         // Kick off stats enrichment after squads loaded
         setTimeout(() => this.enrichStats(), 800);
 
@@ -1779,34 +1782,39 @@ createApp({
       return '';
     },
 
+    // ── Detect current game week ──────────────────────────────────────────────
+    async fetchCurrentGameWeek() {
+      // Try /game first
+      try {
+        const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
+        const w = Number(gameRes?.week ?? gameRes?.currentWeek ?? gameRes?.gameWeek ?? gameRes?.currentGameWeek ?? gameRes?.weekNumber);
+        if (w > 0 && !isNaN(w)) { this.currentGameWeek = w; return; }
+        // Log the full response so we can see what fields it has
+        console.log('[SF] /game response (no week field found):', JSON.stringify(gameRes).slice(0,300));
+      } catch(e) { console.log('[SF] /game failed:', e.message); }
+      // Try /matches — infer from latest match week
+      try {
+        const mRes = await fetch(`${API}/matches?club=${encodeURIComponent(MY_CLUB)}&limit=3`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
+        const weeks = (mRes.matches||[]).map(m => Number(m.week ?? m.gameWeek ?? m.round ?? m.weekNumber)).filter(w => w > 0 && !isNaN(w));
+        if (weeks.length) { this.currentGameWeek = Math.max(...weeks) + 1; return; }
+        console.log('[SF] /matches response sample:', JSON.stringify((mRes.matches||[])[0]).slice(0,300));
+      } catch(e) {}
+      // Final fallback: asOfWeek + 1 (tables = last completed week)
+      const w = Number(this.asOfWeek);
+      if (w > 0 && !isNaN(w)) this.currentGameWeek = w + 1;
+    },
+
     // ── Generate applicants ───────────────────────────────────────────────────
     async generateApplicants() {
       this.staffGenLoading = true;
       this.staffGenResults = null;
       try {
-        let week = this.staffGenWeek;
+        let week = this.staffGenWeek || this.currentGameWeek;
         if (!week) {
-          // Try /game endpoint first — week may come back as string "28" or integer 28
-          try {
-            const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(3000)}).then(r=>r.json());
-            const w = Number(gameRes?.week ?? gameRes?.currentWeek ?? gameRes?.gameWeek ?? gameRes?.currentGameWeek);
-            if (w > 0 && !isNaN(w)) { week = w; console.log('[SF] week from /game:', w); }
-          } catch(e) {}
+          // currentGameWeek not yet loaded — fetch it now
+          await this.fetchCurrentGameWeek();
+          week = this.currentGameWeek || this.asOfWeek;
         }
-        if (!week) {
-          // Try /matches to get latest week from most recent fixture
-          try {
-            const mRes = await fetch(`${API}/matches?club=${encodeURIComponent(MY_CLUB)}&limit=3`, {signal: AbortSignal.timeout(3000)}).then(r=>r.json());
-            const weeks = (mRes.matches||[]).map(m => Number(m.week ?? m.gameWeek ?? m.round)).filter(w => w > 0 && !isNaN(w));
-            if (weeks.length) { week = Math.max(...weeks) + 1; console.log('[SF] week inferred from matches:', week); }
-          } catch(e) {}
-        }
-        if (!week) {
-          // Final fallback: asOfWeek from tables + 1 (tables = last COMPLETED week)
-          const w = Number(this.asOfWeek);
-          if (w > 0 && !isNaN(w)) { week = w + 1; console.log('[SF] week from asOfWeek+1:', week); }
-        }
-        if (!week) week = this.asOfWeek;
         const token = localStorage.getItem('token') || '';
         const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
@@ -2114,6 +2122,8 @@ createApp({
     // from blocking the initial render and making the page appear frozen on slower machines.
     // Double-RAF: first fires before paint, second fires after paint.
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
+    // Fetch current game week proactively so the staff recruitment input shows the right week
+    this.fetchCurrentGameWeek();
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental
     this.youthBgInterval = setInterval(() => { this.bgAutoRefresh(); }, 8 * 60 * 1000);
   }
