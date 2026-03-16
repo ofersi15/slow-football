@@ -1603,20 +1603,27 @@ createApp({
       try {
         const week = this.asOfWeek;
         this.staffGenMsg = `Week ${week} — posting ads…`;
+        const token = localStorage.getItem('token') || '';
+        const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
         for (const role of ROLES) {
           await fetch(`${API}/staff/ads`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders,
             body: JSON.stringify({ club: MY_CLUB, role }),
           }).catch(() => {});
         }
         this.staffGenMsg = 'Generating candidates…';
-        const gen = await fetch(`${API}/staff/generate`, {
+        const genRes = await fetch(`${API}/staff/generate`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({ club: MY_CLUB, week }),
-        }).then(r => r.json());
+        });
+        if (!genRes.ok) {
+          const txt = await genRes.text();
+          throw new Error(`${genRes.status} ${genRes.statusText} — ${txt.slice(0,120)}`);
+        }
+        const gen = await genRes.json();
         const candidates = Array.isArray(gen) ? gen : (gen.applicants || []);
         const byRole = {};
         for (const c of candidates) {
