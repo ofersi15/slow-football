@@ -1599,11 +1599,9 @@ createApp({
     // ── Generate applicants ───────────────────────────────────────────────────
     async generateApplicants() {
       this.staffGenLoading = true;
-      this.staffGenMsg = 'Fetching current week…';
       this.staffGenResults = null;
       try {
-        const game = await fetch(`${API}/game`).then(r => r.json());
-        const week = game.week;
+        const week = this.asOfWeek;
         this.staffGenMsg = `Week ${week} — posting ads…`;
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
         for (const role of ROLES) {
