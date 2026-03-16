@@ -4,6 +4,28 @@ This file gives Claude Code full context about this project. Read it at the star
 
 ---
 
+## Game API Access (IMPORTANT)
+
+The game API at `https://slowfootball.club/api` requires a Bearer token for all requests.
+The token is stored at `/home/user/.sf_token` (gitignored, never commit it).
+
+To make authenticated API calls, always use curl via Bash:
+```bash
+TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/ENDPOINT"
+```
+
+Examples:
+```bash
+TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/game"
+TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/api/scouting/jobs?club=Leverkusen"
+TOKEN=$(cat /home/user/.sf_token) && curl -s -H "Authorization: Bearer $TOKEN" "https://slowfootball.club/development"
+```
+
+WebFetch cannot be used for the game (no header support → always 403). Use Bash+curl instead.
+The token may expire — if curl returns 401/403, ask the user to refresh it.
+
+---
+
 ## What This Is
 
 A personal fantasy football analytics web app. It's a **single-page Vue 3 app** (CDN, no build step) that:
