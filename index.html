@@ -971,7 +971,8 @@
               <div class="c-gray">
                 Scout Lv <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span>
                 · Bump <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span>
-                · <span class="c-blue">{{youthAllHistoryJobs.filter(j=>j._club===club).length}} scouts</span>
+                · <span class="c-green">{{youthAllHistoryJobs.filter(j=>j._club===club&&(j._jobStatus||j.status)==='active').length}} active</span>
+                · <span class="c-blue">{{youthAllHistoryJobs.filter(j=>j._club===club).length}} total</span>
               </div>
             </div>
           </div>
@@ -982,7 +983,7 @@
               <thead><tr style="cursor:pointer">
                 <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th>
                 <th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th>Best Attr</th>
-                <th>Scouting Club</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th></th>
+                <th>Scouting Club</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th>Status</th><th></th>
               </tr></thead>
               <tbody>
                 <tr v-for="job in youthHistFiltered" :key="job.id" class="clickable"
@@ -1008,6 +1009,13 @@
                     </div>
                   </td>
                   <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'}}</td>
+                  <td>
+                    <span v-if="(job._jobStatus||job.status)==='rejected'" style="background:#3a1212;color:#ff7b72;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✗ Rejected</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='active'||(job._jobStatus||job.status)==='scouting'" style="background:#1a4a2e;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">● Active</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='pending'" style="background:#1f3a5a;color:#79c0ff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">⏳ Pending</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='completed'||(job._jobStatus||job.status)==='accepted'" style="background:#1a3a1a;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✓ Done</span>
+                    <span v-else style="color:#8b949e;font-size:10px">{{job._jobStatus||job.status||'—'}}</span>
+                  </td>
                   <td @click.stop>
                     <button class="btn" style="font-size:10px;padding:2px 7px" :disabled="job._refreshing" @click="refreshYouthJob(job)">
                       {{job._refreshing?'…':job._refreshed?'✓':job._refreshFailed?'✗':'↻'}}

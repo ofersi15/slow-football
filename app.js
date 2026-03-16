@@ -1367,6 +1367,39 @@ createApp({
             found._incompleteStats = FULL_ATTR_KEYS.filter(a=>found[a]!=null&&found[a]>0).length < 5;
           }
         }
+
+        // Enrich active scout job.player objects with missing attributes from club squads
+        const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+        const hasFullAttrs = p => p && ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5;
+        const activeScouts = (sjRes.items||[]).filter(j => j.player && !hasFullAttrs(j.player));
+        if (activeScouts.length) {
+          const uniqueClubs = [...new Set(activeScouts.map(j=>j.player?.club||j.player?.Club).filter(Boolean))];
+          const squadCache = {};
+          await Promise.all(uniqueClubs.map(async club => {
+            try {
+              const d = await fetch(`${API}/squads?club=${encodeURIComponent(club)}`).then(r=>r.json());
+              squadCache[club.toLowerCase()] = d.players||[];
+            } catch(e) {}
+          }));
+          const MERGE = ['Speed','Stamina','Dribbling','Passing','Shooting','Tackling','Marking','Heading','Vision','Handling','Reflexes','Strength','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
+          for (const job of activeScouts) {
+            const club = (job.player?.club||job.player?.Club||'').toLowerCase();
+            const squad = squadCache[club]||[];
+            const pName = (job.player?.name||job.player?.Player||'').toLowerCase();
+            const found = squad.find(p=>(p.Player||'').toLowerCase()===pName);
+            if (found) {
+              MERGE.forEach(a=>{ if (found[a]!=null) job.player[a]=found[a]; });
+              if (found.Rating) job.player.rating = found.Rating;
+              if (found.Value) job.player.value = found.Value;
+              if (found.Age) job.player.age = found.Age;
+            }
+          }
+          // Update the cache with enriched data
+          newCache.scouts = sjRes.items||[];
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
+          // Re-apply so youthScouts gets the enriched player objects
+          applyCache(newCache, rejRes.items);
+        }
       } catch(e) {
         this.youthMsg = 'Load failed: ' + (e.message || String(e));
       }
@@ -1465,8 +1498,13 @@ createApp({
           await Promise.all(batch.map(async c => {
             const enc = encodeURIComponent(c);
             try {
-              const rejRes = await fetch(`${API}/scouting/jobs?club=${enc}&status=rejected`).then(r=>r.json());
-              const jobs = rejRes.items||[];
+              const [rejRes, activeRes] = await Promise.all([
+                fetch(`${API}/scouting/jobs?club=${enc}&status=rejected`).then(r=>r.json()),
+                fetch(`${API}/scouting/jobs?club=${enc}`).then(r=>r.json()),
+              ]);
+              const rejJobs = (rejRes.items||[]).map(j=>({...j, _jobStatus: j.status||'rejected'}));
+              const activeJobs = (activeRes.items||[]).map(j=>({...j, _jobStatus: j.status||'active'}));
+              const jobs = [...activeJobs, ...rejJobs];
               if (jobs.length > 0) {
                 const [facRes, staffRes] = await Promise.all([
                   fetch(`${API}/facilities?club=${enc}`).then(r=>r.json()).catch(()=>({})),
@@ -1788,8 +1826,12 @@ createApp({
       try {
         const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
         const w = Number(gameRes?.week ?? gameRes?.currentWeek ?? gameRes?.gameWeek ?? gameRes?.currentGameWeek ?? gameRes?.weekNumber);
-        if (w > 0 && !isNaN(w)) { this.currentGameWeek = w; return; }
-        // Log the full response so we can see what fields it has
+        if (w > 0 && !isNaN(w)) {
+          // If /game returns same week as tables (asOfWeek), it's also reporting last completed week — use +1
+          const asOf = Number(this.asOfWeek);
+          this.currentGameWeek = (asOf > 0 && w <= asOf) ? w + 1 : w;
+          return;
+        }
         console.log('[SF] /game response (no week field found):', JSON.stringify(gameRes).slice(0,300));
       } catch(e) { console.log('[SF] /game failed:', e.message); }
       // Try /matches — infer from latest match week
