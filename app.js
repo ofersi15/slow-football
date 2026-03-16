@@ -775,7 +775,10 @@ createApp({
               // so the current game week is accurate for staff generation
               fetch(`${API}/tables/from-fixtures`).then(r=>r.json()).then(d => {
                 const w = d?.meta?.asOfWeek;
-                if (w != null && w !== '?') this.asOfWeek = w;
+                if (w != null && w !== '?') {
+                  this.asOfWeek = w;
+                  this.fetchCurrentGameWeek(); // re-calculate now that asOfWeek is fresh
+                }
               }).catch(()=>{});
               // Enrich stats in background
               setTimeout(() => this.enrichStats(), 500);
