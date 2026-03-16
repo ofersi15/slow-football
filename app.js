@@ -792,8 +792,14 @@ createApp({
       serverCacheDelete(STATS_CACHE_KEY);
       try { localStorage.removeItem(PLAYERS_CACHE_KEY); } catch(e){}
       try { localStorage.removeItem(STATS_CACHE_KEY); } catch(e){}
+      // Also clear youth caches so history/scouts refresh too
+      try { localStorage.removeItem('sf_youth_hist_v2'); } catch(e){}
+      try { localStorage.removeItem('sf_youth_idx_v2'); } catch(e){}
       this.allPlayers=[]; this.loaded=false; this.playersCacheDate=null;
       this.statsEnriched=false; this.statsProgress=0;
+      // Reset youth state so next tab visit re-fetches
+      this.youthHistLoaded=false; this.youthHistCacheDate=null;
+      this.youthLoaded=false;
       this.fetchFreshData(true);
     },
 
@@ -845,10 +851,16 @@ createApp({
             const name = encodeURIComponent(p.Player || '');
             if (!name) return;
             const d = await fetch(`${API}/player-stats?player=${name}`).then(r=>r.json());
-            if (!d.ok || !d.seasonStats) return;
-            const s = d.seasonStats;
+            if (!d.ok) return;
+            // Extract physical attributes from d.player if the API returns them
+            const physAttrs = {};
+            const PHYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
+            if (d.player) PHYS.forEach(a => { if (d.player[a] != null) physAttrs[a] = d.player[a]; });
+            if (!d.seasonStats && Object.keys(physAttrs).length === 0) return;
+            const s = d.seasonStats || {};
             const mins = s.minutes || 0;
             const enriched = {
+              ...physAttrs,
               Games: s.games || 0,
               Minutes: mins,
               Goals: s.goals || 0,
@@ -1459,6 +1471,38 @@ createApp({
           await new Promise(r=>setTimeout(r,80)); // small throttle between batches
         }
 
+        // Auto-enrich players with incomplete attributes from their club squads
+        const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+        const hasFullAttrs = p => p && ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5;
+        const needsEnrich = allJobs.filter(j => j.player && !hasFullAttrs(j.player));
+        if (needsEnrich.length) {
+          this.youthHistMsg = `Enriching attributes for ${needsEnrich.length} players…`;
+          const uniqueClubs = [...new Set(needsEnrich.map(j=>j.player?.club||j.player?.Club).filter(Boolean))];
+          const squadCache = {};
+          const ENRICH_BATCH = 4;
+          for (let i=0; i<uniqueClubs.length; i+=ENRICH_BATCH) {
+            await Promise.all(uniqueClubs.slice(i,i+ENRICH_BATCH).map(async club => {
+              try {
+                const d = await fetch(`${API}/squads?club=${encodeURIComponent(club)}`).then(r=>r.json());
+                squadCache[club.toLowerCase()] = d.players||[];
+              } catch(e) {}
+            }));
+          }
+          const MERGE = ['Speed','Stamina','Dribbling','Passing','Shooting','Tackling','Marking','Heading','Vision','Handling','Reflexes','Strength','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
+          for (const j of needsEnrich) {
+            const club = (j.player?.club||j.player?.Club||'').toLowerCase();
+            const squad = squadCache[club]||[];
+            const pName = (j.player?.name||j.player?.Player||'').toLowerCase();
+            const found = squad.find(p=>(p.Player||'').toLowerCase()===pName);
+            if (found) {
+              MERGE.forEach(a=>{ if (found[a]!=null) j.player[a]=found[a]; });
+              if (found.Rating) j.player.rating = found.Rating;
+              if (found.Value) j.player.value = found.Value;
+              if (found.Age) j.player.age = found.Age;
+            }
+          }
+        }
+
         try {
           localStorage.setItem(HIST_CACHE_KEY, JSON.stringify({
             data: {jobs: allJobs, clubInfo: clubInfoMap},
@@ -1733,10 +1777,25 @@ createApp({
       try {
         let week = this.staffGenWeek;
         if (!week) {
+          // Try /game endpoint first — week may come back as string "28" or integer 28
           try {
             const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(3000)}).then(r=>r.json());
-            if (gameRes?.week && Number.isInteger(gameRes.week)) week = gameRes.week;
+            const w = Number(gameRes?.week ?? gameRes?.currentWeek ?? gameRes?.gameWeek ?? gameRes?.currentGameWeek);
+            if (w > 0 && !isNaN(w)) { week = w; console.log('[SF] week from /game:', w); }
           } catch(e) {}
+        }
+        if (!week) {
+          // Try /matches to get latest week from most recent fixture
+          try {
+            const mRes = await fetch(`${API}/matches?club=${encodeURIComponent(MY_CLUB)}&limit=3`, {signal: AbortSignal.timeout(3000)}).then(r=>r.json());
+            const weeks = (mRes.matches||[]).map(m => Number(m.week ?? m.gameWeek ?? m.round)).filter(w => w > 0 && !isNaN(w));
+            if (weeks.length) { week = Math.max(...weeks) + 1; console.log('[SF] week inferred from matches:', week); }
+          } catch(e) {}
+        }
+        if (!week) {
+          // Final fallback: asOfWeek from tables + 1 (tables = last COMPLETED week)
+          const w = Number(this.asOfWeek);
+          if (w > 0 && !isNaN(w)) { week = w + 1; console.log('[SF] week from asOfWeek+1:', week); }
         }
         if (!week) week = this.asOfWeek;
         const token = localStorage.getItem('token') || '';
@@ -1761,7 +1820,9 @@ createApp({
           throw new Error(`${genRes.status} ${genRes.statusText} — ${txt.slice(0,120)}`);
         }
         const gen = await genRes.json();
-        const candidates = Array.isArray(gen) ? gen : (gen.applicants || []);
+        const rejectedNames = new Set(JSON.parse(localStorage.getItem('sf_staff_rejected_v1')||'[]'));
+        const candidates = (Array.isArray(gen) ? gen : (gen.applicants || []))
+          .filter(c => !rejectedNames.has((c.name||c.Name||'').toLowerCase()));
         const byRole = {};
         for (const c of candidates) {
           const role = c.role || c.Role || 'Unknown';
@@ -1803,9 +1864,52 @@ createApp({
         this.staffAdsLoading = false;
       }
     },
+    _persistRejected(candidates) {
+      // Persist rejected candidate names in localStorage so they're filtered on next generate
+      try {
+        const key = 'sf_staff_rejected_v1';
+        const existing = JSON.parse(localStorage.getItem(key)||'[]');
+        const names = candidates.map(c => (c.name||c.Name||'').toLowerCase()).filter(Boolean);
+        const merged = [...new Set([...existing, ...names])];
+        localStorage.setItem(key, JSON.stringify(merged.slice(-200))); // cap at 200
+      } catch(e) {}
+    },
+    async _apiRejectCandidate(c) {
+      const token = localStorage.getItem('token') || '';
+      const headers = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+      // Try DELETE /staff/applicants/{id} if candidate has an id field
+      if (c.id) {
+        try { await fetch(`${API}/staff/applicants/${c.id}`, { method: 'DELETE', headers }); return; } catch(e) {}
+      }
+      // Try POST /staff/applicants/reject
+      try {
+        await fetch(`${API}/staff/applicants/reject`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ club: MY_CLUB, name: c.name||c.Name, role: c.role||c.Role, week: this.staffGenResults?.week }),
+        });
+      } catch(e) {}
+    },
     rejectCandidate(role, idx) {
       if (!this.staffGenResults) return;
-      this.staffGenResults.byRole[role].splice(idx, 1);
+      const candidate = this.staffGenResults.byRole[role][idx];
+      if (candidate) {
+        this._persistRejected([candidate]);
+        this._apiRejectCandidate(candidate);
+      }
+      const byRole = { ...this.staffGenResults.byRole };
+      byRole[role] = byRole[role].filter((_, i) => i !== idx);
+      this.staffGenResults = { ...this.staffGenResults, byRole };
+    },
+    rejectAllCandidates(role) {
+      if (!this.staffGenResults) return;
+      const all = this.staffGenResults.byRole[role] || [];
+      if (all.length) {
+        this._persistRejected(all);
+        all.forEach(c => this._apiRejectCandidate(c));
+      }
+      const byRole = { ...this.staffGenResults.byRole };
+      byRole[role] = [];
+      this.staffGenResults = { ...this.staffGenResults, byRole };
     },
 
     // ── Espionage ─────────────────────────────────────────────────────────────
