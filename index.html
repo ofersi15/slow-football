@@ -1312,12 +1312,15 @@
           <div style="font-size:10px;color:#8b949e;margin-bottom:8px">Week {{staffGenResults.week}} · candidates will appear in-game after the week transition</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
             <div v-for="(cands, role) in staffGenResults.byRole" :key="role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
-              <div style="font-weight:700;color:#79c0ff;font-size:11px;margin-bottom:6px">{{role}}</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{role}}</span>
+                <button v-if="cands.length" @click="rejectAllCandidates(role)" style="background:none;border:1px solid #30363d;border-radius:4px;color:#6e7681;cursor:pointer;font-size:10px;padding:1px 6px" title="Reject all candidates for this role">✕ all</button>
+              </div>
               <div v-for="(c, i) in cands" :key="i" style="display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px solid #21262d">
                 <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
                 <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || c.Name || '?'}}</span>
                 <span :class="ratingClass(c.rating||c.r)" style="font-size:11px;font-weight:700">r{{c.rating||c.r||'?'}}</span>
-                <button @click="rejectCandidate(role, i)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;hover:color:#ff7b72" title="Dismiss">×</button>
+                <button @click="rejectCandidate(role, i)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Dismiss">×</button>
               </div>
               <div v-if="!cands.length" class="c-gray" style="font-size:11px;font-style:italic">No candidates</div>
             </div>
