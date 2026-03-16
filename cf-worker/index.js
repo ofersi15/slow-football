@@ -7,7 +7,7 @@ export default {
     const url = new URL(request.url);
     const key = url.pathname.replace(/^\/sf-cache\//, '').replace(/^\//, '');
     const cors = {
-      'Access-Control-Allow-Origin': 'https://ofersi15.github.io',
+      'Access-Control-Allow-Origin': request.headers.get('Origin')?.includes('ofersi15') ? request.headers.get('Origin') : 'https://sf.ofersi15.workers.dev',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
