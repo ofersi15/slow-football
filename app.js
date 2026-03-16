@@ -238,7 +238,7 @@ createApp({
       clubLoading: false, clubLoaded: false, clubMsg: '', clubSubTab: 'facilities',
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
       // Generate applicants
-      staffGenLoading: false, staffGenMsg: '', staffGenResults: null,
+      staffGenLoading: false, staffGenMsg: '', staffGenResults: null, staffGenWeek: '',
       // Saved lineup
       savedLineup: null,
       // Espionage tab
@@ -1601,10 +1601,7 @@ createApp({
       this.staffGenLoading = true;
       this.staffGenResults = null;
       try {
-        this.staffGenMsg = 'Fetching current week…';
-        const tablesRes = await fetch(`${API}/tables/from-fixtures`).then(r => r.json());
-        const week = tablesRes.meta?.asOfWeek || this.asOfWeek;
-        this.asOfWeek = week;
+        const week = this.staffGenWeek || this.asOfWeek;
         this.staffGenMsg = `Fetching week ${week} applicants…`;
         const res = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}&week=${week}`);
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
