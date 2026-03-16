@@ -637,6 +637,7 @@ createApp({
       this.drawTacticsCharts();
     },
     activeTab: {
+      immediate: true,
       handler(v) {
         localStorage.setItem('sf_activeTab', v);
         if (v === 'youth') {
@@ -769,7 +770,13 @@ createApp({
               this.playersRefreshing = true;
               this.fetchFreshData(false);  // background refresh
             } else {
-              // Even if data is fresh, enrich stats in background
+              // Even if player data is fresh, always refresh asOfWeek from live tables
+              // so the current game week is accurate for staff generation
+              fetch(`${API}/tables/from-fixtures`).then(r=>r.json()).then(d => {
+                const w = d?.meta?.asOfWeek;
+                if (w != null && w !== '?') this.asOfWeek = w;
+              }).catch(()=>{});
+              // Enrich stats in background
               setTimeout(() => this.enrichStats(), 500);
             }
             return;
@@ -792,14 +799,16 @@ createApp({
       serverCacheDelete(STATS_CACHE_KEY);
       try { localStorage.removeItem(PLAYERS_CACHE_KEY); } catch(e){}
       try { localStorage.removeItem(STATS_CACHE_KEY); } catch(e){}
-      // Also clear youth caches so history/scouts refresh too
+      // Also clear youth and club caches
       try { localStorage.removeItem('sf_youth_hist_v2'); } catch(e){}
       try { localStorage.removeItem('sf_youth_idx_v2'); } catch(e){}
+      try { localStorage.removeItem('sf_club_v1'); } catch(e){}
       this.allPlayers=[]; this.loaded=false; this.playersCacheDate=null;
       this.statsEnriched=false; this.statsProgress=0;
-      // Reset youth state so next tab visit re-fetches
+      // Reset tab states so next visit re-fetches
       this.youthHistLoaded=false; this.youthHistCacheDate=null;
       this.youthLoaded=false;
+      this.clubLoaded=false; this.clubLoading=false;
       this.fetchFreshData(true);
     },
 
@@ -1864,24 +1873,18 @@ createApp({
         this.staffAdsLoading = false;
       }
     },
-    _persistRejected(candidates) {
-      // Persist rejected candidate names in localStorage so they're filtered on next generate
+    persistRejectedStaff(candidates) {
       try {
         const key = 'sf_staff_rejected_v1';
         const existing = JSON.parse(localStorage.getItem(key)||'[]');
         const names = candidates.map(c => (c.name||c.Name||'').toLowerCase()).filter(Boolean);
         const merged = [...new Set([...existing, ...names])];
-        localStorage.setItem(key, JSON.stringify(merged.slice(-200))); // cap at 200
+        localStorage.setItem(key, JSON.stringify(merged.slice(-200)));
       } catch(e) {}
     },
-    async _apiRejectCandidate(c) {
+    async apiRejectCandidate(c) {
       const token = localStorage.getItem('token') || '';
       const headers = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
-      // Try DELETE /staff/applicants/{id} if candidate has an id field
-      if (c.id) {
-        try { await fetch(`${API}/staff/applicants/${c.id}`, { method: 'DELETE', headers }); return; } catch(e) {}
-      }
-      // Try POST /staff/applicants/reject
       try {
         await fetch(`${API}/staff/applicants/reject`, {
           method: 'POST', headers,
@@ -1893,8 +1896,8 @@ createApp({
       if (!this.staffGenResults) return;
       const candidate = this.staffGenResults.byRole[role][idx];
       if (candidate) {
-        this._persistRejected([candidate]);
-        this._apiRejectCandidate(candidate);
+        this.persistRejectedStaff([candidate]);
+        this.apiRejectCandidate(candidate);
       }
       const byRole = { ...this.staffGenResults.byRole };
       byRole[role] = byRole[role].filter((_, i) => i !== idx);
@@ -1904,8 +1907,8 @@ createApp({
       if (!this.staffGenResults) return;
       const all = this.staffGenResults.byRole[role] || [];
       if (all.length) {
-        this._persistRejected(all);
-        all.forEach(c => this._apiRejectCandidate(c));
+        this.persistRejectedStaff(all);
+        all.forEach(c => this.apiRejectCandidate(c));
       }
       const byRole = { ...this.staffGenResults.byRole };
       byRole[role] = [];
