@@ -1640,15 +1640,12 @@ createApp({
         return `${caps[lv]} seat capacity → matchday income · CEO quality via staff`;
       }
       if (key === 'medical') {
-        // Verified across 8 clubs: no Physio = 0 bonus regardless of facility level
-        // Physio rating drives the effect: r72≈−18%inj/+23%rec · r74≈−20%/+25%
-        const caps = {1:'~r74',2:'~r78',3:'~r82',4:'~r86',5:'~r90'};
-        return `Physio rating cap ${lv}/5 (up to ${caps[lv]}) · Physio rating → injury risk↓ & recovery↑ · no Physio hired = no bonus`;
+        const det = {1:'No bonus',2:'-3% weekly injury chance · +4% rehab speed',3:'-6% weekly injury chance · +8% rehab speed',4:'-10% weekly injury chance · +12% rehab speed',5:'-14% weekly injury chance · +16% rehab speed'};
+        return det[lv] + ' · Physio staff drives actual effect';
       }
       if (key === 'analytics') {
-        // Verified: Assistant tier cap; automation on/off toggled via Responsibilities tab
-        const caps = {1:'~r75',2:'~r78',3:'~r82',4:'~r86',5:'~r90'};
-        return `Assistant rating cap ${lv}/5 (up to ${caps[lv]}) · assign tasks in Responsibilities (renew contracts, training plan, facilities, youth scouting)`;
+        const fms = {1:'442 · 433 · 4231 · 532 · 343',2:'+352 · 541 · 4411',3:'+4321 · 451',4:'+4141 · 442 D · 3421',5:'+3241 · 4222 · 4132'};
+        return `Formations unlocked: ${fms[lv]} · automation via Responsibilities tab`;
       }
       return 'Effects from staff quality';
     },
@@ -1662,8 +1659,14 @@ createApp({
         return slots + ' slots' + (qual ? ` · +${qual} rtg` : '') + ` · +${speed}% spd`;
       }
       if (key === 'academy') return ['15.0','17.5','19.8','22.0','24.1'][lv-1] + '% big-jump';
-      if (key === 'medical') return `Physio ${lv}/5`;
-      if (key === 'analytics') return `Asst. ${lv}/5`;
+      if (key === 'medical') {
+        const med = {1:'Base',2:'-3% inj / +4% rehab',3:'-6% inj / +8% rehab',4:'-10% inj / +12% rehab',5:'-14% inj / +16% rehab'};
+        return med[lv];
+      }
+      if (key === 'analytics') {
+        const fms = {1:'442 433 4231 532 343',2:'+352 541 4411',3:'+4321 451',4:'+4141 442D 3421',5:'+3241 4222 4132'};
+        return fms[lv];
+      }
       if (key === 'stadium') return ['30k','40k','50k','60k','80k'][lv-1] + ' seats';
       return '';
     },
