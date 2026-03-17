@@ -1385,25 +1385,12 @@
               <tr v-for="lv in [1,2,3,4,5]" :key="lv"
                   :style="{borderBottom:'1px solid #21262d', background: clubFacilities && ([clubFacilities.training,clubFacilities.academy,clubFacilities.scouting,clubFacilities.medical,clubFacilities.analytics,clubFacilities.stadium].some(f=>(f&&(f.current===lv||(f.upgrading&&f.level===lv-1)))) ? '#1c2128' : 'transparent')}">
                 <td style="padding:5px 8px;font-weight:700;color:#e6edf3">{{lv}}</td>
-                <td style="padding:5px 8px;color:#7ee787">
-                  <span v-if="lv===1" class="c-gray">Base</span>
-                  <span v-else>+{{(lv-1)*20}}%</span>
-                </td>
-                <td style="padding:5px 8px;color:#79c0ff">
-                  {{lv>=5?5:lv>=4?4:3}} slots<span v-if="lv>=3"> · +{{lv>=5?2:1}} rating</span>
-                </td>
-                <td style="padding:5px 8px;color:#d2a8ff">
-                  {{['15.0','17.5','19.8','22.0','24.1'][lv-1]}}% big-jump
-                </td>
-                <td style="padding:5px 8px;color:#ffa657">
-                  Physio {{lv}}/5
-                </td>
-                <td style="padding:5px 8px;color:#ffa657">
-                  Asst. {{lv}}/5
-                </td>
-                <td style="padding:5px 8px;color:#8b949e">
-                  {{['~30k','~40k','~50k','~60k','max'][lv-1]}} seats
-                </td>
+                <td style="padding:5px 8px;color:#7ee787">{{facRef('training',lv)}}</td>
+                <td style="padding:5px 8px;color:#79c0ff">{{facRef('scouting',lv)}}</td>
+                <td style="padding:5px 8px;color:#d2a8ff">{{facRef('academy',lv)}}</td>
+                <td style="padding:5px 8px;color:#ffa657">{{facRef('medical',lv)}}</td>
+                <td style="padding:5px 8px;color:#ffa657">{{facRef('analytics',lv)}}</td>
+                <td style="padding:5px 8px;color:#8b949e">{{facRef('stadium',lv)}}</td>
               </tr>
             </tbody>
           </table>
