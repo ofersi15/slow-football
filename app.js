@@ -40,7 +40,7 @@ function stringifyAsync(data) {
   });
 }
 
-const API = 'https://slowfootball.club/api';
+const API = 'https://sf-game-proxy.ofersi15.workers.dev/api';
 const MY_CLUB = 'Leverkusen';
 const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];
 const ALL_POSITIONS = ['GK','FB','CB','DM','CM','AM','WF','CF'];
@@ -1857,8 +1857,7 @@ createApp({
           await this.fetchCurrentGameWeek();
           week = this.currentGameWeek || this.asOfWeek;
         }
-        const token = localStorage.getItem('token') || '';
-        const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+        const authHeaders = { 'Content-Type': 'application/json' };
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
         this.staffGenMsg = `Week ${week} — posting ads…`;
         for (const role of ROLES) {
@@ -1905,8 +1904,7 @@ createApp({
       this.staffAdsMsg = '';
       this.staffAdsPosted = false;
       try {
-        const token = localStorage.getItem('token') || '';
-        const authHeaders = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+        const authHeaders = { 'Content-Type': 'application/json' };
         const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
         for (const role of ROLES) {
           await fetch(`${API}/staff/ads`, {
@@ -1933,8 +1931,7 @@ createApp({
       } catch(e) {}
     },
     async apiRejectCandidate(c) {
-      const token = localStorage.getItem('token') || '';
-      const headers = { 'Content-Type': 'application/json', ...(token && {'Authorization': `Bearer ${token}`}) };
+      const headers = { 'Content-Type': 'application/json' };
       try {
         await fetch(`${API}/staff/applicants/reject`, {
           method: 'POST', headers,
