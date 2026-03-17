@@ -199,7 +199,7 @@
           </thead>
           <tbody>
             <tr v-for="(p,i) in pagedPlayers" :key="p.Player+p.Club+i" class="clickable" @click="openModal(p)">
-              <td><span style="color:#e6edf3;font-weight:500">{{p.Player}}</span></td>
+              <td><span style="color:#e6edf3;font-weight:500">{{p.Player}}</span><span v-if="p._incompleteStats" title="Partial stats — some attributes unknown" style="margin-left:4px;background:#2d1f0e;color:#f0883e;font-size:9px;padding:1px 5px;border-radius:8px;vertical-align:middle">partial</span></td>
               <td>
                 <span :class="'league-tag lg-'+(p._league||'other')" style="font-size:9px;padding:1px 5px;margin-right:3px">{{p._league||'?'}}</span>
                 {{p.Club}}<span v-if="!p._managed" title="No manager" style="margin-left:3px">🔴</span>
@@ -948,6 +948,12 @@
             <select v-model="youthHistClubFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
               <option value="">All clubs</option>
               <option v-for="c in youthHistClubs" :key="c" :value="c">{{c}}</option>
+            </select>
+            <select v-model="youthHistStatusFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="rejected">Rejected</option>
+              <option value="accepted">Accepted</option>
             </select>
             <select v-model="youthHistSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
               <option value="date">Latest first</option>

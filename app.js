@@ -233,7 +233,7 @@ createApp({
       // All-clubs history state
       youthHistLoading: false, youthHistLoaded: false, youthHistMsg: '', youthHistProgress: 0,
       youthHistCacheDate: null, youthAllHistoryJobs: [], youthClubInfoMap: {},
-      youthHistSearch: '', youthHistClubFilter: '',
+      youthHistSearch: '', youthHistClubFilter: '', youthHistStatusFilter: '',
       // Background refresh state
       youthBgInterval: null, youthBgLastRefresh: null,
       // Club tab state (Facilities + Staff)
@@ -586,6 +586,7 @@ createApp({
       if (q) items = items.filter(j=>(j.player?.name||'').toLowerCase().includes(q)||(j.player?.club||'').toLowerCase().includes(q)||(j._club||'').toLowerCase().includes(q));
       if (this.youthHistPos) items = items.filter(j=>(j.player?.position||j.player?.Position)===this.youthHistPos);
       if (this.youthHistClubFilter) items = items.filter(j=>j._club===this.youthHistClubFilter);
+      if (this.youthHistStatusFilter) items = items.filter(j=>(j._jobStatus||j.status)===this.youthHistStatusFilter);
       const s = this.youthHistSort;
       if (s==='date')     return [...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
       if (s==='date_a')   return [...items].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
@@ -1370,7 +1371,7 @@ createApp({
 
         // Enrich active scout job.player objects with missing attributes from club squads
         const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
-        const hasFullAttrs = p => p && ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5;
+        const hasFullAttrs = p => p && (ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5 || (p.stats && ATTR_KEYS.filter(a=>p.stats[a]!=null&&p.stats[a]>0).length >= 5));
         const activeScouts = (sjRes.items||[]).filter(j => j.player && !hasFullAttrs(j.player));
         if (activeScouts.length) {
           const uniqueClubs = [...new Set(activeScouts.map(j=>j.player?.club||j.player?.Club).filter(Boolean))];
@@ -1498,13 +1499,15 @@ createApp({
           await Promise.all(batch.map(async c => {
             const enc = encodeURIComponent(c);
             try {
-              const [rejRes, activeRes] = await Promise.all([
+              const [rejRes, activeRes, accRes] = await Promise.all([
                 fetch(`${API}/scouting/jobs?club=${enc}&status=rejected`).then(r=>r.json()),
                 fetch(`${API}/scouting/jobs?club=${enc}`).then(r=>r.json()),
+                fetch(`${API}/scouting/jobs?club=${enc}&status=accepted`).then(r=>r.json()),
               ]);
               const rejJobs = (rejRes.items||[]).map(j=>({...j, _jobStatus: j.status||'rejected'}));
               const activeJobs = (activeRes.items||[]).map(j=>({...j, _jobStatus: j.status||'active'}));
-              const jobs = [...activeJobs, ...rejJobs];
+              const accJobs = (accRes.items||[]).map(j=>({...j, _jobStatus: 'accepted'}));
+              const jobs = [...activeJobs, ...rejJobs, ...accJobs];
               if (jobs.length > 0) {
                 const [facRes, staffRes] = await Promise.all([
                   fetch(`${API}/facilities?club=${enc}`).then(r=>r.json()).catch(()=>({})),
@@ -1523,7 +1526,7 @@ createApp({
 
         // Auto-enrich players with incomplete attributes from their club squads
         const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
-        const hasFullAttrs = p => p && ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5;
+        const hasFullAttrs = p => p && (ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5 || (p.stats && ATTR_KEYS.filter(a=>p.stats[a]!=null&&p.stats[a]>0).length >= 5));
         const needsEnrich = allJobs.filter(j => j.player && !hasFullAttrs(j.player));
         if (needsEnrich.length) {
           this.youthHistMsg = `Enriching attributes for ${needsEnrich.length} players…`;
@@ -1559,6 +1562,23 @@ createApp({
             ts: Date.now()
           }));
         } catch(e) {}
+
+        // Enrich _incompleteStats squad players using accepted scouting job data
+        const acceptedJobs = allJobs.filter(j => j._jobStatus === 'accepted' && j.player?.stats && Object.keys(j.player.stats).length >= 11);
+        if (acceptedJobs.length && this.allPlayers?.length) {
+          const enrichCount = { n: 0 };
+          this.allPlayers = this.allPlayers.map(p => {
+            if (!p._incompleteStats) return p;
+            const pname = (p.Player||'').toLowerCase();
+            const match = acceptedJobs.find(j => (j.player.name||'').toLowerCase() === pname);
+            if (!match) return p;
+            enrichCount.n++;
+            const enriched = {...p, ...match.player.stats};
+            enriched._incompleteStats = FULL_ATTR_KEYS.filter(a=>enriched[a]!=null&&enriched[a]>0).length < 5;
+            return enriched;
+          });
+          if (enrichCount.n) console.log(`[SF] enriched ${enrichCount.n} incomplete players from accepted scouting jobs`);
+        }
 
         this.youthAllHistoryJobs = allJobs.map(j=>({...j,_refreshed:false,_refreshing:false,_refreshFailed:false}));
         this.youthClubInfoMap = clubInfoMap;
