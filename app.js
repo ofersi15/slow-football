@@ -1654,17 +1654,21 @@ createApp({
     },
     facRef(key, lv) {
       lv = Math.max(1, Math.min(5, lv || 1));
-      if (key === 'training') return lv === 1 ? 'Base' : `+${(lv-1)*20}%`;
+      if (key === 'training') return lv === 1 ? 'Base (no XP cap bonus)' : `+${(lv-1)*20}% XP cap`;
       if (key === 'scouting') {
         const slots = 3 + (lv >= 5 ? 2 : lv >= 4 ? 1 : 0);
         const qual = lv >= 5 ? 2 : lv >= 3 ? 1 : 0;
-        return slots + ' slots' + (qual ? ` · +${qual} rating` : '');
+        const speed = lv * 5;
+        return slots + ' slots' + (qual ? ` · +${qual} rtg` : '') + ` · +${speed}% spd`;
       }
       if (key === 'academy') return ['15.0','17.5','19.8','22.0','24.1'][lv-1] + '% big-jump';
       if (key === 'medical') return `Physio ${lv}/5`;
       if (key === 'analytics') return `Asst. ${lv}/5`;
-      if (key === 'stadium') return ['~30k','~40k','~50k','~60k','~80k'][lv-1] + ' seats';
+      if (key === 'stadium') return ['30k','40k','50k','60k','80k'][lv-1] + ' seats';
       return '';
+    },
+    facCurLv(key) {
+      return this.clubFacData?.levels?.[key] || 0;
     },
     facEmoji(key) {
       return {stadium:'🏟',training:'⚽',scouting:'🔭',analytics:'📊',academy:'🌱',medical:'🏥'}[key]||'🏗';

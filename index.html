@@ -1128,11 +1128,6 @@
             "{{facDescription(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}"
           </div>
 
-          <!-- Bonus -->
-          <div style="background:#161b22;border-radius:5px;padding:5px 9px;font-size:11px;color:#79c0ff;margin-bottom:5px">
-            📈 {{facBonus(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}
-          </div>
-
           <!-- Live effects: training -->
           <div v-if="key==='training' && clubStaffEffects && clubStaffEffects.training"
             style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
@@ -1382,21 +1377,22 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="lv in [1,2,3,4,5]" :key="lv"
-                  :style="{borderBottom:'1px solid #21262d', background: clubFacilities && ([clubFacilities.training,clubFacilities.academy,clubFacilities.scouting,clubFacilities.medical,clubFacilities.analytics,clubFacilities.stadium].some(f=>(f&&(f.current===lv||(f.upgrading&&f.level===lv-1)))) ? '#1c2128' : 'transparent')}">
+              <tr v-for="lv in [1,2,3,4,5]" :key="lv" style="border-bottom:1px solid #21262d">
                 <td style="padding:5px 8px;font-weight:700;color:#e6edf3">{{lv}}</td>
-                <td style="padding:5px 8px;color:#7ee787">{{facRef('training',lv)}}</td>
-                <td style="padding:5px 8px;color:#79c0ff">{{facRef('scouting',lv)}}</td>
-                <td style="padding:5px 8px;color:#d2a8ff">{{facRef('academy',lv)}}</td>
-                <td style="padding:5px 8px;color:#ffa657">{{facRef('medical',lv)}}</td>
-                <td style="padding:5px 8px;color:#ffa657">{{facRef('analytics',lv)}}</td>
-                <td style="padding:5px 8px;color:#8b949e">{{facRef('stadium',lv)}}</td>
+                <td v-for="fk in ['training','scouting','academy','medical','analytics','stadium']" :key="fk"
+                  :style="{padding:'5px 8px',
+                    background: facCurLv(fk)===lv ? '#1c2d1e' : (clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv) ? '#2d1f0e' : 'transparent',
+                    fontWeight: facCurLv(fk)===lv ? '700' : '400',
+                    color: fk==='training'?'#7ee787':fk==='scouting'?'#79c0ff':fk==='academy'?'#d2a8ff':fk==='stadium'?'#8b949e':'#ffa657'}">
+                  {{facRef(fk,lv)}}
+                  <span v-if="clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv" style="font-size:9px;margin-left:3px;color:#ffa657">▲</span>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div style="font-size:10px;color:#6e7681;margin-top:5px">
-          Training = XP gain multiplier · Scouting = weekly scout slots &amp; prospect rating boost · Academy = big-jump training chance · Medical = Physio tier cap → injury &amp; recovery · Analytics = Assistant tier cap → automation features · Stadium = matchday capacity &amp; CEO quality
+          Current level highlighted green · ▲ = upgrade in progress · Training = XP cap · Scouting = slots / rating boost / speed · Academy = big-jump chance · Medical = Physio tier cap · Analytics = Assistant tier cap · Stadium = capacity
         </div>
       </div>
 
