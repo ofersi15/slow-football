@@ -1617,12 +1617,15 @@ createApp({
     facBonus(key, level) {
       const lv = Math.max(1, Math.min(5, level || 1));
       if (key === 'training') {
-        const xpLabels = {1:'No XP bonus',2:'Small XP boost',3:'Moderate XP & fatigue recovery',4:'Strong XP & fatigue recovery',5:'Max XP & fatigue recovery'};
-        return xpLabels[lv] + ' (live values shown below)';
+        const xpCap = Math.round((1 + 0.2*(lv-1) - 1)*100);
+        const capStr = xpCap === 0 ? 'No XP cap bonus' : `Up to +${xpCap}% XP cap`;
+        return `${capStr} · live XP & fatigue recovery rates shown below`;
       }
       if (key === 'scouting') {
-        const slotMap = {1:3,2:3,3:4,4:4,5:5};
-        return `${slotMap[lv]||3} active scout slots · live quality bump & prospects/wk shown below`;
+        const slots = 3 + (lv >= 5 ? 2 : lv >= 4 ? 1 : 0);
+        const qualityBump = lv >= 5 ? 2 : lv >= 3 ? 1 : 0;
+        const speedPct = lv * 5;
+        return `${slots} active scout slots · +${qualityBump} quality boost · +${speedPct}% scouting speed`;
       }
       if (key === 'academy') {
         const o = lv - 1;
@@ -1633,7 +1636,7 @@ createApp({
         return `${bigJump}% big-jump chance · ${expected} avg training score`;
       }
       if (key === 'stadium') {
-        const caps = {1:'~30k',2:'~40k',3:'~50k',4:'~60k',5:'max'};
+        const caps = {1:'30,000',2:'40,000',3:'50,000',4:'60,000',5:'80,000'};
         return `${caps[lv]} seat capacity → matchday income · CEO quality via staff`;
       }
       if (key === 'medical') {
