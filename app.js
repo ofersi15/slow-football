@@ -40,7 +40,7 @@ function stringifyAsync(data) {
   });
 }
 
-const API = 'https://sf-game-proxy.ofersi15.workers.dev/api';
+const API = 'https://slowfootball.club/api';
 const MY_CLUB = 'Leverkusen';
 const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];
 const ALL_POSITIONS = ['GK','FB','CB','DM','CM','AM','WF','CF'];
