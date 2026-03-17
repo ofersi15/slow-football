@@ -1133,6 +1133,25 @@
             📈 {{facBonus(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}
           </div>
 
+          <!-- Live effects: training -->
+          <div v-if="key==='training' && clubStaffEffects && clubStaffEffects.training"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">XP gains: <b :class="(clubStaffEffects.training.xpMult||1)>1?'c-green':'c-gray'">
+              +{{Math.round(((clubStaffEffects.training.xpMult||1)-1)*100)}}%
+            </b></span>
+            <span class="c-gray">Fatigue recovery: <b :class="(clubStaffEffects.training.fatigueRecovery||0)>0?'c-green':'c-gray'">
+              +{{Math.round((clubStaffEffects.training.fatigueRecovery||0)*100)}}%
+            </b></span>
+          </div>
+
+          <!-- Live effects: scouting -->
+          <div v-if="key==='scouting' && clubStaffEffects && clubStaffEffects.scouting"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">Prospects/wk: <b class="c-blue">{{clubStaffEffects.scouting.weeklyProspects||0}}</b></span>
+            <span class="c-gray">Quality bump: <b class="c-green">+{{clubStaffEffects.scouting.qualityBump||0}}</b></span>
+            <span v-if="clubStaffEffects.scouting.biasToAdverts" class="c-orange">📋 Bias to ads</span>
+          </div>
+
           <!-- Live effects: medical -->
           <div v-if="key==='medical' && clubStaffEffects && clubStaffEffects.medical"
             style="font-size:11px;display:flex;gap:12px;padding:3px 2px">

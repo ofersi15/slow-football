@@ -1617,12 +1617,12 @@ createApp({
     facBonus(key, level) {
       const lv = Math.max(1, Math.min(5, level || 1));
       if (key === 'training') {
-        return lv === 1 ? 'No training bonus (base)' : `+${(lv-1)*20}% training gains`;
+        const xpLabels = {1:'No XP bonus',2:'Small XP boost',3:'Moderate XP & fatigue recovery',4:'Strong XP & fatigue recovery',5:'Max XP & fatigue recovery'};
+        return xpLabels[lv] + ' (live values shown below)';
       }
       if (key === 'scouting') {
-        const jobs = 3 + (lv >= 5 ? 2 : lv >= 4 ? 1 : 0);
-        const rating = lv >= 5 ? 2 : lv >= 3 ? 1 : 0;
-        return `${jobs} active scout slots${rating > 0 ? ' · up to +'+rating+' prospect rating' : ''}`;
+        const slotMap = {1:3,2:3,3:4,4:4,5:5};
+        return `${slotMap[lv]||3} active scout slots · live quality bump & prospects/wk shown below`;
       }
       if (key === 'academy') {
         const o = lv - 1;
@@ -1867,7 +1867,7 @@ createApp({
       // Try /matches — infer from latest match week
       try {
         const mRes = await fetch(`${API}/matches?club=${encodeURIComponent(MY_CLUB)}&limit=3`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
-        const weeks = (mRes.matches||[]).map(m => Number(m.week ?? m.gameWeek ?? m.round ?? m.weekNumber)).filter(w => w > 0 && !isNaN(w));
+        const weeks = (mRes.matches||[]).map(m => Number(m.gameweek ?? m.week ?? m.gameWeek ?? m.round ?? m.weekNumber)).filter(w => w > 0 && !isNaN(w));
         if (weeks.length) { this.currentGameWeek = Math.max(...weeks) + 1; return; }
         console.log('[SF] /matches response sample:', JSON.stringify((mRes.matches||[])[0]).slice(0,300));
       } catch(e) {}
