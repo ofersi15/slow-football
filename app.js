@@ -57,7 +57,7 @@ const PLAYERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 // When running via server.py, these persist across browser cache clears and
 // are shared across all devices on the same network / Tailscale VPN.
 // All three fall back silently to localStorage if the server is unreachable.
-const SF_CACHE_BASE = ['ofersi15.github.io', 'sf.ofersi15.workers.dev'].includes(location.hostname)
+const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
   ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
   : '/sf-cache';
 async function serverCacheGet(key) {
