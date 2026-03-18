@@ -250,7 +250,8 @@ createApp({
       matchArchive: null,         // null=not loaded, []=loaded
       matchArchiveBuilding: false, matchArchiveProgress: 0, matchArchiveMsg: '',
       matchArchiveCacheDate: null,
-      matchView: null,            // full match object currently open
+      matchView: null, matchDetailLoading: false,
+      matchChunks: {}, matchArchiveChunkCount: 0, matchBuildLog: [],
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
       matchSort: 'date_d',
       // Espionage tab
@@ -2253,6 +2254,113 @@ createApp({
       return gs > gc ? 'W' : gs < gc ? 'L' : 'D';
     },
 
+    async buildMatchArchive() {
+      if (this.matchArchiveBuilding) return;
+      this.matchArchiveBuilding = true;
+      this.matchArchiveProgress = 0;
+      this.matchArchiveMsg = 'Starting…';
+      this.matchBuildLog = [];
+      const log = (msg) => { this.matchBuildLog.push(`${new Date().toLocaleTimeString('en-GB')} ${msg}`); };
+      const delay = ms => new Promise(r => setTimeout(r, ms));
+      const CHUNK_SIZE = 30; // ~750KB per chunk
+      try {
+        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
+        log(`Club list: ${clubList.length} clubs`);
+
+        // Pass 1: collect all unique fixture IDs from match list endpoints
+        const fixtureMap = new Map(); // fixtureId → basic summary
+        for (let i = 0; i < clubList.length; i += 3) {
+          const batch = clubList.slice(i, i + 3);
+          this.matchArchiveProgress = Math.round((i / clubList.length) * 35);
+          this.matchArchiveMsg = `Pass 1: ${Math.min(i+3, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} matches`;
+          await Promise.all(batch.map(async club => {
+            try {
+              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
+              let added = 0;
+              for (const m of (d.matches || [])) {
+                if (m.fixtureId && !fixtureMap.has(m.fixtureId)) { fixtureMap.set(m.fixtureId, m); added++; }
+              }
+              if (added) log(`${club}: ${added} matches`);
+            } catch(e) { log(`ERROR fetching matches for ${club}: ${e.message}`); }
+          }));
+          await delay(250);
+        }
+        log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
+
+        // Pass 2: fetch full match detail for each fixture
+        const fixtureIds = Array.from(fixtureMap.keys());
+        const fullMatches = [];
+        let fetchErrors = 0;
+        for (let i = 0; i < fixtureIds.length; i += 4) {
+          const batch = fixtureIds.slice(i, i + 4);
+          this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 58);
+          this.matchArchiveMsg = `Pass 2: ${i+1}–${Math.min(i+4, fixtureIds.length)}/${fixtureIds.length} · ${fetchErrors} errors`;
+          await Promise.all(batch.map(async id => {
+            try {
+              const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
+              if (d?.match) {
+                const m = d.match;
+                m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
+                m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
+                fullMatches.push(m);
+              } else {
+                fetchErrors++;
+                log(`No match data for fixture ${id}: ${JSON.stringify(d).slice(0,80)}`);
+              }
+            } catch(e) { fetchErrors++; log(`ERROR fetching fixture ${id}: ${e.message}`); }
+          }));
+          await delay(200);
+        }
+        fullMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
+        log(`Pass 2 done: ${fullMatches.length} full matches, ${fetchErrors} errors`);
+
+        // Save compact index (for list view)
+        const compactMatches = fullMatches.map((m, idx) => ({
+          fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
+          competition: m.competition,
+          home: { club: m.home?.club }, away: { club: m.away?.club },
+          score: m.score, headline: m.headline,
+          _homeManager: m._homeManager, _awayManager: m._awayManager,
+          _chunk: Math.floor(idx / CHUNK_SIZE),
+        }));
+        const chunkCount = Math.ceil(fullMatches.length / CHUNK_SIZE);
+        const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, chunkCount, matches: compactMatches };
+        this.matchArchiveMsg = `Saving index…`;
+        log(`Saving index (${(JSON.stringify(indexData).length/1024).toFixed(0)}KB)…`);
+        const idxRes = await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(indexData),
+        });
+        if (!idxRes.ok) throw new Error(`Index save failed: HTTP ${idxRes.status}`);
+        log('Index saved OK');
+
+        // Save data chunks
+        for (let c = 0; c < chunkCount; c++) {
+          const chunk = fullMatches.slice(c * CHUNK_SIZE, (c+1) * CHUNK_SIZE);
+          const chunkStr = JSON.stringify({ matches: chunk });
+          this.matchArchiveMsg = `Saving chunk ${c+1}/${chunkCount} (${(chunkStr.length/1024).toFixed(0)}KB)…`;
+          log(`Saving chunk ${c}: ${chunk.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB`);
+          const r = await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1_data_${c}?permanent=1`, {
+            method: 'POST', headers: {'Content-Type':'application/json'}, body: chunkStr,
+          });
+          if (!r.ok) throw new Error(`Chunk ${c} save failed: HTTP ${r.status}`);
+          log(`Chunk ${c} saved OK`);
+          this.matchArchiveProgress = 93 + Math.round((c / chunkCount) * 7);
+          await delay(300);
+        }
+
+        this.matchArchive = compactMatches;
+        this.matchArchiveChunkCount = chunkCount;
+        this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        this.matchArchiveProgress = 100;
+        this.matchArchiveMsg = `Done — ${fullMatches.length} matches in ${chunkCount} chunks`;
+        log(`Build complete: ${fullMatches.length} matches, ${chunkCount} chunks`);
+      } catch(e) {
+        this.matchArchiveMsg = 'Error: ' + (e.message || e);
+        log(`FATAL: ${e.message || e}`);
+      }
+      this.matchArchiveBuilding = false;
+    },
+
     async loadMatchArchive() {
       try {
         const raw = await serverCacheGet('sf_match_archive_v1');
@@ -2260,81 +2368,39 @@ createApp({
         const data = JSON.parse(raw);
         if (data?.matches?.length) {
           this.matchArchive = data.matches;
+          this.matchArchiveChunkCount = data.chunkCount || 0;
           this.matchArchiveCacheDate = new Date(data.builtAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+          // Pre-load all chunks in background
+          for (let i = 0; i < this.matchArchiveChunkCount; i++) this.loadMatchChunk(i);
         }
       } catch(e) {}
     },
 
-    async buildMatchArchive() {
-      if (this.matchArchiveBuilding) return;
-      this.matchArchiveBuilding = true;
-      this.matchArchiveProgress = 0;
-      this.matchArchiveMsg = 'Fetching club list…';
-      const delay = ms => new Promise(r => setTimeout(r, ms));
-      const BATCH = 3; // parallel requests — keep low to avoid rate limiting
-      const DELAY = 300;
+    async loadMatchChunk(i) {
+      if (this.matchChunks[i]) return;
       try {
-        // Use already-loaded player data to get the club list (avoids extra API call)
-        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
+        const raw = await serverCacheGet(`sf_match_archive_v1_data_${i}`);
+        if (raw) this.matchChunks[i] = JSON.parse(raw).matches || [];
+      } catch(e) {}
+    },
 
-        // Pass 1: collect all unique fixtureIds (batched parallel fetches)
-        const fixtureMap = new Map();
-        for (let i = 0; i < clubList.length; i += BATCH) {
-          const batch = clubList.slice(i, i + BATCH);
-          this.matchArchiveProgress = Math.round((i / clubList.length) * 35);
-          this.matchArchiveMsg = `Scanning match lists: ${i+1}–${Math.min(i+BATCH, clubList.length)}/${clubList.length} clubs (${fixtureMap.size} found)`;
-          await Promise.all(batch.map(async club => {
-            try {
-              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
-              for (const m of (d.matches || [])) {
-                if (m.fixtureId) fixtureMap.set(m.fixtureId, m); // skip null/undefined IDs
-              }
-            } catch(e) {}
-          }));
-          await delay(DELAY);
-        }
-
-        // Pass 2: fetch full match detail (sequential to avoid rate limiting)
-        const fixtureIds = Array.from(fixtureMap.keys());
-        const archiveMatches = [];
-        for (let i = 0; i < fixtureIds.length; i += BATCH) {
-          const batch = fixtureIds.slice(i, i + BATCH);
-          this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 60);
-          this.matchArchiveMsg = `Fetching match details: ${i+1}–${Math.min(i+BATCH, fixtureIds.length)}/${fixtureIds.length}`;
-          for (const id of batch) {
-            try {
-              const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
-              if (d?.match) {
-                const match = d.match;
-                match._homeManager = this.extractManager(match.reportNarrative, match.home?.club || '');
-                match._awayManager = this.extractManager(match.reportNarrative, match.away?.club || '');
-                archiveMatches.push(match);
-              }
-            } catch(e) {} // skip failed individual fetches
-            await delay(150);
-          }
-        }
-
-        // Sort by date descending before storing (guard against missing kickoff)
-        archiveMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
-
-        this.matchArchiveMsg = 'Saving to permanent cache…';
-        const archiveData = { builtAt: Date.now(), matchCount: archiveMatches.length, matches: archiveMatches };
-        // Store with no TTL (omit expirationTtl) → permanent in KV
-        await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(archiveData),
-        });
-
-        this.matchArchive = archiveMatches;
-        this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-        this.matchArchiveProgress = 100;
-        this.matchArchiveMsg = `Done — ${archiveMatches.length} matches archived`;
-      } catch(e) {
-        this.matchArchiveMsg = 'Error: ' + (e.message || e);
+    async openMatch(summary) {
+      this.matchView = summary;
+      this.matchDetailLoading = true;
+      const ci = summary._chunk ?? 0;
+      // Try chunk cache first
+      if (!this.matchChunks[ci]) await this.loadMatchChunk(ci);
+      const full = this.matchChunks[ci]?.find(m => m.fixtureId === summary.fixtureId);
+      if (full) {
+        this.matchView = full;
+      } else {
+        // Fallback: fetch from game API
+        try {
+          const d = await fetch(`${API}/matches/${summary.fixtureId}`).then(r=>r.json());
+          if (d?.match) this.matchView = { ...d.match, _homeManager: summary._homeManager, _awayManager: summary._awayManager };
+        } catch(e) {}
       }
-      this.matchArchiveBuilding = false;
+      this.matchDetailLoading = false;
     },
   },
 

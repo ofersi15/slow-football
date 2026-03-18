@@ -1609,6 +1609,10 @@
           <div :style="{width:matchArchiveProgress+'%',height:'100%',background:'linear-gradient(90deg,#238636,#56d364)',borderRadius:'4px',transition:'width .4s'}"></div>
         </div>
         <div style="font-size:11px;color:#6e7681;margin-top:4px">{{matchArchiveProgress}}%</div>
+        <div v-if="matchBuildLog.length" style="margin-top:10px;max-height:160px;overflow-y:auto;background:#0d1117;border-radius:4px;padding:8px">
+          <div v-for="(line,i) in matchBuildLog" :key="i"
+            :style="{fontSize:'10px',fontFamily:'monospace',color:line.includes('ERROR')||line.includes('FATAL')?'#ff7b72':'#8b949e',marginBottom:'2px'}">{{line}}</div>
+        </div>
       </div>
     </div>
 
@@ -1639,6 +1643,7 @@
       <div v-if="matchView" class="card" style="padding:14px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
           <button @click="matchView=null" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer">← Back</button>
+          <span v-if="matchDetailLoading" style="font-size:11px;color:#8b949e">⏳ Loading full data…</span>
           <span class="c-gray" style="font-size:11px">{{matchView.competition?.name}} · GW{{matchView.gameweek}} · {{new Date(matchView.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}}</span>
         </div>
         <!-- Score header -->
@@ -1741,7 +1746,7 @@
             </thead>
             <tbody>
               <tr v-for="m in matchArchiveFiltered" :key="m.fixtureId"
-                @click="matchView=m" style="border-bottom:1px solid #161b22;cursor:pointer"
+                @click="openMatch(m)" style="border-bottom:1px solid #161b22;cursor:pointer"
                 :style="{background: m.home?.club==='Leverkusen'||m.away?.club==='Leverkusen' ? '#1c2128' : 'transparent'}"
                 class="hover-row">
                 <td style="padding:6px 10px;color:#8b949e">{{new Date(m.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}</td>
@@ -1996,6 +2001,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
