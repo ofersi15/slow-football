@@ -2263,6 +2263,19 @@ createApp({
       this.matchBuildLog = [];
       const log = (msg) => { this.matchBuildLog.push(`${new Date().toLocaleTimeString('en-GB')} ${msg}`); };
       const delay = ms => new Promise(r => setTimeout(r, ms));
+
+      // ── Connectivity test ──────────────────────────────────────────────────
+      log(`Host: ${location.hostname}`);
+      log(`Cache URL: ${SF_CACHE_BASE}`);
+      const pingResult = await fetch(`${SF_CACHE_BASE}/__ping__`, { signal: AbortSignal.timeout(5000) })
+        .then(r => `HTTP ${r.status}`)
+        .catch(e => `FAIL: ${e.message}`);
+      log(`Cache ping: ${pingResult}`);
+      if (pingResult.startsWith('FAIL')) {
+        throw new Error(`Cache worker unreachable — run: wrangler deploy (in cf-worker/ folder)`);
+      }
+      // ── End connectivity test ──────────────────────────────────────────────
+
       // Retry a save up to 3 times with exponential backoff
       const saveWithRetry = async (url, body) => {
         let lastErr;
