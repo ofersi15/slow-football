@@ -2273,8 +2273,8 @@ createApp({
       const delay = ms => new Promise(r => setTimeout(r, ms));
       const DELAY = 400;
       try {
-        const clubs = await fetch(`${API}/admin/squads/public/clubs`).then(r=>r.json());
-        const clubList = Array.isArray(clubs) ? clubs : [];
+        // Use already-loaded player data to get the club list (avoids extra API call)
+        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
 
         // Pass 1: collect all unique fixtureIds
         const fixtureMap = new Map();
