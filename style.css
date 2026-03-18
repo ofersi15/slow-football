@@ -6,7 +6,7 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-seri
 .attr-btn:hover{background:#161b22;color:#e6edf3}
 .attr-btn.active{background:#1f6feb;color:#fff;border-color:#388bfd}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.header{background:#161b22;border-bottom:1px solid #21262d;padding:8px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.header{background:#161b22;border-bottom:1px solid #21262d;padding:8px 14px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;overflow-x:auto}
 .content{flex:1;overflow:auto}
 .btn{padding:4px 10px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#8b949e;transition:all .12s}
 .btn:hover{background:#161b22;color:#e6edf3}
