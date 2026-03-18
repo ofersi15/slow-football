@@ -2271,7 +2271,8 @@ createApp({
       this.matchArchiveProgress = 0;
       this.matchArchiveMsg = 'Fetching club list…';
       const delay = ms => new Promise(r => setTimeout(r, ms));
-      const BATCH = 6; // parallel requests per batch
+      const BATCH = 3; // parallel requests — keep low to avoid rate limiting
+      const DELAY = 300;
       try {
         // Use already-loaded player data to get the club list (avoids extra API call)
         const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
@@ -2286,32 +2287,32 @@ createApp({
             try {
               const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
               for (const m of (d.matches || [])) {
-                if (!fixtureMap.has(m.fixtureId)) fixtureMap.set(m.fixtureId, m);
+                if (m.fixtureId) fixtureMap.set(m.fixtureId, m); // skip null/undefined IDs
               }
             } catch(e) {}
           }));
-          await delay(200);
+          await delay(DELAY);
         }
 
-        // Pass 2: fetch full match detail (batched parallel fetches)
+        // Pass 2: fetch full match detail (sequential to avoid rate limiting)
         const fixtureIds = Array.from(fixtureMap.keys());
         const archiveMatches = [];
         for (let i = 0; i < fixtureIds.length; i += BATCH) {
           const batch = fixtureIds.slice(i, i + BATCH);
           this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 60);
           this.matchArchiveMsg = `Fetching match details: ${i+1}–${Math.min(i+BATCH, fixtureIds.length)}/${fixtureIds.length}`;
-          const results = await Promise.all(batch.map(id =>
-            fetch(`${API}/matches/${id}`).then(r=>r.json()).catch(()=>null)
-          ));
-          for (const d of results) {
-            if (d?.match) {
-              const match = d.match;
-              match._homeManager = this.extractManager(match.reportNarrative, match.home?.club || '');
-              match._awayManager = this.extractManager(match.reportNarrative, match.away?.club || '');
-              archiveMatches.push(match);
-            }
+          for (const id of batch) {
+            try {
+              const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
+              if (d?.match) {
+                const match = d.match;
+                match._homeManager = this.extractManager(match.reportNarrative, match.home?.club || '');
+                match._awayManager = this.extractManager(match.reportNarrative, match.away?.club || '');
+                archiveMatches.push(match);
+              }
+            } catch(e) {} // skip failed individual fetches
+            await delay(150);
           }
-          await delay(200);
         }
 
         // Sort by date descending before storing (guard against missing kickoff)
