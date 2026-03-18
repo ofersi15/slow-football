@@ -2264,17 +2264,18 @@ createApp({
       const log = (msg) => { this.matchBuildLog.push(`${new Date().toLocaleTimeString('en-GB')} ${msg}`); };
       const delay = ms => new Promise(r => setTimeout(r, ms));
 
-      // ── Connectivity test ──────────────────────────────────────────────────
-      log(`Host: ${location.hostname}`);
-      log(`Cache URL: ${SF_CACHE_BASE}`);
-      const pingResult = await fetch(`${SF_CACHE_BASE}/__ping__`, { signal: AbortSignal.timeout(5000) })
+      // ── Write test: fail before fetching if cache is broken ───────────────
+      log(`Host: ${location.hostname} | Cache: ${SF_CACHE_BASE}`);
+      const writeTestUrl = `${SF_CACHE_BASE}/__write_test__`;
+      const writeTest = await fetch(writeTestUrl, { method: 'POST', body: '1', signal: AbortSignal.timeout(8000) })
         .then(r => `HTTP ${r.status}`)
-        .catch(e => `FAIL: ${e.message}`);
-      log(`Cache ping: ${pingResult}`);
-      if (pingResult.startsWith('FAIL')) {
-        throw new Error(`Cache worker unreachable — run: wrangler deploy (in cf-worker/ folder)`);
+        .catch(e => `FAIL: ${e.name}: ${e.message}`);
+      log(`Cache write test: ${writeTest}`);
+      fetch(writeTestUrl, { method: 'DELETE' }).catch(() => {}); // clean up test key
+      if (!writeTest.startsWith('HTTP 2')) {
+        throw new Error(`Cache write failed before fetch: ${writeTest}`);
       }
-      // ── End connectivity test ──────────────────────────────────────────────
+      // ──────────────────────────────────────────────────────────────────────
 
       // Retry a save up to 3 times with exponential backoff
       const saveWithRetry = async (url, body) => {
@@ -2282,38 +2283,38 @@ createApp({
         for (let attempt = 0; attempt < 3; attempt++) {
           if (attempt > 0) await delay(1000 * attempt);
           try {
-            // text/plain avoids CORS preflight (simple request) — Worker reads it as text regardless
-            const r = await fetch(url, { method: 'POST', body });
+            const r = await fetch(url, { method: 'POST', body, signal: AbortSignal.timeout(15000) });
             if (r.ok) return true;
             lastErr = `HTTP ${r.status}: ${await r.text().catch(()=>'')}`;
-          } catch(e) { lastErr = e.message; }
+          } catch(e) { lastErr = `${e.name}: ${e.message}`; }
         }
-        return lastErr; // return error string on failure
+        return lastErr;
       };
 
       try {
-        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
-        log(`Club list: ${clubList.length} clubs`);
-
-        // Pass 1: collect all unique fixture IDs (6 clubs at a time)
+        // Pass 1: collect fixtures by gameweek — cleaner than by-club, no deduplication needed
         const fixtureMap = new Map();
-        for (let i = 0; i < clubList.length; i += 6) {
-          const batch = clubList.slice(i, i + 6);
-          this.matchArchiveProgress = Math.round((i / clubList.length) * 30);
-          this.matchArchiveMsg = `Pass 1: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} matches`;
-          await Promise.all(batch.map(async club => {
+        const MAX_GW = 50; // overshoot; empty GWs just return 0 results
+        let lastNonEmptyGw = 0;
+        for (let g = 1; g <= MAX_GW; g += 10) {
+          const gwBatch = Array.from({length: 10}, (_, i) => g + i);
+          this.matchArchiveProgress = Math.round((g / MAX_GW) * 30);
+          this.matchArchiveMsg = `Pass 1: GW${g}–GW${g+9} · ${fixtureMap.size} fixtures`;
+          await Promise.all(gwBatch.map(async gw => {
             try {
-              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
+              const d = await fetch(`${API}/matches?gameweek=${gw}&limit=100`).then(r=>r.json());
               let added = 0;
-              for (const m of (d.matches || [])) {
+              for (const m of (d?.matches || [])) {
                 if (m.fixtureId && !fixtureMap.has(m.fixtureId)) { fixtureMap.set(m.fixtureId, m); added++; }
               }
-              if (added) log(`${club}: +${added} (total ${fixtureMap.size})`);
-            } catch(e) { log(`ERROR ${club}: ${e.message}`); }
+              if (added) { log(`GW${gw}: ${added} matches`); lastNonEmptyGw = Math.max(lastNonEmptyGw, gw); }
+            } catch(e) { log(`ERROR GW${gw}: ${e.message}`); }
           }));
-          await delay(120);
+          // Stop if we're 15+ GWs past the last match
+          if (g > 10 && g > lastNonEmptyGw + 15) { log(`No matches past GW${lastNonEmptyGw}, stopping`); break; }
+          await delay(100);
         }
-        log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
+        log(`Pass 1 done: ${fixtureMap.size} unique fixtures (last GW: ${lastNonEmptyGw})`);
 
         // Pass 2: fetch full match detail (10 at a time)
         const fixtureIds = Array.from(fixtureMap.keys());
