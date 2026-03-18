@@ -2263,8 +2263,6 @@ createApp({
       this.matchBuildLog = [];
       const log = (msg) => { this.matchBuildLog.push(`${new Date().toLocaleTimeString('en-GB')} ${msg}`); };
       const delay = ms => new Promise(r => setTimeout(r, ms));
-      const CHUNK_SIZE = 30;
-
       // Retry a save up to 3 times with exponential backoff
       const saveWithRetry = async (url, body) => {
         let lastErr;
@@ -2309,7 +2307,7 @@ createApp({
         let fetchErrors = 0;
         for (let i = 0; i < fixtureIds.length; i += 10) {
           const batch = fixtureIds.slice(i, i + 10);
-          this.matchArchiveProgress = 30 + Math.round((i / fixtureIds.length) * 58);
+          this.matchArchiveProgress = 30 + Math.round((i / fixtureIds.length) * 55);
           this.matchArchiveMsg = `Pass 2: ${Math.min(i+10, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
           await Promise.all(batch.map(async id => {
             try {
@@ -2330,55 +2328,64 @@ createApp({
         fullMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
         log(`Pass 2 done: ${fullMatches.length} matches, ${fetchErrors} errors`);
 
-        // Build compact index
-        const compactMatches = fullMatches.map((m, idx) => ({
+        // Group full matches by gameweek for chunk storage
+        const gwMap = new Map(); // gw → [matches]
+        for (const m of fullMatches) {
+          const gw = m.gameweek ?? 0;
+          if (!gwMap.has(gw)) gwMap.set(gw, []);
+          gwMap.get(gw).push(m);
+        }
+        const sortedGws = [...gwMap.keys()].sort((a,b) => a - b);
+        log(`Gameweeks: ${sortedGws.length} (GW${sortedGws[0]}–GW${sortedGws[sortedGws.length-1]})`);
+
+        // Build compact index — _gw field points to the gameweek chunk
+        const compactMatches = fullMatches.map(m => ({
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
           home: { club: m.home?.club }, away: { club: m.away?.club },
           score: m.score, headline: m.headline,
           _homeManager: m._homeManager, _awayManager: m._awayManager,
-          _chunk: Math.floor(idx / CHUNK_SIZE),
+          _gw: m.gameweek ?? 0,
         }));
-        const chunkCount = Math.ceil(fullMatches.length / CHUNK_SIZE);
-        const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, chunkCount, matches: compactMatches };
+        const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, gwCount: sortedGws.length, gameweeks: sortedGws, matches: compactMatches };
         const indexStr = JSON.stringify(indexData);
 
         // Save index (with retry)
-        this.matchArchiveProgress = 89;
+        this.matchArchiveProgress = 86;
         this.matchArchiveMsg = `Saving index (${(indexStr.length/1024).toFixed(0)}KB)…`;
         log(`Saving index: ${(indexStr.length/1024).toFixed(0)}KB`);
-        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, indexStr);
+        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v2?permanent=1`, indexStr);
         if (idxErr !== true) throw new Error(`Index save failed: ${idxErr}`);
         log('Index saved OK');
 
-        // Save chunks — continue even if some fail, log failures
+        // Save one chunk per gameweek — continue even if some fail
         let chunksFailed = 0;
-        for (let c = 0; c < chunkCount; c++) {
-          const chunk = fullMatches.slice(c * CHUNK_SIZE, (c+1) * CHUNK_SIZE);
-          const chunkStr = JSON.stringify({ matches: chunk });
-          this.matchArchiveProgress = 89 + Math.round(((c + 1) / chunkCount) * 10);
-          this.matchArchiveMsg = `Saving chunk ${c+1}/${chunkCount} (${(chunkStr.length/1024).toFixed(0)}KB)…`;
-          log(`Chunk ${c}: ${chunk.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB`);
-          const err = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v1_data_${c}?permanent=1`, chunkStr);
+        for (let gi = 0; gi < sortedGws.length; gi++) {
+          const gw = sortedGws[gi];
+          const gwMatches = gwMap.get(gw);
+          const chunkStr = JSON.stringify({ gw, matches: gwMatches });
+          this.matchArchiveProgress = 86 + Math.round(((gi + 1) / sortedGws.length) * 13);
+          this.matchArchiveMsg = `Saving GW${gw} (${gwMatches.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB)…`;
+          const err = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v2_gw_${gw}?permanent=1`, chunkStr);
           if (err === true) {
-            log(`Chunk ${c} saved OK`);
+            log(`GW${gw}: ${gwMatches.length} matches saved OK (${(chunkStr.length/1024).toFixed(0)}KB)`);
           } else {
             chunksFailed++;
-            log(`ERROR chunk ${c}: ${err}`);
+            log(`ERROR GW${gw}: ${err}`);
           }
           await delay(150);
         }
 
         this.matchArchive = compactMatches;
-        this.matchArchiveChunkCount = chunkCount;
+        this.matchArchiveChunkCount = sortedGws.length;
         this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         this.matchArchiveProgress = 100;
         if (chunksFailed > 0) {
-          this.matchArchiveMsg = `Done with ${chunksFailed} chunk save errors — ${fullMatches.length} matches`;
-          log(`Build complete (${chunksFailed} chunks failed to save)`);
+          this.matchArchiveMsg = `Done (${chunksFailed} GW save errors) — ${fullMatches.length} matches`;
+          log(`Build complete: ${fullMatches.length} matches, ${chunksFailed} GW(s) failed`);
         } else {
-          this.matchArchiveMsg = `Done — ${fullMatches.length} matches in ${chunkCount} chunks`;
-          log(`Build complete: ${fullMatches.length} matches, ${chunkCount} chunks`);
+          this.matchArchiveMsg = `Done — ${fullMatches.length} matches across ${sortedGws.length} gameweeks`;
+          log(`Build complete: ${fullMatches.length} matches, ${sortedGws.length} GW chunks`);
         }
       } catch(e) {
         this.matchArchiveMsg = 'Error: ' + (e.message || e);
@@ -2389,34 +2396,31 @@ createApp({
 
     async loadMatchArchive() {
       try {
-        const raw = await serverCacheGet('sf_match_archive_v1');
+        const raw = await serverCacheGet('sf_match_archive_v2');
         if (!raw) return;
         const data = JSON.parse(raw);
         if (data?.matches?.length) {
           this.matchArchive = data.matches;
-          this.matchArchiveChunkCount = data.chunkCount || 0;
+          this.matchArchiveChunkCount = data.gwCount || 0;
           this.matchArchiveCacheDate = new Date(data.builtAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-          // Pre-load all chunks in background
-          for (let i = 0; i < this.matchArchiveChunkCount; i++) this.loadMatchChunk(i);
         }
       } catch(e) {}
     },
 
-    async loadMatchChunk(i) {
-      if (this.matchChunks[i]) return;
+    async loadMatchChunk(gw) {
+      if (this.matchChunks[gw]) return;
       try {
-        const raw = await serverCacheGet(`sf_match_archive_v1_data_${i}`);
-        if (raw) this.matchChunks[i] = JSON.parse(raw).matches || [];
+        const raw = await serverCacheGet(`sf_match_archive_v2_gw_${gw}`);
+        if (raw) this.matchChunks[gw] = JSON.parse(raw).matches || [];
       } catch(e) {}
     },
 
     async openMatch(summary) {
       this.matchView = summary;
       this.matchDetailLoading = true;
-      const ci = summary._chunk ?? 0;
-      // Try chunk cache first
-      if (!this.matchChunks[ci]) await this.loadMatchChunk(ci);
-      const full = this.matchChunks[ci]?.find(m => m.fixtureId === summary.fixtureId);
+      const gw = summary._gw ?? summary.gameweek ?? 0;
+      if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
+      const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
       if (full) {
         this.matchView = full;
       } else {
