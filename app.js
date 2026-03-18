@@ -2242,7 +2242,8 @@ createApp({
       const text = Array.isArray(narrativeArr) ? narrativeArr.join(' ') : (narrativeArr || '');
       // Match "First Last's ClubName" — handles accented chars
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pat = new RegExp(`([A-ZÀ-Ý][a-zà-ÿ]+(?:[- ][A-ZÀ-Ý][a-zà-ÿ]+)+)'s (?:${esc})\\b`);
+      // Use explicit safe ranges to avoid × (U+00D7) and ÷ (U+00F7) in character classes
+      const pat = new RegExp(`([A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF]+(?:[- ][A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF]+)+)'s (?:${esc})\\b`);
       const m = text.match(pat);
       return m ? m[1] : null;
     },
@@ -2262,17 +2263,32 @@ createApp({
       this.matchBuildLog = [];
       const log = (msg) => { this.matchBuildLog.push(`${new Date().toLocaleTimeString('en-GB')} ${msg}`); };
       const delay = ms => new Promise(r => setTimeout(r, ms));
-      const CHUNK_SIZE = 30; // ~750KB per chunk
+      const CHUNK_SIZE = 30;
+
+      // Retry a save up to 3 times with exponential backoff
+      const saveWithRetry = async (url, body) => {
+        let lastErr;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0) await delay(1000 * attempt);
+          try {
+            const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body });
+            if (r.ok) return true;
+            lastErr = `HTTP ${r.status}: ${await r.text().catch(()=>'')}`;
+          } catch(e) { lastErr = e.message; }
+        }
+        return lastErr; // return error string on failure
+      };
+
       try {
         const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
         log(`Club list: ${clubList.length} clubs`);
 
-        // Pass 1: collect all unique fixture IDs from match list endpoints
-        const fixtureMap = new Map(); // fixtureId → basic summary
-        for (let i = 0; i < clubList.length; i += 3) {
-          const batch = clubList.slice(i, i + 3);
-          this.matchArchiveProgress = Math.round((i / clubList.length) * 35);
-          this.matchArchiveMsg = `Pass 1: ${Math.min(i+3, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} matches`;
+        // Pass 1: collect all unique fixture IDs (6 clubs at a time)
+        const fixtureMap = new Map();
+        for (let i = 0; i < clubList.length; i += 6) {
+          const batch = clubList.slice(i, i + 6);
+          this.matchArchiveProgress = Math.round((i / clubList.length) * 30);
+          this.matchArchiveMsg = `Pass 1: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} matches`;
           await Promise.all(batch.map(async club => {
             try {
               const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
@@ -2280,21 +2296,21 @@ createApp({
               for (const m of (d.matches || [])) {
                 if (m.fixtureId && !fixtureMap.has(m.fixtureId)) { fixtureMap.set(m.fixtureId, m); added++; }
               }
-              if (added) log(`${club}: ${added} matches`);
-            } catch(e) { log(`ERROR fetching matches for ${club}: ${e.message}`); }
+              if (added) log(`${club}: +${added} (total ${fixtureMap.size})`);
+            } catch(e) { log(`ERROR ${club}: ${e.message}`); }
           }));
-          await delay(250);
+          await delay(120);
         }
         log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
 
-        // Pass 2: fetch full match detail for each fixture
+        // Pass 2: fetch full match detail (10 at a time)
         const fixtureIds = Array.from(fixtureMap.keys());
         const fullMatches = [];
         let fetchErrors = 0;
-        for (let i = 0; i < fixtureIds.length; i += 4) {
-          const batch = fixtureIds.slice(i, i + 4);
-          this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 58);
-          this.matchArchiveMsg = `Pass 2: ${i+1}–${Math.min(i+4, fixtureIds.length)}/${fixtureIds.length} · ${fetchErrors} errors`;
+        for (let i = 0; i < fixtureIds.length; i += 10) {
+          const batch = fixtureIds.slice(i, i + 10);
+          this.matchArchiveProgress = 30 + Math.round((i / fixtureIds.length) * 58);
+          this.matchArchiveMsg = `Pass 2: ${Math.min(i+10, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
           await Promise.all(batch.map(async id => {
             try {
               const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
@@ -2305,16 +2321,16 @@ createApp({
                 fullMatches.push(m);
               } else {
                 fetchErrors++;
-                log(`No match data for fixture ${id}: ${JSON.stringify(d).slice(0,80)}`);
+                log(`No data for ${id}: ${JSON.stringify(d).slice(0,60)}`);
               }
-            } catch(e) { fetchErrors++; log(`ERROR fetching fixture ${id}: ${e.message}`); }
+            } catch(e) { fetchErrors++; log(`ERROR fixture ${id}: ${e.message}`); }
           }));
-          await delay(200);
+          await delay(80);
         }
         fullMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
-        log(`Pass 2 done: ${fullMatches.length} full matches, ${fetchErrors} errors`);
+        log(`Pass 2 done: ${fullMatches.length} matches, ${fetchErrors} errors`);
 
-        // Save compact index (for list view)
+        // Build compact index
         const compactMatches = fullMatches.map((m, idx) => ({
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
@@ -2325,35 +2341,45 @@ createApp({
         }));
         const chunkCount = Math.ceil(fullMatches.length / CHUNK_SIZE);
         const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, chunkCount, matches: compactMatches };
-        this.matchArchiveMsg = `Saving index…`;
-        log(`Saving index (${(JSON.stringify(indexData).length/1024).toFixed(0)}KB)…`);
-        const idxRes = await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, {
-          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(indexData),
-        });
-        if (!idxRes.ok) throw new Error(`Index save failed: HTTP ${idxRes.status}`);
+        const indexStr = JSON.stringify(indexData);
+
+        // Save index (with retry)
+        this.matchArchiveProgress = 89;
+        this.matchArchiveMsg = `Saving index (${(indexStr.length/1024).toFixed(0)}KB)…`;
+        log(`Saving index: ${(indexStr.length/1024).toFixed(0)}KB`);
+        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, indexStr);
+        if (idxErr !== true) throw new Error(`Index save failed: ${idxErr}`);
         log('Index saved OK');
 
-        // Save data chunks
+        // Save chunks — continue even if some fail, log failures
+        let chunksFailed = 0;
         for (let c = 0; c < chunkCount; c++) {
           const chunk = fullMatches.slice(c * CHUNK_SIZE, (c+1) * CHUNK_SIZE);
           const chunkStr = JSON.stringify({ matches: chunk });
+          this.matchArchiveProgress = 89 + Math.round(((c + 1) / chunkCount) * 10);
           this.matchArchiveMsg = `Saving chunk ${c+1}/${chunkCount} (${(chunkStr.length/1024).toFixed(0)}KB)…`;
-          log(`Saving chunk ${c}: ${chunk.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB`);
-          const r = await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1_data_${c}?permanent=1`, {
-            method: 'POST', headers: {'Content-Type':'application/json'}, body: chunkStr,
-          });
-          if (!r.ok) throw new Error(`Chunk ${c} save failed: HTTP ${r.status}`);
-          log(`Chunk ${c} saved OK`);
-          this.matchArchiveProgress = 93 + Math.round((c / chunkCount) * 7);
-          await delay(300);
+          log(`Chunk ${c}: ${chunk.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB`);
+          const err = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v1_data_${c}?permanent=1`, chunkStr);
+          if (err === true) {
+            log(`Chunk ${c} saved OK`);
+          } else {
+            chunksFailed++;
+            log(`ERROR chunk ${c}: ${err}`);
+          }
+          await delay(150);
         }
 
         this.matchArchive = compactMatches;
         this.matchArchiveChunkCount = chunkCount;
         this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         this.matchArchiveProgress = 100;
-        this.matchArchiveMsg = `Done — ${fullMatches.length} matches in ${chunkCount} chunks`;
-        log(`Build complete: ${fullMatches.length} matches, ${chunkCount} chunks`);
+        if (chunksFailed > 0) {
+          this.matchArchiveMsg = `Done with ${chunksFailed} chunk save errors — ${fullMatches.length} matches`;
+          log(`Build complete (${chunksFailed} chunks failed to save)`);
+        } else {
+          this.matchArchiveMsg = `Done — ${fullMatches.length} matches in ${chunkCount} chunks`;
+          log(`Build complete: ${fullMatches.length} matches, ${chunkCount} chunks`);
+        }
       } catch(e) {
         this.matchArchiveMsg = 'Error: ' + (e.message || e);
         log(`FATAL: ${e.message || e}`);

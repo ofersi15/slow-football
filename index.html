@@ -1644,7 +1644,7 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
           <button @click="matchView=null" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer">← Back</button>
           <span v-if="matchDetailLoading" style="font-size:11px;color:#8b949e">⏳ Loading full data…</span>
-          <span class="c-gray" style="font-size:11px">{{matchView.competition?.name}} · GW{{matchView.gameweek}} · {{new Date(matchView.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}}</span>
+          <span class="c-gray" style="font-size:11px">{{matchView.competition?.name}} · GW{{matchView.gameweek}} · {{matchView.kickoff ? new Date(matchView.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : ''}}</span>
         </div>
         <!-- Score header -->
         <div style="text-align:center;margin-bottom:12px">
@@ -1687,8 +1687,8 @@
           <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Match Report</div>
           <div v-for="(para,i) in matchView.reportNarrative" :key="i"
             :style="{fontSize:'12px',lineHeight:'1.6',marginBottom:'8px',paddingLeft:'8px',
-              borderLeft: para.startsWith('Pre-match')?'2px solid #388bfd':para.startsWith('Half-time')?'2px solid #ffa657':para.startsWith('Full-time')?'2px solid #56d364':'2px solid #30363d',
-              color: para.startsWith('Pre-match')||para.startsWith('Half-time')||para.startsWith('Full-time')?'#8b949e':'#e6edf3'}">
+              borderLeft: para?.startsWith('Pre-match')?'2px solid #388bfd':para?.startsWith('Half-time')?'2px solid #ffa657':para?.startsWith('Full-time')?'2px solid #56d364':'2px solid #30363d',
+              color: para?.startsWith('Pre-match')||para?.startsWith('Half-time')||para?.startsWith('Full-time')?'#8b949e':'#e6edf3'}">
             {{para}}
           </div>
         </div>
@@ -2001,6 +2001,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
