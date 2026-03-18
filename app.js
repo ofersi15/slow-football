@@ -209,7 +209,7 @@ createApp({
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: localStorage.getItem('sf_activeTab') || 'squad',
-      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 Club'},{id:'espionage',label:'🕵 Espionage'}],
+      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 Club'},{id:'espionage',label:'🕵 Espionage'},{id:'matches',label:'📺 Matches'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
       attrFiltersOpen: false,
@@ -246,6 +246,13 @@ createApp({
       tblSort: {}, negoSort: 'date_d',
       // Saved lineup
       savedLineup: null,
+      // Matches archive tab
+      matchArchive: null,         // null=not loaded, []=loaded
+      matchArchiveBuilding: false, matchArchiveProgress: 0, matchArchiveMsg: '',
+      matchArchiveCacheDate: null,
+      matchView: null,            // full match object currently open
+      matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
+      matchSort: 'date_d',
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -331,6 +338,47 @@ createApp({
   },
 
   computed: {
+    matchArchiveFiltered() {
+      if (!this.matchArchive) return [];
+      let items = this.matchArchive;
+      if (this.matchFilterComp) items = items.filter(m => m.competition?.code === this.matchFilterComp);
+      if (this.matchFilterClub) {
+        const c = this.matchFilterClub;
+        items = items.filter(m => m.home?.club === c || m.away?.club === c);
+      }
+      if (this.matchFilterManager) {
+        const mg = this.matchFilterManager.toLowerCase();
+        items = items.filter(m => (m._homeManager||'').toLowerCase().includes(mg) || (m._awayManager||'').toLowerCase().includes(mg));
+      }
+      const s = this.matchSort;
+      if (s === 'date_d') return [...items].sort((a,b) => b.kickoff.localeCompare(a.kickoff));
+      if (s === 'date_a') return [...items].sort((a,b) => a.kickoff.localeCompare(b.kickoff));
+      return items;
+    },
+    matchArchiveManagers() {
+      if (!this.matchArchive) return [];
+      const mgrs = new Set();
+      this.matchArchive.forEach(m => {
+        if (m._homeManager) mgrs.add(m._homeManager);
+        if (m._awayManager) mgrs.add(m._awayManager);
+      });
+      return Array.from(mgrs).sort();
+    },
+    matchArchiveClubs() {
+      if (!this.matchArchive) return [];
+      const clubs = new Set();
+      this.matchArchive.forEach(m => {
+        if (m.home?.club) clubs.add(m.home.club);
+        if (m.away?.club) clubs.add(m.away.club);
+      });
+      return Array.from(clubs).sort();
+    },
+    matchArchiveComps() {
+      if (!this.matchArchive) return [];
+      const comps = new Map();
+      this.matchArchive.forEach(m => { if (m.competition?.code) comps.set(m.competition.code, m.competition.name); });
+      return Array.from(comps.entries()).map(([code,name])=>({code,name})).sort((a,b)=>a.name.localeCompare(b.name));
+    },
     filterableAttrs() {
       return [
         {k:'Speed',l:'Speed'},{k:'Stamina',l:'Stamina'},{k:'Dribbling',l:'Drib'},
@@ -2193,6 +2241,100 @@ createApp({
     if (this.youthBgInterval) clearInterval(this.youthBgInterval);
   },
 
+  // ── Match Archive ─────────────────────────────────────────────────────────
+    extractManager(narrativeArr, club) {
+      const text = Array.isArray(narrativeArr) ? narrativeArr.join(' ') : (narrativeArr || '');
+      // Match "First Last's ClubName" — handles accented chars
+      const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pat = new RegExp(`([A-ZÀ-Ý][a-zà-ÿ]+(?:[- ][A-ZÀ-Ý][a-zà-ÿ]+)+)'s (?:${esc})\\b`);
+      const m = text.match(pat);
+      return m ? m[1] : null;
+    },
+
+    matchResultFor(match, club) {
+      const isHome = match.home?.club === club;
+      const hs = match.score?.home ?? 0, as = match.score?.away ?? 0;
+      const gs = isHome ? hs : as, gc = isHome ? as : hs;
+      return gs > gc ? 'W' : gs < gc ? 'L' : 'D';
+    },
+
+    async loadMatchArchive() {
+      try {
+        const raw = await serverCacheGet('sf_match_archive_v1');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data?.matches?.length) {
+          this.matchArchive = data.matches;
+          this.matchArchiveCacheDate = new Date(data.builtAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        }
+      } catch(e) {}
+    },
+
+    async buildMatchArchive() {
+      if (this.matchArchiveBuilding) return;
+      this.matchArchiveBuilding = true;
+      this.matchArchiveProgress = 0;
+      this.matchArchiveMsg = 'Fetching club list…';
+      const delay = ms => new Promise(r => setTimeout(r, ms));
+      const DELAY = 400;
+      try {
+        const clubs = await fetch(`${API}/admin/squads/public/clubs`).then(r=>r.json());
+        const clubList = Array.isArray(clubs) ? clubs : [];
+
+        // Pass 1: collect all unique fixtureIds
+        const fixtureMap = new Map();
+        for (let i = 0; i < clubList.length; i++) {
+          this.matchArchiveProgress = Math.round((i / clubList.length) * 35);
+          this.matchArchiveMsg = `Scanning match lists: ${i+1}/${clubList.length} clubs (${fixtureMap.size} matches found)`;
+          await delay(DELAY);
+          try {
+            const d = await fetch(`${API}/matches?club=${encodeURIComponent(clubList[i])}&limit=200`).then(r=>r.json());
+            for (const m of (d.matches || [])) {
+              if (!fixtureMap.has(m.fixtureId)) fixtureMap.set(m.fixtureId, m);
+            }
+          } catch(e) {}
+        }
+
+        // Pass 2: fetch full detail for each unique match
+        const fixtureIds = Array.from(fixtureMap.keys());
+        const archiveMatches = [];
+        for (let i = 0; i < fixtureIds.length; i++) {
+          this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 60);
+          this.matchArchiveMsg = `Fetching full match data: ${i+1}/${fixtureIds.length}`;
+          await delay(DELAY);
+          try {
+            const d = await fetch(`${API}/matches/${fixtureIds[i]}`).then(r=>r.json());
+            if (d.match) {
+              const match = d.match;
+              match._homeManager = this.extractManager(match.reportNarrative, match.home?.club || '');
+              match._awayManager = this.extractManager(match.reportNarrative, match.away?.club || '');
+              archiveMatches.push(match);
+            }
+          } catch(e) {}
+        }
+
+        // Sort by date descending before storing
+        archiveMatches.sort((a,b) => b.kickoff.localeCompare(a.kickoff));
+
+        this.matchArchiveMsg = 'Saving to permanent cache…';
+        const archiveData = { builtAt: Date.now(), matchCount: archiveMatches.length, matches: archiveMatches };
+        // Store with no TTL (omit expirationTtl) → permanent in KV
+        await fetch(`${SF_CACHE_BASE}/sf_match_archive_v1?permanent=1`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(archiveData),
+        });
+
+        this.matchArchive = archiveMatches;
+        this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        this.matchArchiveProgress = 100;
+        this.matchArchiveMsg = `Done — ${archiveMatches.length} matches archived`;
+      } catch(e) {
+        this.matchArchiveMsg = 'Error: ' + (e.message || e);
+      }
+      this.matchArchiveBuilding = false;
+    },
+
   mounted() {
     Chart.defaults.font.family="'Segoe UI',system-ui,sans-serif";
     Chart.defaults.color='#8b949e';
@@ -2215,6 +2357,7 @@ createApp({
     // from blocking the initial render and making the page appear frozen on slower machines.
     // Double-RAF: first fires before paint, second fires after paint.
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
+    this.loadMatchArchive();
     // Fetch current game week proactively so the staff recruitment input shows the right week
     this.fetchCurrentGameWeek();
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental

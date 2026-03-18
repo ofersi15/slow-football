@@ -19,7 +19,9 @@ export default {
       return new Response(val, { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     if (request.method === 'POST') {
-      await env.SF_CACHE.put(key, await request.text(), { expirationTtl: 7 * 24 * 3600 });
+      const permanent = url.searchParams.get('permanent') === '1';
+      const opts = permanent ? {} : { expirationTtl: 7 * 24 * 3600 };
+      await env.SF_CACHE.put(key, await request.text(), opts);
       return new Response('ok', { headers: cors });
     }
     if (request.method === 'DELETE') {
