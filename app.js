@@ -351,8 +351,8 @@ createApp({
         items = items.filter(m => (m._homeManager||'').toLowerCase().includes(mg) || (m._awayManager||'').toLowerCase().includes(mg));
       }
       const s = this.matchSort;
-      if (s === 'date_d') return [...items].sort((a,b) => b.kickoff.localeCompare(a.kickoff));
-      if (s === 'date_a') return [...items].sort((a,b) => a.kickoff.localeCompare(b.kickoff));
+      if (s === 'date_d') return [...items].sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
+      if (s === 'date_a') return [...items].sort((a,b) => (a.kickoff||'').localeCompare(b.kickoff||''));
       return items;
     },
     matchArchiveManagers() {
@@ -2271,45 +2271,51 @@ createApp({
       this.matchArchiveProgress = 0;
       this.matchArchiveMsg = 'Fetching club list…';
       const delay = ms => new Promise(r => setTimeout(r, ms));
-      const DELAY = 400;
+      const BATCH = 6; // parallel requests per batch
       try {
         // Use already-loaded player data to get the club list (avoids extra API call)
         const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
 
-        // Pass 1: collect all unique fixtureIds
+        // Pass 1: collect all unique fixtureIds (batched parallel fetches)
         const fixtureMap = new Map();
-        for (let i = 0; i < clubList.length; i++) {
+        for (let i = 0; i < clubList.length; i += BATCH) {
+          const batch = clubList.slice(i, i + BATCH);
           this.matchArchiveProgress = Math.round((i / clubList.length) * 35);
-          this.matchArchiveMsg = `Scanning match lists: ${i+1}/${clubList.length} clubs (${fixtureMap.size} matches found)`;
-          await delay(DELAY);
-          try {
-            const d = await fetch(`${API}/matches?club=${encodeURIComponent(clubList[i])}&limit=200`).then(r=>r.json());
-            for (const m of (d.matches || [])) {
-              if (!fixtureMap.has(m.fixtureId)) fixtureMap.set(m.fixtureId, m);
-            }
-          } catch(e) {}
+          this.matchArchiveMsg = `Scanning match lists: ${i+1}–${Math.min(i+BATCH, clubList.length)}/${clubList.length} clubs (${fixtureMap.size} found)`;
+          await Promise.all(batch.map(async club => {
+            try {
+              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
+              for (const m of (d.matches || [])) {
+                if (!fixtureMap.has(m.fixtureId)) fixtureMap.set(m.fixtureId, m);
+              }
+            } catch(e) {}
+          }));
+          await delay(200);
         }
 
-        // Pass 2: fetch full detail for each unique match
+        // Pass 2: fetch full match detail (batched parallel fetches)
         const fixtureIds = Array.from(fixtureMap.keys());
         const archiveMatches = [];
-        for (let i = 0; i < fixtureIds.length; i++) {
+        for (let i = 0; i < fixtureIds.length; i += BATCH) {
+          const batch = fixtureIds.slice(i, i + BATCH);
           this.matchArchiveProgress = 35 + Math.round((i / fixtureIds.length) * 60);
-          this.matchArchiveMsg = `Fetching full match data: ${i+1}/${fixtureIds.length}`;
-          await delay(DELAY);
-          try {
-            const d = await fetch(`${API}/matches/${fixtureIds[i]}`).then(r=>r.json());
-            if (d.match) {
+          this.matchArchiveMsg = `Fetching match details: ${i+1}–${Math.min(i+BATCH, fixtureIds.length)}/${fixtureIds.length}`;
+          const results = await Promise.all(batch.map(id =>
+            fetch(`${API}/matches/${id}`).then(r=>r.json()).catch(()=>null)
+          ));
+          for (const d of results) {
+            if (d?.match) {
               const match = d.match;
               match._homeManager = this.extractManager(match.reportNarrative, match.home?.club || '');
               match._awayManager = this.extractManager(match.reportNarrative, match.away?.club || '');
               archiveMatches.push(match);
             }
-          } catch(e) {}
+          }
+          await delay(200);
         }
 
-        // Sort by date descending before storing
-        archiveMatches.sort((a,b) => b.kickoff.localeCompare(a.kickoff));
+        // Sort by date descending before storing (guard against missing kickoff)
+        archiveMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
 
         this.matchArchiveMsg = 'Saving to permanent cache…';
         const archiveData = { builtAt: Date.now(), matchCount: archiveMatches.length, matches: archiveMatches };
