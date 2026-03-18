@@ -2235,11 +2235,6 @@ createApp({
           options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#e6edf3',font:{weight:'bold'}}}}}});
       }
     },
-  },
-
-  beforeUnmount() {
-    if (this.youthBgInterval) clearInterval(this.youthBgInterval);
-  },
 
   // ── Match Archive ─────────────────────────────────────────────────────────
     extractManager(narrativeArr, club) {
@@ -2334,6 +2329,11 @@ createApp({
       }
       this.matchArchiveBuilding = false;
     },
+  },
+
+  beforeUnmount() {
+    if (this.youthBgInterval) clearInterval(this.youthBgInterval);
+  },
 
   mounted() {
     Chart.defaults.font.family="'Segoe UI',system-ui,sans-serif";
