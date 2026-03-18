@@ -2269,7 +2269,8 @@ createApp({
         for (let attempt = 0; attempt < 3; attempt++) {
           if (attempt > 0) await delay(1000 * attempt);
           try {
-            const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body });
+            // text/plain avoids CORS preflight (simple request) — Worker reads it as text regardless
+            const r = await fetch(url, { method: 'POST', body });
             if (r.ok) return true;
             lastErr = `HTTP ${r.status}: ${await r.text().catch(()=>'')}`;
           } catch(e) { lastErr = e.message; }
