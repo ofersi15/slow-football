@@ -1741,19 +1741,19 @@
             <tbody>
               <tr v-for="m in matchArchiveFiltered" :key="m.fixtureId"
                 @click="matchView=m" style="border-bottom:1px solid #161b22;cursor:pointer"
-                :style="{background: m.home?.club===MY_CLUB||m.away?.club===MY_CLUB ? '#1c2128' : 'transparent'}"
+                :style="{background: m.home?.club==='Leverkusen'||m.away?.club==='Leverkusen' ? '#1c2128' : 'transparent'}"
                 class="hover-row">
                 <td style="padding:6px 10px;color:#8b949e">{{new Date(m.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}</td>
                 <td style="padding:6px 6px">
                   <span style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 5px;font-size:10px;color:#8b949e">{{m.competition?.code}}</span>
                 </td>
-                <td style="padding:6px 6px;font-weight:500" :class="m.home?.club===MY_CLUB?'c-green':''">{{m.home?.club}}</td>
+                <td style="padding:6px 6px;font-weight:500" :class="m.home?.club==='Leverkusen'?'c-green':''">{{m.home?.club}}</td>
                 <td style="padding:6px 6px;text-align:center;font-weight:700;font-size:13px">
                   <span :class="m.score?.home>m.score?.away?'c-green':m.score?.home<m.score?.away?'c-red':''">{{m.score?.home}}</span>
                   <span class="c-gray">–</span>
                   <span :class="m.score?.away>m.score?.home?'c-green':m.score?.away<m.score?.home?'c-red':''">{{m.score?.away}}</span>
                 </td>
-                <td style="padding:6px 6px;font-weight:500" :class="m.away?.club===MY_CLUB?'c-green':''">{{m.away?.club}}</td>
+                <td style="padding:6px 6px;font-weight:500" :class="m.away?.club==='Leverkusen'?'c-green':''">{{m.away?.club}}</td>
                 <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{m._homeManager||'—'}}</td>
                 <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{m._awayManager||'—'}}</td>
               </tr>
