@@ -2300,7 +2300,7 @@ createApp({
         LCB:'CB', RCB:'CB',
         LDM:'DM', RDM:'DM',
         LCM:'CM', RCM:'CM',
-        LWM:'WM', RWM:'WM',
+        LM:'WM', RM:'WM', LWM:'WM', RWM:'WM',
         LAM:'AM', RAM:'AM',
         LW:'WF', RW:'WF', LWF:'WF', RWF:'WF',
         LCF:'CF', RCF:'CF',
