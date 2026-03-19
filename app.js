@@ -2942,10 +2942,12 @@ createApp({
       const mv = this.matchView;
       mv._homeManager = this.extractManager(mv.reportNarrative, mv.home?.club || '');
       mv._awayManager = this.extractManager(mv.reportNarrative, mv.away?.club || '');
-      // Formations: submissions first (most accurate), fallback to narrative, then derived
+      // Formations: sub data from chunk first, then on-demand fetch, then narrative/derived fallback
+      const homeFmtFromSub = mv.home?.sub?.formation ? this.fmtFormation(mv.home.sub.formation) : null;
+      const awayFmtFromSub = mv.away?.sub?.formation ? this.fmtFormation(mv.away.sub.formation) : null;
       const [homeFmt, awayFmt] = await Promise.all([
-        this.getClubFormation(mv.home?.club, gw),
-        this.getClubFormation(mv.away?.club, gw),
+        homeFmtFromSub ? Promise.resolve(homeFmtFromSub) : this.getClubFormation(mv.home?.club, gw),
+        awayFmtFromSub ? Promise.resolve(awayFmtFromSub) : this.getClubFormation(mv.away?.club, gw),
       ]);
       mv._homeFormation = homeFmt
                           || this.extractFormation(mv.reportNarrative, mv.home?.club)

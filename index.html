@@ -1927,6 +1927,32 @@
           <span>Poss: {{matchView.stats.possession?.home}}% – {{matchView.stats.possession?.away}}%</span>
           <span>Pass%: {{matchView.stats.passAccuracy?.home}} – {{matchView.stats.passAccuracy?.away}}</span>
         </div>
+        <!-- Tactics panel: instructions + roles from submission -->
+        <div v-if="matchView.home?.sub || matchView.away?.sub" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;font-size:11px">
+          <div v-for="side in ['home','away']" :key="'tac-'+side">
+            <template v-if="matchView[side]?.sub">
+              <!-- Instructions badges -->
+              <div v-if="matchView[side].sub.instructions" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+                <template v-for="(val,key) in matchView[side].sub.instructions" :key="key">
+                  <span v-if="key!=='training_focus' && val" style="background:#1f2937;border-radius:10px;padding:2px 7px;font-size:10px;white-space:nowrap">
+                    <span style="color:#6e7681">{{({mentality:'⚡',style:'🎨',structure:'🏗',defensive_line:'📐',pressing_intensity:'🫁',attacking_focus:'🎯',transition_speed:'⚡'})[key]||''}} {{({mentality:'Mentality',style:'Style',structure:'Structure',defensive_line:'Def.Line',pressing_intensity:'Press',attacking_focus:'Attack',transition_speed:'Trans.'})[key]||key}}</span>
+                    <span style="color:#e6edf3;margin-left:4px;font-weight:600">{{val}}</span>
+                  </span>
+                </template>
+              </div>
+              <!-- Roles -->
+              <div v-if="matchView[side].sub.roles" style="display:flex;flex-wrap:wrap;gap:4px">
+                <template v-for="(name,role) in matchView[side].sub.roles" :key="role">
+                  <span v-if="name" style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:2px 7px;font-size:10px;white-space:nowrap">
+                    <span style="color:#6e7681;text-transform:capitalize">{{({captain:'©',penalty:'Pen',freekick:'FK',corner:'Cnr'})[role]||role}}</span>
+                    <span style="color:#8b949e;margin-left:3px">{{name}}</span>
+                  </span>
+                </template>
+              </div>
+            </template>
+            <div v-else class="c-gray" style="font-size:10px;font-style:italic">No submission data</div>
+          </div>
+        </div>
         <!-- Lineups -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;font-size:11px">
           <div v-for="side in ['home','away']" :key="side">
