@@ -255,6 +255,7 @@ createApp({
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
       matchSort: 'gw_d', matchSubTab: 'list',
       clubLineups: {}, clubLineupsLoaded: false,
+      mySubmission: null, mySubmissionLoading: false,
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -2345,6 +2346,60 @@ createApp({
       this.clubLineupsLoaded = true;
     },
 
+    // Format a formation code like "4231" → "4-2-3-1"
+    fmtFormation(code) {
+      if (!code) return null;
+      return String(code).split('').join('-');
+    },
+
+    // Extract tactical settings for a club from Pre-match narrative paragraphs
+    // Maps free-form narrative language to actual game API instruction values
+    extractTactics(narrativeArr, club) {
+      if (!club || !narrativeArr) return null;
+      const paras = Array.isArray(narrativeArr) ? narrativeArr : [narrativeArr];
+      const pre = paras.filter(p => typeof p === 'string' && p.startsWith('Pre-match')).join(' ');
+      if (!pre) return null;
+      const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Find sentences mentioning this club; fall back to all pre-match text
+      const sentences = pre.split(/(?<=[.!?])\s+/);
+      const relevant = sentences.filter(s => new RegExp(esc, 'i').test(s)).join(' ') || pre;
+      const lc = relevant.toLowerCase();
+      const t = {};
+      // mentality: Attacking / Balanced / Defensive
+      if (/\battacking\b/.test(lc)) t.mentality = 'Attacking';
+      else if (/\bdefensive\b/.test(lc)) t.mentality = 'Defensive';
+      else if (/\bbalanced\b/.test(lc)) t.mentality = 'Balanced';
+      // style: Short / Direct / Mixed
+      if (/short[- ]pass|tiki/.test(lc)) t.style = 'Short';
+      else if (/\bdirect\b/.test(lc)) t.style = 'Direct';
+      // structure: Fluid / Rigid / Balanced
+      if (/\bfluid\b/.test(lc)) t.structure = 'Fluid';
+      else if (/\brigid\b/.test(lc)) t.structure = 'Rigid';
+      // pressing: Aggressive / Passive / Mixed
+      if (/aggressive press|relentless press|high press/.test(lc)) t.pressing = 'Aggressive';
+      else if (/\bpassive\b/.test(lc)) t.pressing = 'Passive';
+      // defensive line: High / Medium / Low / Deep
+      if (/high line/.test(lc)) t.defLine = 'High';
+      else if (/sitting low|deep block|low block|sit(?:ting)? deep/.test(lc)) t.defLine = 'Low';
+      // transition: Fast / Slow / Moderate
+      if (/fast (?:break|counter|transition)|spring fast|quick (?:counter|break)/.test(lc)) t.transition = 'Fast';
+      else if (/slow build|patient build|deliberate/.test(lc)) t.transition = 'Slow';
+      // attacking focus: Wide / Central / Mixed
+      if (/\bwide\b/.test(lc)) t.focus = 'Wide';
+      else if (/through the (?:center|centre|middle)|central focus/.test(lc)) t.focus = 'Central';
+      return Object.keys(t).length ? t : null;
+    },
+
+    async fetchMySubmission() {
+      if (this.mySubmissionLoading) return;
+      this.mySubmissionLoading = true;
+      try {
+        const d = await fetch(`${API}/submissions/last?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
+        if (d?.xi) this.mySubmission = d;
+      } catch(e) {}
+      this.mySubmissionLoading = false;
+    },
+
     extractManager(narrativeArr, club) {
       // Only search Pre-match paragraphs — they're structured and contain manager names
       const paras = Array.isArray(narrativeArr) ? narrativeArr : [narrativeArr || ''];
@@ -2566,14 +2621,14 @@ createApp({
       if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
       const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
       if (full) this.matchView = full;
-      // Compute formations from stored data (no API call)
+      // Compute formations and tactics from stored data (no API call)
       const mv = this.matchView;
-      if (mv.ratings) {
-        mv._homeFormation = this.extractFormation(mv.reportNarrative, mv.home?.club)
-                            || this.deriveFormation(mv.ratings.home);
-        mv._awayFormation = this.extractFormation(mv.reportNarrative, mv.away?.club)
-                            || this.deriveFormation(mv.ratings.away);
-      }
+      mv._homeFormation = this.extractFormation(mv.reportNarrative, mv.home?.club)
+                          || (mv.ratings && this.deriveFormation(mv.ratings.home));
+      mv._awayFormation = this.extractFormation(mv.reportNarrative, mv.away?.club)
+                          || (mv.ratings && this.deriveFormation(mv.ratings.away));
+      mv._homeTactics = this.extractTactics(mv.reportNarrative, mv.home?.club);
+      mv._awayTactics = this.extractTactics(mv.reportNarrative, mv.away?.club);
       this.matchDetailLoading = false;
     },
   },
