@@ -2930,11 +2930,24 @@ createApp({
         };
 
         // Build compact index — _gw field points to the gameweek chunk
-        const compactMatches = fullMatches.map(m => ({
+        // Formation fallback chain: submission → extracted from narrative → derived from ratings
+        const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
+        const compactMatches = fullMatches.map(m => {
+          const hNarInstr = this.parseInstructions(m.reportNarrative, m.home?.club);
+          const aNarInstr = this.parseInstructions(m.reportNarrative, m.away?.club);
+          return {
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
-          home: { club: m.home?.club, formation: m.home?.sub?.formation || null, mentality: m.home?.sub?.instructions?.mentality || null, style: m.home?.sub?.instructions?.style || null, sqRtg: computeSquadRatings(m.home?.sub) },
-          away: { club: m.away?.club, formation: m.away?.sub?.formation || null, mentality: m.away?.sub?.instructions?.mentality || null, style: m.away?.sub?.instructions?.style || null, sqRtg: computeSquadRatings(m.away?.sub) },
+          home: { club: m.home?.club,
+            formation: m.home?.sub?.formation || stripDashes(this.extractFormation(m.reportNarrative, m.home?.club)) || stripDashes(this.deriveFormation(m.ratings?.home)) || null,
+            mentality: m.home?.sub?.instructions?.mentality || hNarInstr?.mentality || null,
+            style: m.home?.sub?.instructions?.style || hNarInstr?.style || null,
+            sqRtg: computeSquadRatings(m.home?.sub) },
+          away: { club: m.away?.club,
+            formation: m.away?.sub?.formation || stripDashes(this.extractFormation(m.reportNarrative, m.away?.club)) || stripDashes(this.deriveFormation(m.ratings?.away)) || null,
+            mentality: m.away?.sub?.instructions?.mentality || aNarInstr?.mentality || null,
+            style: m.away?.sub?.instructions?.style || aNarInstr?.style || null,
+            sqRtg: computeSquadRatings(m.away?.sub) },
           score: m.score, headline: m.headline,
           // Key match stats for formation/style analysis (inline to avoid loading every chunk)
           stats: m.stats ? {
@@ -2944,7 +2957,8 @@ createApp({
           } : null,
           _homeManager: m._homeManager, _awayManager: m._awayManager,
           _gw: m.gameweek ?? 0,
-        }));
+          }; // close return object
+        }); // close fullMatches.map
         const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, gwCount: sortedGws.length, gameweeks: sortedGws, matches: compactMatches };
         const indexStr = JSON.stringify(indexData);
 
