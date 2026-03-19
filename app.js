@@ -305,6 +305,8 @@ createApp({
       matchChunks: {}, matchArchiveChunkCount: 0, matchBuildLog: [],
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
       matchSort: 'gw_d', matchSubTab: 'list',
+      analysisLoading: false, analysisLoaded: false, analysisMsg: '', analysisProgress: 0,
+      analysisMatches: [], analysisFilterFormation: '',
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
@@ -445,6 +447,64 @@ createApp({
       const comps = new Map();
       this.matchArchive.forEach(m => { if (m.competition?.code) comps.set(m.competition.code, m.competition.name); });
       return Array.from(comps.entries()).map(([code,name])=>({code,name})).sort((a,b)=>a.name.localeCompare(b.name));
+    },
+    tacticsAnalysis() {
+      if (!this.matchArchive) return null;
+      const acc = (map, key, result, gf, ga, xgF, xgA, sqDiff) => {
+        if (!key) return;
+        if (!map[key]) map[key] = { n:0, W:0, D:0, L:0, gf:0, ga:0, xgF:0, xgA:0, sqDiff:0 };
+        const r = map[key]; r.n++; r[result]++; r.gf+=gf; r.ga+=ga; r.xgF+=xgF||0; r.xgA+=xgA||0; r.sqDiff+=sqDiff||0;
+      };
+      const summarise = (map) => {
+        return Object.entries(map).map(([key, r]) => ({
+          key, n: r.n, W: r.W, D: r.D, L: r.L,
+          winPct: r.n ? Math.round(r.W / r.n * 100) : 0,
+          ppg: r.n ? Math.round((r.W*3 + r.D) / r.n * 100) / 100 : 0,
+          avgGF: r.n ? Math.round(r.gf / r.n * 10) / 10 : 0,
+          avgGA: r.n ? Math.round(r.ga / r.n * 10) / 10 : 0,
+          avgXgF: r.n ? Math.round(r.xgF / r.n * 10) / 10 : 0,
+          avgXgA: r.n ? Math.round(r.xgA / r.n * 10) / 10 : 0,
+          avgXgDiff: r.n ? Math.round((r.xgF - r.xgA) / r.n * 10) / 10 : 0,
+          avgSqDiff: r.n ? Math.round(r.sqDiff / r.n * 10) / 10 : 0,
+        })).filter(r => r.n >= 3).sort((a,b) => b.winPct - a.winPct);
+      };
+      const fmVfm = {}, menVmen = {};
+      for (const m of this.matchArchive) {
+        const hs = m.score?.home ?? 0, as_ = m.score?.away ?? 0;
+        const hRes = hs > as_ ? 'W' : hs < as_ ? 'L' : 'D';
+        const aRes = as_ > hs ? 'W' : as_ < hs ? 'L' : 'D';
+        const hXg = m.stats?.xg?.home || 0, aXg = m.stats?.xg?.away || 0;
+        const sqD = (m.home?.sqRtg?.overall || 0) - (m.away?.sqRtg?.overall || 0);
+        const hFm = this.fmtFormation(m.home?.formation), aFm = this.fmtFormation(m.away?.formation);
+        const hMen = m.home?.mentality, aMen = m.away?.mentality;
+        acc(fmVfm, hFm && aFm ? `${hFm} vs ${aFm}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(fmVfm, hFm && aFm ? `${aFm} vs ${hFm}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+        acc(menVmen, hMen && aMen ? `${hMen} vs ${aMen}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(menVmen, hMen && aMen ? `${aMen} vs ${hMen}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+      }
+      const preVsty = {}, lineVtrans = {};
+      for (const m of this.analysisMatches) {
+        const hs = m.score?.home ?? 0, as_ = m.score?.away ?? 0;
+        const hRes = hs > as_ ? 'W' : hs < as_ ? 'L' : 'D';
+        const aRes = as_ > hs ? 'W' : as_ < hs ? 'L' : 'D';
+        const hXg = m.stats?.xg?.home || 0, aXg = m.stats?.xg?.away || 0;
+        const sqD = (m.home?.sqRtg?.overall || 0) - (m.away?.sqRtg?.overall || 0);
+        const hInstr = m.home?.sub?.instructions || {}, aInstr = m.away?.sub?.instructions || {};
+        const hPress = hInstr.pressing_intensity, aPress = aInstr.pressing_intensity;
+        const hStyle = hInstr.style, aStyle = aInstr.style;
+        const hLine = hInstr.defensive_line, aLine = aInstr.defensive_line;
+        const hTrans = hInstr.transition_speed, aTrans = aInstr.transition_speed;
+        acc(preVsty, hPress && aStyle ? `${hPress} vs ${aStyle}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(preVsty, aPress && hStyle ? `${aPress} vs ${hStyle}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+        acc(lineVtrans, hLine && aTrans ? `${hLine} vs ${aTrans}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(lineVtrans, aLine && hTrans ? `${aLine} vs ${hTrans}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+      }
+      return {
+        formations: summarise(fmVfm),
+        mentalities: summarise(menVmen),
+        pressing: summarise(preVsty),
+        defLine: summarise(lineVtrans),
+      };
     },
     filterableAttrs() {
       return [
@@ -2922,6 +2982,30 @@ createApp({
           }
         }
       } catch(e) {}
+    },
+
+    async loadAnalysisChunks() {
+      if (this.analysisLoading || this.analysisLoaded) return;
+      if (!this.matchArchive) return;
+      this.analysisLoading = true;
+      const gws = [...new Set(this.matchArchive.map(m => m._gw))].sort((a,b)=>a-b);
+      const results = [];
+      for (let i = 0; i < gws.length; i++) {
+        this.analysisProgress = Math.round((i / gws.length) * 100);
+        this.analysisMsg = `Loading GW${gws[i]}… ${i+1}/${gws.length}`;
+        const gw = gws[i];
+        if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
+        for (const m of (this.matchChunks[gw] || [])) {
+          if (m.home?.sub?.instructions && m.away?.sub?.instructions) {
+            results.push(m);
+          }
+        }
+        await new Promise(r => setTimeout(r, 20));
+      }
+      this.analysisMatches = results;
+      this.analysisLoaded = true;
+      this.analysisLoading = false;
+      this.analysisMsg = `${results.length} matches with full tactical data`;
     },
 
     // Return formatted formation for a club/gameweek from submissions (fetches if not cached)
