@@ -52,6 +52,8 @@ const TACTICS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const PLAYERS_CACHE_KEY = 'sf_players_v6';
 const STATS_CACHE_KEY = 'sf_stats_v1';
 const PLAYERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+const SUBMISSIONS_CACHE_KEY = 'sf_submissions_all_v1';
+const SUBMISSIONS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 // ── Server-side cache helpers ──────────────────────────────────────────────
 // When running via server.py, these persist across browser cache clears and
@@ -258,6 +260,10 @@ createApp({
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
       espionageSubmissions: {},  // club → latest submission object
+      selectedClubName: null,
+      selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'squad' | 'transfers'
+      allSubmissionsLoaded: false,
+      clubTransferMap: {},
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -684,6 +690,25 @@ createApp({
       const now = new Date();
       return Math.min(100, Math.max(0, (now-start)/(end-start)*100));
     },
+    selectedClubPlayers() {
+      if (!this.selectedClubName) return [];
+      return this.allPlayers
+        .filter(p => p.Club === this.selectedClubName)
+        .sort((a,b) => (b._gameRating||b.Rating||0) - (a._gameRating||a.Rating||0));
+    },
+    selectedClubSubmissions() {
+      if (!this.selectedClubName) return [];
+      const byGw = this.submissionsCache[this.selectedClubName] || {};
+      return Object.keys(byGw).map(Number).sort((a,b) => b-a).map(gw => ({...byGw[gw], _gw: gw}));
+    },
+    selectedClubTransfers() {
+      if (!this.selectedClubName) return [];
+      return (this.clubTransferMap[this.selectedClubName] || []).slice(0, 20);
+    },
+    selectedClubEspData() {
+      if (!this.selectedClubName) return null;
+      return this.espionageClubs.find(c => c.club === this.selectedClubName) || null;
+    },
   },
 
   watch: {
@@ -1051,6 +1076,19 @@ createApp({
           });
           [allTxMap, realTxMap].forEach(m=>Object.values(m).forEach(arr=>arr.sort((a,b)=>new Date(b.date)-new Date(a.date))));
           this.transferMap=realTxMap;
+          // Build club-keyed transfer map for the club detail view
+          const cTxMap = {};
+          (txRes.deals||[]).forEach(d => {
+            const playerName = d.playerName || '';
+            if (!playerName || !d.amount) return;
+            const deal = { player: playerName, amount: d.amount, buyer: d.buyer||d.toClub, seller: d.seller||d.fromClub, via: d.via, date: d.updatedAt||d.ts };
+            [deal.buyer, deal.seller].filter(Boolean).forEach(club => {
+              if (!cTxMap[club]) cTxMap[club] = [];
+              cTxMap[club].push(deal);
+            });
+          });
+          Object.values(cTxMap).forEach(arr => arr.sort((a,b) => new Date(b.date)-new Date(a.date)));
+          this.clubTransferMap = cTxMap;
           // Build active transfer list map (status===null means listed, 'sold' = done)
           const tlMap = {};
           (tlRes.listings||[]).filter(l=>l.status!=='sold').forEach(l=>{
@@ -2395,6 +2433,20 @@ createApp({
       return Object.keys(t).length ? t : null;
     },
 
+    async loadCachedSubmissions() {
+      try {
+        const raw = await serverCacheGet(SUBMISSIONS_CACHE_KEY);
+        if (!raw) return;
+        const data = await parseAsync(raw);
+        if (data?.clubs && (Date.now() - data.builtAt) < SUBMISSIONS_CACHE_TTL) {
+          for (const [club, byGw] of Object.entries(data.clubs)) {
+            if (!this.submissionsCache[club]) this.submissionsCache[club] = byGw;
+          }
+          this.allSubmissionsLoaded = true;
+        }
+      } catch(e) {}
+    },
+
     // Load latest submission for every club in espionageClubs (parallel, non-blocking)
     async loadEspionageSubmissions() {
       const clubs = (this.espionageClubs || []).map(c => c.club).filter(Boolean);
@@ -2420,6 +2472,30 @@ createApp({
         if (latestGw) result[club] = { ...byGw[latestGw], _gw: latestGw };
       }
       this.espionageSubmissions = result;
+      this.allSubmissionsLoaded = true;
+      // Persist all submissions to KV for fast future loads
+      stringifyAsync({ builtAt: Date.now(), clubs: this.submissionsCache })
+        .then(str => serverCacheSet(SUBMISSIONS_CACHE_KEY, str))
+        .catch(() => {});
+    },
+
+    async openClubDetail(clubName) {
+      this.selectedClubName = clubName;
+      this.selectedClubSubTab = 'xi';
+      // Ensure submissions are loaded for this club
+      if (!this.submissionsCache[clubName]) {
+        try {
+          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(clubName)}`).then(r => r.json());
+          const items = (d?.items || []).filter(s => s.gameweek != null);
+          const byGw = {};
+          for (const s of items) {
+            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+          }
+          this.submissionsCache[clubName] = byGw;
+        } catch(e) {
+          this.submissionsCache[clubName] = {};
+        }
+      }
     },
 
     async fetchMySubmission() {
@@ -2728,6 +2804,7 @@ createApp({
     // from blocking the initial render and making the page appear frozen on slower machines.
     // Double-RAF: first fires before paint, second fires after paint.
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
+    this.loadCachedSubmissions();
     this.loadMatchArchive();
     // Fetch current game week proactively so the staff recruitment input shows the right week
     this.fetchCurrentGameWeek();
