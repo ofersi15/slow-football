@@ -1687,7 +1687,7 @@
                   <span v-if="p.subbedOffAt" style="color:#8b949e;font-size:10px">↓{{p.subbedOffAt}}' </span>
                   {{p.player}}
                   <span style="font-size:10px;font-weight:700;margin-left:4px"
-                    :class="p.position==='GK'?'c-green':['CB','FB'].includes(p.position)?'c-blue':['DM','CM','WM','AM'].includes(p.position)?'c-orange':'c-red'">
+                    :class="basePos(p.position)==='GK'?'c-green':['CB','FB'].includes(basePos(p.position))?'c-blue':['DM','CM','WM','AM'].includes(basePos(p.position))?'c-orange':'c-red'">
                     {{p._posLabel}}
                   </span>
                 </span>
@@ -1764,7 +1764,7 @@
                 <div v-for="p in cl.starters" :key="p.player" style="display:flex;justify-content:space-between;padding:1px 0;border-bottom:1px solid #161b22">
                   <span>
                     <span style="font-size:10px;font-weight:700;margin-right:4px"
-                      :class="p.position==='GK'?'c-green':['CB','FB'].includes(p.position)?'c-blue':['DM','CM','WM','AM'].includes(p.position)?'c-orange':'c-red'">{{p._posLabel}}</span>
+                      :class="basePos(p.position)==='GK'?'c-green':['CB','FB'].includes(basePos(p.position))?'c-blue':['DM','CM','WM','AM'].includes(basePos(p.position))?'c-orange':'c-red'">{{p._posLabel}}</span>
                     {{p.player}}
                   </span>
                   <span :class="p.rating>=8?'c-green':p.rating>=7?'':'c-gray'" style="font-weight:600">{{p.rating?.toFixed(1)}}</span>
@@ -1794,12 +1794,13 @@
         <div class="card" style="padding:0;overflow:hidden">
           <table style="width:100%;border-collapse:collapse;font-size:12px">
             <thead>
-              <tr style="color:#8b949e;border-bottom:1px solid #21262d;font-size:11px">
-                <th style="text-align:left;padding:7px 10px">Date</th>
-                <th style="text-align:left;padding:7px 6px">Comp</th>
-                <th style="text-align:left;padding:7px 6px">Home</th>
+              <tr style="color:#8b949e;border-bottom:1px solid #21262d;font-size:11px;user-select:none">
+                <th @click="matchSort=matchSort==='gw_d'?'gw_a':'gw_d'" style="text-align:left;padding:7px 10px;cursor:pointer;white-space:nowrap">GW <span v-if="matchSort==='gw_d'">↓</span><span v-else-if="matchSort==='gw_a'">↑</span></th>
+                <th @click="matchSort=matchSort==='date_d'?'date_a':'date_d'" style="text-align:left;padding:7px 6px;cursor:pointer;white-space:nowrap">Date <span v-if="matchSort==='date_d'">↓</span><span v-else-if="matchSort==='date_a'">↑</span></th>
+                <th @click="matchSort=matchSort==='comp_a'?'gw_d':'comp_a'" style="text-align:left;padding:7px 6px;cursor:pointer">Comp <span v-if="matchSort==='comp_a'">↑</span></th>
+                <th @click="matchSort=matchSort==='home_a'?'gw_d':'home_a'" style="text-align:left;padding:7px 6px;cursor:pointer">Home <span v-if="matchSort==='home_a'">↑</span></th>
                 <th style="text-align:center;padding:7px 6px">Score</th>
-                <th style="text-align:left;padding:7px 6px">Away</th>
+                <th @click="matchSort=matchSort==='away_a'?'gw_d':'away_a'" style="text-align:left;padding:7px 6px;cursor:pointer">Away <span v-if="matchSort==='away_a'">↑</span></th>
                 <th style="text-align:left;padding:7px 6px">Home Mgr</th>
                 <th style="text-align:left;padding:7px 6px">Away Mgr</th>
               </tr>
@@ -1809,7 +1810,8 @@
                 @click="openMatch(m)" style="border-bottom:1px solid #161b22;cursor:pointer"
                 :style="{background: m.home?.club==='Leverkusen'||m.away?.club==='Leverkusen' ? '#1c2128' : 'transparent'}"
                 class="hover-row">
-                <td style="padding:6px 10px;color:#8b949e">{{new Date(m.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}</td>
+                <td style="padding:6px 10px;color:#8b949e;font-weight:600">GW{{m.gameweek}}</td>
+                <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{m.kickoff?new Date(m.kickoff).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):''}}</td>
                 <td style="padding:6px 6px">
                   <span style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:1px 5px;font-size:10px;color:#8b949e">{{m.competition?.code}}</span>
                 </td>
@@ -2062,6 +2064,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

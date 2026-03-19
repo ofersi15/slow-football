@@ -253,7 +253,7 @@ createApp({
       matchView: null, matchDetailLoading: false,
       matchChunks: {}, matchArchiveChunkCount: 0, matchBuildLog: [],
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
-      matchSort: 'date_d', matchSubTab: 'list',
+      matchSort: 'gw_d', matchSubTab: 'list',
       clubLineups: {}, clubLineupsLoaded: false,
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
@@ -353,8 +353,13 @@ createApp({
         items = items.filter(m => (m._homeManager||'').toLowerCase().includes(mg) || (m._awayManager||'').toLowerCase().includes(mg));
       }
       const s = this.matchSort;
+      if (s === 'gw_d') return [...items].sort((a,b) => (b.gameweek||0)-(a.gameweek||0));
+      if (s === 'gw_a') return [...items].sort((a,b) => (a.gameweek||0)-(b.gameweek||0));
       if (s === 'date_d') return [...items].sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
       if (s === 'date_a') return [...items].sort((a,b) => (a.kickoff||'').localeCompare(b.kickoff||''));
+      if (s === 'home_a') return [...items].sort((a,b) => (a.home?.club||'').localeCompare(b.home?.club||''));
+      if (s === 'away_a') return [...items].sort((a,b) => (a.away?.club||'').localeCompare(b.away?.club||''));
+      if (s === 'comp_a') return [...items].sort((a,b) => (a.competition?.name||'').localeCompare(b.competition?.name||''));
       return items;
     },
     matchArchiveManagers() {
@@ -2262,7 +2267,7 @@ createApp({
       const starters = ratings.filter(p => p.minutes > 0 && !p.subbedOnAt);
       if (starters.length < 9) return null;
       const c = {};
-      for (const p of starters) c[p.position] = (c[p.position] || 0) + 1;
+      for (const p of starters) { const bp = this.basePos(p.position); c[bp] = (c[bp] || 0) + 1; }
       const def = (c.CB || 0) + (c.FB || 0);
       const dm = c.DM || 0;
       const cm = (c.CM || 0) + (c.WM || 0);
@@ -2285,6 +2290,22 @@ createApp({
                        AM:['LAM','AM','RAM'] };
       const labels = total >= 3 && sides3[pos] ? sides3[pos] : sides2[pos];
       return labels?.[idx] ?? pos;
+    },
+
+    // Strip L/R/C side prefix from API position codes → base game position
+    basePos(pos) {
+      if (!pos) return pos;
+      const map = {
+        LB:'FB', RB:'FB',
+        LCB:'CB', RCB:'CB',
+        LDM:'DM', RDM:'DM',
+        LCM:'CM', RCM:'CM',
+        LWM:'WM', RWM:'WM',
+        LAM:'AM', RAM:'AM',
+        LW:'WF', RW:'WF', LWF:'WF', RWF:'WF',
+        LCF:'CF', RCF:'CF',
+      };
+      return map[pos] || pos;
     },
 
     // Return starters in raw API order with position label, plus subs sorted by time on
@@ -2332,12 +2353,12 @@ createApp({
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const W = `[A-Z\u00C0-\u00D6\u00D8-\u00DD][\\w\u00C0-\u00FF]*`;
       const name = `(${W}(?:[ -]${W})*)`;
-      // "Name sends/answers with/fields/lines up/has/deploys Club"
-      const verbs = `(?:sends?|answers? with|fields?|lines? up |has |sets? up |goes with |deploys?|takes?) `;
-      let m = text.match(new RegExp(`${name} ${verbs}${esc}\\b`));
+      // "Name's Club" (possessive, straight or curly apostrophe) — most reliable
+      let m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
       if (m) return m[1];
-      // Fallback: "Name's Club" (possessive, straight or curly apostrophe)
-      m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
+      // "Name [optional interruption ≤40 chars] Club" within same sentence
+      // Handles: "Name sends Club", "Name, by contrast, sent Club", "Name answers with Club"
+      m = text.match(new RegExp(`${name}[^.]{2,40}?\\b${esc}\\b`));
       if (m) return m[1];
       return null;
     },
