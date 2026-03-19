@@ -2325,15 +2325,19 @@ createApp({
     },
 
     extractManager(narrativeArr, club) {
-      const text = Array.isArray(narrativeArr) ? narrativeArr.join(' ') : (narrativeArr || '');
+      // Only search Pre-match paragraphs — they're structured and contain manager names
+      const paras = Array.isArray(narrativeArr) ? narrativeArr : [narrativeArr || ''];
+      const text = paras.filter(p => typeof p === 'string' && p.startsWith('Pre-match')).join(' ');
+      if (!text) return null;
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Word chars including accented letters, single or multi-word names
-      const name = `([A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF\u00DF\w]*(?:[- ][A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF\w]*)*)`;
-      // Try "Name's Club" (with straight or curly apostrophe)
-      let m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
+      const W = `[A-Z\u00C0-\u00D6\u00D8-\u00DD][\\w\u00C0-\u00FF]*`;
+      const name = `(${W}(?:[ -]${W})*)`;
+      // "Name sends/answers with/fields/lines up/has/deploys Club"
+      const verbs = `(?:sends?|answers? with|fields?|lines? up |has |sets? up |goes with |deploys?|takes?) `;
+      let m = text.match(new RegExp(`${name} ${verbs}${esc}\\b`));
       if (m) return m[1];
-      // Try "Club manager Name" or "managed by Name"
-      m = text.match(new RegExp(`(?:${esc} manager|managed by) ${name}`));
+      // Fallback: "Name's Club" (possessive, straight or curly apostrophe)
+      m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
       if (m) return m[1];
       return null;
     },
@@ -2501,7 +2505,7 @@ createApp({
       try {
         const raw = await serverCacheGet('sf_match_archive_v2');
         if (!raw) return;
-        const data = JSON.parse(raw);
+        const data = await parseAsync(raw);
         if (data?.matches?.length) {
           this.matchArchive = data.matches;
           this.matchArchiveChunkCount = data.gwCount || 0;
@@ -2515,7 +2519,7 @@ createApp({
       try {
         const raw = await serverCacheGet(`sf_match_archive_v2_gw_${gw}`);
         if (raw) {
-          const matches = JSON.parse(raw).matches || [];
+          const matches = (await parseAsync(raw)).matches || [];
           // Re-extract managers on load so old builds with broken regex are fixed
           for (const m of matches) {
             m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
