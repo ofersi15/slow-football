@@ -53,7 +53,8 @@ const PLAYERS_CACHE_KEY = 'sf_players_v6';
 const STATS_CACHE_KEY = 'sf_stats_v1';
 const PLAYERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
 const SUBMISSIONS_CACHE_KEY = 'sf_submissions_all_v1';
-const SUBMISSIONS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const SUBMISSIONS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours (KV TTL check)
+const SUBMISSIONS_LS_KEY = 'sf_subs_ls'; // localStorage key — no TTL, persists forever
 
 // ── Server-side cache helpers ──────────────────────────────────────────────
 // When running via server.py, these persist across browser cache clears and
@@ -135,6 +136,15 @@ const FORMATION_SLOT_POS = {
   // GK  LCB          CB           RCB          LWM          LCM          CM           RCM          RWM          LST          RST
   '352':  [{x:34,y:97},{x:17,y:78},{x:34,y:78},{x:51,y:78},{x:7,y:58},{x:22,y:58},{x:34,y:58},{x:46,y:58},{x:61,y:58},{x:24,y:20},{x:44,y:20}],
 };
+
+// Key attribute to display per base position in club XI view
+const MAIN_ATTR = {
+  GK:'Reflexes', FB:'Speed', CB:'Marking', DM:'Tackling',
+  CM:'Passing',  WM:'Dribbling', AM:'Vision', WF:'Dribbling', CF:'Shooting',
+};
+
+// Display order for squad position grouping
+const POS_ORDER = {GK:0,CB:1,FB:2,DM:3,CM:4,WM:5,AM:6,WF:7,CF:8};
 
 // Position colors for SVG pitch (fill, stroke)
 const POS_COLORS = {
@@ -299,7 +309,8 @@ createApp({
       submissionsCache: {},  // club → { gw: {formation, ...} }
       espionageSubmissions: {},  // club → latest submission object
       selectedClubName: null,
-      selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'squad' | 'transfers'
+      selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'transfers'
+      clubSquadSort: 'pos',
       allSubmissionsLoaded: false,
       clubTransferMap: {},
       // Espionage tab
@@ -731,9 +742,20 @@ createApp({
     },
     selectedClubPlayers() {
       if (!this.selectedClubName) return [];
+      const sort = this.clubSquadSort || 'pos';
       return this.allPlayers
         .filter(p => p.Club === this.selectedClubName)
-        .sort((a,b) => (b._gameRating||b.Rating||0) - (a._gameRating||a.Rating||0));
+        .sort((a,b) => {
+          if (sort === 'pos') {
+            const po = (POS_ORDER[a.Position]??9) - (POS_ORDER[b.Position]??9);
+            if (po !== 0) return po;
+            return (b._gameRating||b.Rating||0) - (a._gameRating||a.Rating||0);
+          }
+          if (sort === 'rating') return (b._gameRating||b.Rating||0) - (a._gameRating||a.Rating||0);
+          if (sort === 'value') return (b.Value||0) - (a.Value||0);
+          if (sort === 'age') return (a.Age||0) - (b.Age||0);
+          return (a.Player||'').localeCompare(b.Player||'');
+        });
     },
     selectedClubSubmissions() {
       if (!this.selectedClubName) return [];
@@ -2391,6 +2413,13 @@ createApp({
       return map[pos] || pos;
     },
 
+    // Look up player data from allPlayers by name (case-insensitive)
+    xiPlayerInfo(name) {
+      if (!name) return null;
+      const lc = name.toLowerCase();
+      return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc) || null;
+    },
+
     // Build layout array for pitch visualization: maps each xi player to their slot position + run target
     pitchLayout(submission) {
       if (!submission?.xi?.length) return [];
@@ -2514,6 +2543,18 @@ createApp({
     },
 
     async loadCachedSubmissions() {
+      // 1. localStorage first (no TTL — persists forever across sessions)
+      try {
+        const lsRaw = localStorage.getItem(SUBMISSIONS_LS_KEY);
+        if (lsRaw) {
+          const lsData = JSON.parse(lsRaw);
+          for (const [club, byGw] of Object.entries(lsData?.clubs || {})) {
+            if (!this.submissionsCache[club]) this.submissionsCache[club] = byGw;
+          }
+          if (Object.keys(this.submissionsCache).length > 0) this.allSubmissionsLoaded = true;
+        }
+      } catch(e) {}
+      // 2. KV as fallback (with TTL check to avoid stale KV data overwriting fresh LS data)
       try {
         const raw = await serverCacheGet(SUBMISSIONS_CACHE_KEY);
         if (!raw) return;
@@ -2522,7 +2563,7 @@ createApp({
           for (const [club, byGw] of Object.entries(data.clubs)) {
             if (!this.submissionsCache[club]) this.submissionsCache[club] = byGw;
           }
-          this.allSubmissionsLoaded = true;
+          if (Object.keys(this.submissionsCache).length > 0) this.allSubmissionsLoaded = true;
         }
       } catch(e) {}
     },
@@ -2540,8 +2581,10 @@ createApp({
       }
       this.espionageSubmissions = result;
       this.allSubmissionsLoaded = true;
-      // Persist all submissions to KV for fast future loads
-      stringifyAsync({ builtAt: Date.now(), clubs: this.submissionsCache })
+      // Persist to localStorage (forever) and KV
+      const payload = { builtAt: Date.now(), clubs: this.submissionsCache };
+      try { localStorage.setItem(SUBMISSIONS_LS_KEY, JSON.stringify(payload)); } catch(e) {}
+      stringifyAsync(payload)
         .then(str => serverCacheSet(SUBMISSIONS_CACHE_KEY, str))
         .catch(() => {});
     },
@@ -2550,7 +2593,16 @@ createApp({
       this.activeTab = 'clubs';
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
+      // Always fetch fresh — bypasses bulk cache so we get the latest upcoming GW submission
+      delete this.submissionsCache[clubName];
       await this._fetchClubSubmissions(clubName);
+      // Update localStorage with fresh data for this club
+      try {
+        const lsRaw = localStorage.getItem(SUBMISSIONS_LS_KEY);
+        const lsData = lsRaw ? JSON.parse(lsRaw) : { clubs: {} };
+        lsData.clubs[clubName] = this.submissionsCache[clubName] || {};
+        localStorage.setItem(SUBMISSIONS_LS_KEY, JSON.stringify(lsData));
+      } catch(e) {}
     },
 
     async fetchMySubmission() {
