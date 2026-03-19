@@ -2459,11 +2459,15 @@ createApp({
         const run = runPts[0] || null;
         const slotNum = parseInt(slotKey.replace(/\D/g, '')) || 1;
         const isLeft = slotNum % 2 === 0; // slot2 = left-side players
-        // slot1 (right-side): y=0→attacking end, y=120→GK end (120-unit scale)
-        // slot2 (left-side): y=0→GK end, y=100→attacking end (flipped, 100-unit scale)
+        // Game uses 150-unit coord space; pitch occupies y=[27.5,122.5] (95 units = 105m)
+        // slot1 (right-side): y=27.5→attacking goal, y=122.5→GK → SVG_y=(raw_y-27.5)/95*105
+        // slot2 (left-side): flipped, y=0→GK, y=100→attacking → SVG_y=105-(raw_y/100)*105
+        // x: pitch spans 0–90 units across 68m → SVG_x=(raw_x/90)*68
         return { ...p, slotKey,
-          runX: run !== null ? (run.x / 100) * 68 : null,
-          runY: run !== null ? (isLeft ? 105 - (run.y / 100) * 105 : (run.y / 120) * 105) : null,
+          runX: run !== null ? (run.x / 90) * 68 : null,
+          runY: run !== null ? (isLeft
+            ? 105 - (run.y / 100) * 105
+            : (run.y - 27.5) / 95 * 105) : null,
         };
       });
     },
