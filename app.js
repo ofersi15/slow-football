@@ -760,7 +760,8 @@ createApp({
     selectedClubSubmissions() {
       if (!this.selectedClubName) return [];
       const byGw = this.submissionsCache[this.selectedClubName] || {};
-      return Object.keys(byGw).map(Number).sort((a,b) => b-a).map(gw => ({...byGw[gw], _gw: gw}));
+      // Sort by submittedAt DESC so the most recently submitted (upcoming GW) is always first
+      return Object.values(byGw).sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
     },
     selectedClubTransfers() {
       if (!this.selectedClubName) return [];
@@ -2426,17 +2427,19 @@ createApp({
       const code = String(submission.formation||'').replace(/-/g,'');
       const positions = FORMATION_SLOT_POS[code];
       if (!positions) return [];
-      const slotKeys = buildSlotKeys(code);
-      const basePositions = FORMATIONS[code] || [];
+      const slotCounts = {};
       return submission.xi.map((player, i) => {
         const pos = positions[i] || {x:50,y:50};
-        const slotKey = slotKeys[i] || '';
+        // Use slot from API response (e.g. "WM", "CM", "FB") to build the run key
+        const slotType = player.slot || (FORMATIONS[code]||[])[i] || 'CM';
+        slotCounts[slotType] = (slotCounts[slotType] || 0) + 1;
+        const slotKey = `${slotType}${slotCounts[slotType]}`;
         const runPts = submission.runs?.[slotKey] || [];
         const run = runPts[0] || null;
-        const bp = this.basePos(player.position || basePositions[i] || 'CM');
+        const bp = this.basePos(player.position || slotType || 'CM');
         const colors = POS_COLORS[bp] || POS_COLORS.CM;
         return {
-          name: player.name, position: player.position || basePositions[i],
+          name: player.name, position: player.position || slotType,
           bp, slotKey, x: pos.x, y: pos.y,
           runX: run !== null ? (run.x / 100) * 68 : null,
           runY: run !== null ? (run.y / 100) * 105 : null,
@@ -2533,10 +2536,13 @@ createApp({
     async _fetchClubSubmissions(club) {
       if (!club || this.submissionsCache[club] !== undefined) return;
       try {
-        const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
+        // limit=50 ensures we get upcoming GW submissions, not just past ones
+        const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=50`).then(r => r.json());
         const byGw = {};
-        for (const s of (d?.items || []).filter(s => s.gameweek != null)) {
-          if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+        for (const s of (d?.items || [])) {
+          // Use gameweek as key; null/missing gameweek → 'upcoming'
+          const key = s.gameweek ?? 'upcoming';
+          if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
         }
         this.submissionsCache[club] = byGw;
       } catch(e) { this.submissionsCache[club] = {}; }
@@ -2575,9 +2581,9 @@ createApp({
       await Promise.all(clubs.map(club => this._fetchClubSubmissions(club)));
       const result = {};
       for (const club of clubs) {
-        const byGw = this.submissionsCache[club] || {};
-        const latestGw = Object.keys(byGw).map(Number).sort((a,b) => b-a)[0];
-        if (latestGw) result[club] = { ...byGw[latestGw], _gw: latestGw };
+        const allSubs = Object.values(this.submissionsCache[club] || {});
+        const latest = allSubs.sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0))[0];
+        if (latest) result[club] = latest;
       }
       this.espionageSubmissions = result;
       this.allSubmissionsLoaded = true;
