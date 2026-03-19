@@ -2452,15 +2452,19 @@ createApp({
 
       // Pass 3: attach run targets
       // Game coords: x=0 right side (mirrored), y=0 GK end → flip both axes
-      return players.map((p, i) => {
+      const result = players.map((p, i) => {
         const slotKey = slotKeys[i];
         const runPts = submission.runs?.[slotKey] || [];
         const run = runPts[0] || null;
         return { ...p, slotKey,
           runX: run !== null ? 68 - (run.x / 100) * 68 : null,
           runY: run !== null ? 105 - (run.y / 100) * 105 : null,
+          _rawRun: run,
         };
       });
+      // DEBUG: log run data to console
+      console.table(result.map(p => ({ name: p.name, slotKey: p.slotKey, x: p.x, y: p.y, runX: p.runX?.toFixed(1), runY: p.runY?.toFixed(1), raw_run_x: p._rawRun?.x, raw_run_y: p._rawRun?.y })));
+      return result;
     },
 
     // Return starters in raw API order with position label, plus subs sorted by time on
