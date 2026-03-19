@@ -307,6 +307,7 @@ createApp({
       matchSort: 'gw_d', matchSubTab: 'list',
       analysisLoading: false, analysisLoaded: false, analysisMsg: '', analysisProgress: 0,
       analysisMatches: [], analysisFilterFormation: '',
+      subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
@@ -514,6 +515,41 @@ createApp({
         defLine: summarise(lineVtrans),
         coverage: { total, bothFormations, bothMentality, withInstr, withPress, withDefLine, withTrans },
       };
+    },
+    subsDbStats() {
+      if (!this.subsDb || !this.matchArchive) return null;
+      const clubs = this.subsDb.clubs || {};
+      const byGw = {};
+      for (const m of this.matchArchive) {
+        const gw = m._gw;
+        if (gw == null) continue;
+        const hSub = clubs[m.home?.club]?.[gw];
+        const aSub = clubs[m.away?.club]?.[gw];
+        if (!byGw[gw]) byGw[gw] = { gw, n:0, hSub:0, aSub:0, bothSub:0, bothFm:0, bothMen:0, press:0, line:0, trans:0, sides:0 };
+        const row = byGw[gw];
+        row.n++;
+        if (hSub) row.hSub++;
+        if (aSub) row.aSub++;
+        if (hSub && aSub) row.bothSub++;
+        if (hSub?.formation && aSub?.formation) row.bothFm++;
+        if (hSub?.instructions?.mentality && aSub?.instructions?.mentality) row.bothMen++;
+        // pressing/line/trans: count each side separately (one side having it is still useful)
+        for (const sub of [hSub, aSub]) {
+          if (!sub) continue;
+          row.sides++;
+          if (sub.instructions?.pressing_intensity) row.press++;
+          if (sub.instructions?.defensive_line) row.line++;
+          if (sub.instructions?.transition_speed) row.trans++;
+        }
+      }
+      const rows = Object.values(byGw).sort((a,b) => b.gw - a.gw);
+      const total = this.matchArchive.length;
+      const totals = rows.reduce((acc, r) => {
+        acc.bothSub += r.bothSub; acc.bothFm += r.bothFm; acc.bothMen += r.bothMen;
+        acc.sides += r.sides; acc.press += r.press; acc.line += r.line; acc.trans += r.trans;
+        return acc;
+      }, { bothSub:0, bothFm:0, bothMen:0, sides:0, press:0, line:0, trans:0 });
+      return { rows, total, totals };
     },
     filterableAttrs() {
       return [
@@ -3015,6 +3051,50 @@ createApp({
       this.analysisLoaded = true;
       this.analysisLoading = false;
       this.analysisMsg = `${results.length} matches with full tactical data`;
+    },
+
+    async loadSubsDb() {
+      if (this.subsDbLoading) return;
+      this.subsDbLoading = true;
+      this.subsDbMsg = 'Checking cache…';
+      const raw = await serverCacheGet('sf_submissions_db_v1');
+      if (raw) {
+        this.subsDb = await parseAsync(raw);
+        this.subsDbLoaded = true;
+        this.subsDbLoading = false;
+        const d = this.subsDb.builtAt ? new Date(this.subsDb.builtAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        this.subsDbMsg = `Loaded from cache · ${d}`;
+        return;
+      }
+      await this.buildSubsDb();
+    },
+
+    async buildSubsDb() {
+      this.subsDbLoading = true;
+      this.subsDbLoaded = false;
+      const clubList = [...new Set((this.allPlayers || []).map(p => p.Club).filter(Boolean))].sort();
+      const db = {};
+      for (let i = 0; i < clubList.length; i++) {
+        const club = clubList[i];
+        this.subsDbProgress = Math.round(i / clubList.length * 100);
+        this.subsDbMsg = `${i+1}/${clubList.length} · ${club}`;
+        try {
+          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=200`).then(r => r.json());
+          const byGw = {};
+          for (const s of (d?.items || [])) {
+            const key = s.gameweek ?? 'upcoming';
+            if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
+          }
+          db[club] = byGw;
+        } catch(e) { db[club] = {}; }
+        if (i % 8 === 0) await new Promise(r => setTimeout(r, 20));
+      }
+      const result = { clubs: db, builtAt: new Date().toISOString() };
+      await serverCacheSet('sf_submissions_db_v1', JSON.stringify(result));
+      this.subsDb = result;
+      this.subsDbLoaded = true;
+      this.subsDbLoading = false;
+      this.subsDbMsg = `Built · ${clubList.length} clubs`;
     },
 
     // Return formatted formation for a club/gameweek from submissions (fetches if not cached)
