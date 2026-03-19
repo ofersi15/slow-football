@@ -2292,29 +2292,27 @@ createApp({
       };
 
       try {
-        // Pass 1: collect fixtures by gameweek — cleaner than by-club, no deduplication needed
+        // Pass 1: collect unique fixture IDs by club (API doesn't support ?gameweek filter)
         const fixtureMap = new Map();
-        const MAX_GW = 50; // overshoot; empty GWs just return 0 results
-        let lastNonEmptyGw = 0;
-        for (let g = 1; g <= MAX_GW; g += 10) {
-          const gwBatch = Array.from({length: 10}, (_, i) => g + i);
-          this.matchArchiveProgress = Math.round((g / MAX_GW) * 30);
-          this.matchArchiveMsg = `Pass 1: GW${g}–GW${g+9} · ${fixtureMap.size} fixtures`;
-          await Promise.all(gwBatch.map(async gw => {
+        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
+        log(`${clubList.length} clubs to scan`);
+        for (let i = 0; i < clubList.length; i += 6) {
+          const batch = clubList.slice(i, i + 6);
+          this.matchArchiveProgress = Math.round((i / clubList.length) * 30);
+          this.matchArchiveMsg = `Pass 1: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} fixtures`;
+          await Promise.all(batch.map(async club => {
             try {
-              const d = await fetch(`${API}/matches?gameweek=${gw}&limit=100`).then(r=>r.json());
+              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
               let added = 0;
               for (const m of (d?.matches || [])) {
                 if (m.fixtureId && !fixtureMap.has(m.fixtureId)) { fixtureMap.set(m.fixtureId, m); added++; }
               }
-              if (added) { log(`GW${gw}: ${added} matches`); lastNonEmptyGw = Math.max(lastNonEmptyGw, gw); }
-            } catch(e) { log(`ERROR GW${gw}: ${e.message}`); }
+              if (added) log(`${club}: +${added} (${fixtureMap.size} total)`);
+            } catch(e) { log(`ERROR ${club}: ${e.message}`); }
           }));
-          // Stop if we're 15+ GWs past the last match
-          if (g > 10 && g > lastNonEmptyGw + 15) { log(`No matches past GW${lastNonEmptyGw}, stopping`); break; }
           await delay(100);
         }
-        log(`Pass 1 done: ${fixtureMap.size} unique fixtures (last GW: ${lastNonEmptyGw})`);
+        log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
 
         // Pass 2: fetch full match detail (10 at a time)
         const fixtureIds = Array.from(fixtureMap.keys());
