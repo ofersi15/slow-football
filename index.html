@@ -1469,6 +1469,7 @@
                 <th title="Analytics facility level" @click="espSortBy('analytics')">Ana{{espSortIcon('analytics')}}</th>
                 <th title="Stadium facility level" @click="espSortBy('stadium')">Std{{espSortIcon('stadium')}}</th>
                 <th title="Active open job ads" @click="espSortBy('ads')">Ads{{espSortIcon('ads')}}</th>
+                <th title="Latest submitted formation & tactics">Sub</th>
               </tr>
             </thead>
             <tbody>
@@ -1491,6 +1492,18 @@
                 <td :class="espFacClass(c.levels?.stadium)" style="text-align:center">{{c.levels?.stadium||'—'}}</td>
                 <td style="text-align:center">
                   <span v-if="c.ads && c.ads.length" class="c-orange" style="font-size:10px;font-weight:700">{{c.ads.length}}</span>
+                  <span v-else class="c-gray">—</span>
+                </td>
+                <td style="min-width:90px">
+                  <template v-if="espionageSubmissions[c.club]">
+                    <span style="color:#79c0ff;font-weight:600;font-size:11px">{{fmtFormation(espionageSubmissions[c.club].formation)}}</span>
+                    <span class="c-gray" style="font-size:9px"> GW{{espionageSubmissions[c.club]._gw}}</span>
+                    <div style="font-size:9px;color:#8b949e;margin-top:1px;line-height:1.4">
+                      <span v-if="espionageSubmissions[c.club].instructions?.mentality">{{espionageSubmissions[c.club].instructions.mentality}}</span>
+                      <span v-if="espionageSubmissions[c.club].instructions?.style"> · {{espionageSubmissions[c.club].instructions.style}}</span>
+                      <span v-if="espionageSubmissions[c.club].instructions?.pressing_intensity"> · {{espionageSubmissions[c.club].instructions.pressing_intensity}}</span>
+                    </div>
+                  </template>
                   <span v-else class="c-gray">—</span>
                 </td>
               </tr>
@@ -2111,6 +2124,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

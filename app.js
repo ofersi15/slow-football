@@ -256,6 +256,8 @@ createApp({
       matchSort: 'gw_d', matchSubTab: 'list',
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
+      submissionsCache: {},  // club → { gw: {formation, ...} }
+      espionageSubmissions: {},  // club → latest submission object
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -2142,6 +2144,7 @@ createApp({
             this.espionageCacheDate = new Date(cached.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
             this.espionageLoaded = true;
             this.espionageLoading = false;
+            this.loadEspionageSubmissions();
             return;
           }
         } catch(e) {}
@@ -2216,6 +2219,7 @@ createApp({
         try { localStorage.setItem(CACHE_KEY, espionageCacheStr); } catch(e) {}
         this.espionageLoaded = true;
         this.espionageProgress = 100;
+        this.loadEspionageSubmissions();
       } catch(e) {
         this.espionageMsg = '⚠ ' + e.message;
       } finally {
@@ -2389,6 +2393,33 @@ createApp({
       if (/\bwide\b/.test(lc)) t.focus = 'Wide';
       else if (/through the (?:center|centre|middle)|central focus/.test(lc)) t.focus = 'Central';
       return Object.keys(t).length ? t : null;
+    },
+
+    // Load latest submission for every club in espionageClubs (parallel, non-blocking)
+    async loadEspionageSubmissions() {
+      const clubs = (this.espionageClubs || []).map(c => c.club).filter(Boolean);
+      if (!clubs.length) return;
+      await Promise.all(clubs.map(async club => {
+        if (this.submissionsCache[club] !== undefined) return;
+        try {
+          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
+          const items = (d?.items || []).filter(s => s.gameweek != null);
+          const byGw = {};
+          for (const s of items) {
+            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+          }
+          this.submissionsCache[club] = byGw;
+        } catch(e) {
+          this.submissionsCache[club] = {};
+        }
+      }));
+      const result = {};
+      for (const club of clubs) {
+        const byGw = this.submissionsCache[club] || {};
+        const latestGw = Object.keys(byGw).map(Number).sort((a,b) => b-a)[0];
+        if (latestGw) result[club] = { ...byGw[latestGw], _gw: latestGw };
+      }
+      this.espionageSubmissions = result;
     },
 
     async fetchMySubmission() {
@@ -2624,6 +2655,26 @@ createApp({
       } catch(e) {}
     },
 
+    // Fetch all submissions for a club, cache by gw, return formatted formation for given gw
+    async getClubFormation(club, gameweek) {
+      if (!club || !gameweek) return null;
+      if (!this.submissionsCache[club]) {
+        try {
+          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
+          const items = (d?.items || []).filter(s => s.gameweek != null);
+          const byGw = {};
+          for (const s of items) {
+            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+          }
+          this.submissionsCache[club] = byGw;
+        } catch(e) {
+          this.submissionsCache[club] = {};
+        }
+      }
+      const sub = this.submissionsCache[club]?.[gameweek];
+      return sub?.formation ? this.fmtFormation(sub.formation) : null;
+    },
+
     async openMatch(summary) {
       this.matchView = summary;
       this.matchDetailLoading = true;
@@ -2631,13 +2682,19 @@ createApp({
       if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
       const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
       if (full) this.matchView = full;
-      // Compute managers, formations and tactics from stored narrative (no API call)
       const mv = this.matchView;
       mv._homeManager = this.extractManager(mv.reportNarrative, mv.home?.club || '');
       mv._awayManager = this.extractManager(mv.reportNarrative, mv.away?.club || '');
-      mv._homeFormation = this.extractFormation(mv.reportNarrative, mv.home?.club)
+      // Formations: submissions first (most accurate), fallback to narrative, then derived
+      const [homeFmt, awayFmt] = await Promise.all([
+        this.getClubFormation(mv.home?.club, gw),
+        this.getClubFormation(mv.away?.club, gw),
+      ]);
+      mv._homeFormation = homeFmt
+                          || this.extractFormation(mv.reportNarrative, mv.home?.club)
                           || (mv.ratings && this.deriveFormation(mv.ratings.home));
-      mv._awayFormation = this.extractFormation(mv.reportNarrative, mv.away?.club)
+      mv._awayFormation = awayFmt
+                          || this.extractFormation(mv.reportNarrative, mv.away?.club)
                           || (mv.ratings && this.deriveFormation(mv.ratings.away));
       mv._homeTactics = this.extractTactics(mv.reportNarrative, mv.home?.club);
       mv._awayTactics = this.extractTactics(mv.reportNarrative, mv.away?.club);
