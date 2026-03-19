@@ -1648,14 +1648,24 @@
         </div>
         <!-- Score header -->
         <div style="text-align:center;margin-bottom:12px">
-          <div style="font-size:18px;font-weight:700">
-            <span :style="{color: matchView._homeManager?'#e6edf3':'#8b949e'}">{{matchView.home?.club}}</span>
-            <span style="color:#8b949e;margin:0 10px;font-size:14px">{{matchView._homeManager||'—'}}</span>
-            <span style="font-size:26px;color:#7ee787;font-weight:800;margin:0 8px">{{matchView.score?.home}}–{{matchView.score?.away}}</span>
-            <span style="color:#8b949e;margin:0 10px;font-size:14px">{{matchView._awayManager||'—'}}</span>
-            <span :style="{color: matchView._awayManager?'#e6edf3':'#8b949e'}">{{matchView.away?.club}}</span>
+          <div style="font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
+            <div style="text-align:right">
+              <div :style="{color: matchView._homeManager?'#e6edf3':'#8b949e'}">{{matchView.home?.club}}</div>
+              <div style="font-size:11px;color:#8b949e;font-weight:400">
+                {{matchView._homeManager||'—'}}
+                <span v-if="matchView._homeFormation" style="margin-left:6px;background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{matchView._homeFormation}}</span>
+              </div>
+            </div>
+            <span style="font-size:28px;color:#7ee787;font-weight:800;margin:0 10px">{{matchView.score?.home}}–{{matchView.score?.away}}</span>
+            <div style="text-align:left">
+              <div :style="{color: matchView._awayManager?'#e6edf3':'#8b949e'}">{{matchView.away?.club}}</div>
+              <div style="font-size:11px;color:#8b949e;font-weight:400">
+                {{matchView._awayManager||'—'}}
+                <span v-if="matchView._awayFormation" style="margin-left:6px;background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{matchView._awayFormation}}</span>
+              </div>
+            </div>
           </div>
-          <div class="c-gray" style="font-size:11px;margin-top:4px;font-style:italic">{{matchView.headline}}</div>
+          <div class="c-gray" style="font-size:11px;margin-top:6px;font-style:italic">{{matchView.headline}}</div>
         </div>
         <!-- Stats bar -->
         <div v-if="matchView.stats" style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;font-size:11px;color:#8b949e">
@@ -1668,18 +1678,33 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;font-size:11px">
           <div v-for="side in ['home','away']" :key="side">
             <div style="font-weight:700;color:#8b949e;text-transform:uppercase;font-size:10px;margin-bottom:5px">
-              {{matchView[side]?.club}} <span v-if="matchView['_'+side+'Manager']" style="font-weight:400;color:#6e7681">· {{matchView['_'+side+'Manager']}}</span>
+              {{matchView[side]?.club}}
             </div>
-            <div v-for="p in (matchView.ratings?.[side]||[]).filter(p=>p.minutes>0)" :key="p.player"
-              style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #21262d">
-              <span>
-                <span v-if="p.subbedOnAt" style="color:#ffa657;font-size:10px">↑{{p.subbedOnAt}}' </span>
-                <span v-if="p.subbedOffAt" style="color:#8b949e;font-size:10px">↓{{p.subbedOffAt}}' </span>
-                {{p.player}}
-                <span class="c-gray" style="font-size:10px"> {{p.position}}</span>
-              </span>
-              <span :class="p.rating>=8?'c-green':p.rating>=7?'':'c-gray'" style="font-weight:600">{{p.rating?.toFixed(1)}}</span>
-            </div>
+            <!-- Starters -->
+            <template v-for="p in lineupDisplay(matchView.ratings?.[side]).starters" :key="p.player">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #21262d">
+                <span>
+                  <span v-if="p.subbedOffAt" style="color:#8b949e;font-size:10px">↓{{p.subbedOffAt}}' </span>
+                  {{p.player}}
+                  <span style="font-size:10px;font-weight:700;margin-left:4px"
+                    :class="p.position==='GK'?'c-green':['CB','FB'].includes(p.position)?'c-blue':['DM','CM','WM','AM'].includes(p.position)?'c-orange':'c-red'">
+                    {{p._posLabel}}
+                  </span>
+                </span>
+                <span :class="p.rating>=8?'c-green':p.rating>=7?'':'c-gray'" style="font-weight:600">{{p.rating?.toFixed(1)}}</span>
+              </div>
+            </template>
+            <!-- Subs -->
+            <template v-for="p in lineupDisplay(matchView.ratings?.[side]).subs" :key="'sub-'+p.player">
+              <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #21262d;opacity:.7">
+                <span>
+                  <span style="color:#56d364;font-size:10px">↑{{p.subbedOnAt}}' </span>
+                  {{p.player}}
+                  <span class="c-gray" style="font-size:10px">{{p.position}}</span>
+                </span>
+                <span :class="p.rating>=8?'c-green':p.rating>=7?'':'c-gray'" style="font-weight:600">{{p.rating?.toFixed(1)}}</span>
+              </div>
+            </template>
           </div>
         </div>
         <!-- Match narrative -->
@@ -1714,8 +1739,43 @@
         </div>
       </div>
 
-      <!-- Filters + match list -->
+      <!-- Filters + match list / Club Lineups -->
       <div v-else>
+        <!-- Sub-tab switcher -->
+        <div style="display:flex;gap:4px;margin-bottom:12px">
+          <button @click="matchSubTab='list'" :style="{background:matchSubTab==='list'?'#238636':'#21262d',color:matchSubTab==='list'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Match List</button>
+          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups()" :style="{background:matchSubTab==='lineups'?'#238636':'#21262d',color:matchSubTab==='lineups'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Club Lineups</button>
+        </div>
+
+        <!-- Club Lineups panel -->
+        <div v-if="matchSubTab==='lineups'">
+          <div v-if="!clubLineupsLoaded" class="c-gray" style="font-size:12px;padding:20px 0;text-align:center">Building club lineup index…</div>
+          <div v-else>
+            <div style="font-size:11px;color:#8b949e;margin-bottom:10px">Last known starting XI per club (from match archive)</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+              <div v-for="cl in Object.values(clubLineups).sort((a,b)=>a.club.localeCompare(b.club))" :key="cl.club" class="card" style="padding:10px;font-size:11px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                  <span style="font-weight:700;font-size:12px" :class="cl.club==='Leverkusen'?'c-green':''">{{cl.club}}</span>
+                  <span v-if="cl.formation" style="background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{cl.formation}}</span>
+                </div>
+                <div style="color:#8b949e;font-size:10px;margin-bottom:6px">
+                  {{cl.manager||'No manager'}} · GW{{cl.gameweek}}
+                </div>
+                <div v-for="p in cl.starters" :key="p.player" style="display:flex;justify-content:space-between;padding:1px 0;border-bottom:1px solid #161b22">
+                  <span>
+                    <span style="font-size:10px;font-weight:700;margin-right:4px"
+                      :class="p.position==='GK'?'c-green':['CB','FB'].includes(p.position)?'c-blue':['DM','CM','WM','AM'].includes(p.position)?'c-orange':'c-red'">{{p._posLabel}}</span>
+                    {{p.player}}
+                  </span>
+                  <span :class="p.rating>=8?'c-green':p.rating>=7?'':'c-gray'" style="font-weight:600">{{p.rating?.toFixed(1)}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Match list (existing) -->
+        <div v-if="matchSubTab==='list'">
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <select v-model="matchFilterComp" style="background:#161b22;border:1px solid #30363d;color:#e6edf3;border-radius:5px;padding:5px 8px;font-size:12px">
             <option value="">All competitions</option>
@@ -1766,6 +1826,7 @@
             </tbody>
           </table>
         </div>
+        </div><!-- /matchSubTab==='list' -->
       </div>
     </div>
   </div>
@@ -2001,6 +2062,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

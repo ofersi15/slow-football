@@ -253,7 +253,8 @@ createApp({
       matchView: null, matchDetailLoading: false,
       matchChunks: {}, matchArchiveChunkCount: 0, matchBuildLog: [],
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
-      matchSort: 'date_d',
+      matchSort: 'date_d', matchSubTab: 'list',
+      clubLineups: {}, clubLineupsLoaded: false,
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -2238,6 +2239,103 @@ createApp({
     },
 
   // ── Match Archive ─────────────────────────────────────────────────────────
+    // ── Match processing helpers (all from stored data, no API calls) ────────
+
+    // Extract formation string from narrative text, looking near club name
+    extractFormation(narrativeArr, club) {
+      if (!club) return null;
+      const text = Array.isArray(narrativeArr)
+        ? (narrativeArr.find(p => typeof p === 'string' && p.startsWith('Pre-match')) || narrativeArr.join(' '))
+        : (narrativeArr || '');
+      const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const fmt = '(\\d-\\d(?:-\\d){0,2})';
+      let m = text.match(new RegExp(`${esc}.{0,150}${fmt}`));
+      if (m) return m[1];
+      m = text.match(new RegExp(`${fmt}.{0,150}${esc}`));
+      if (m) return m[1];
+      return null;
+    },
+
+    // Derive formation from starters' position counts (fallback when not in narrative)
+    deriveFormation(ratings) {
+      if (!ratings?.length) return null;
+      const starters = ratings.filter(p => p.minutes > 0 && !p.subbedOnAt);
+      if (starters.length < 9) return null;
+      const c = {};
+      for (const p of starters) c[p.position] = (c[p.position] || 0) + 1;
+      const def = (c.CB || 0) + (c.FB || 0);
+      const dm = c.DM || 0;
+      const cm = (c.CM || 0) + (c.WM || 0);
+      const am = c.AM || 0;
+      const att = (c.WF || 0) + (c.CF || 0);
+      const parts = [def];
+      if (dm) parts.push(dm);
+      if (cm) parts.push(cm);
+      if (am) parts.push(am);
+      parts.push(att);
+      return parts.join('-');
+    },
+
+    // L/R/C position label given position code, index within that position, total count
+    posLabel(pos, idx, total) {
+      if (total <= 1 || pos === 'GK') return pos;
+      const sides2 = { FB:['LB','RB'], CB:['LCB','RCB'], DM:['LDM','RDM'], CM:['LCM','RCM'],
+                       WM:['LWM','RWM'], AM:['LAM','RAM'], WF:['LW','RW'], CF:['LCF','RCF'] };
+      const sides3 = { CB:['LCB','CB','RCB'], DM:['LDM','DM','RDM'], CM:['LCM','CM','RCM'],
+                       AM:['LAM','AM','RAM'] };
+      const labels = total >= 3 && sides3[pos] ? sides3[pos] : sides2[pos];
+      return labels?.[idx] ?? pos;
+    },
+
+    // Return starters sorted by field position with L/R/C labels, plus subs list
+    lineupDisplay(ratings) {
+      if (!ratings?.length) return { starters: [], subs: [] };
+      const POS_ORDER = { GK:0, CB:1, FB:2, DM:3, CM:4, WM:5, AM:6, WF:7, CF:8 };
+      const starters = ratings
+        .filter(p => p.minutes > 0 && !p.subbedOnAt)
+        .sort((a, b) => (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9));
+      const subs = ratings
+        .filter(p => p.minutes > 0 && p.subbedOnAt)
+        .sort((a, b) => (a.subbedOnAt ?? 0) - (b.subbedOnAt ?? 0));
+      // Count positions among starters for side labelling
+      const counts = {};
+      for (const p of starters) counts[p.position] = (counts[p.position] || 0) + 1;
+      const posIdx = {};
+      const label = (p) => {
+        if (p.subbedOnAt) return { ...p, _posLabel: p.position };
+        const i = posIdx[p.position] = (posIdx[p.position] || 0);
+        posIdx[p.position]++;
+        return { ...p, _posLabel: this.posLabel(p.position, i, counts[p.position]) };
+      };
+      return { starters: starters.map(label), subs: subs.map(label) };
+    },
+
+    // Scan all loaded GW chunks and return the last known starting XI per club
+    buildClubLineups() {
+      const lineups = {};
+      for (const gw of Object.keys(this.matchChunks)) {
+        for (const m of (this.matchChunks[gw] || [])) {
+          if (!m.kickoff || !m.ratings) continue;
+          for (const side of ['home', 'away']) {
+            const club = m[side]?.club;
+            if (!club) continue;
+            if (!lineups[club] || m.kickoff > lineups[club].kickoff) {
+              const { starters } = this.lineupDisplay(m.ratings[side]);
+              lineups[club] = {
+                club, kickoff: m.kickoff, gameweek: m.gameweek,
+                manager: side === 'home' ? m._homeManager : m._awayManager,
+                formation: this.extractFormation(m.reportNarrative, club)
+                           || this.deriveFormation(m.ratings[side]),
+                starters,
+              };
+            }
+          }
+        }
+      }
+      this.clubLineups = lineups;
+      this.clubLineupsLoaded = true;
+    },
+
     extractManager(narrativeArr, club) {
       const text = Array.isArray(narrativeArr) ? narrativeArr.join(' ') : (narrativeArr || '');
       // Match "First Last's ClubName" — handles accented chars
@@ -2434,14 +2532,14 @@ createApp({
       const gw = summary._gw ?? summary.gameweek ?? 0;
       if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
       const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
-      if (full) {
-        this.matchView = full;
-      } else {
-        // Fallback: fetch from game API
-        try {
-          const d = await fetch(`${API}/matches/${summary.fixtureId}`).then(r=>r.json());
-          if (d?.match) this.matchView = { ...d.match, _homeManager: summary._homeManager, _awayManager: summary._awayManager };
-        } catch(e) {}
+      if (full) this.matchView = full;
+      // Compute formations from stored data (no API call)
+      const mv = this.matchView;
+      if (mv.ratings) {
+        mv._homeFormation = this.extractFormation(mv.reportNarrative, mv.home?.club)
+                            || this.deriveFormation(mv.ratings.home);
+        mv._awayFormation = this.extractFormation(mv.reportNarrative, mv.away?.club)
+                            || this.deriveFormation(mv.ratings.away);
       }
       this.matchDetailLoading = false;
     },
