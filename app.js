@@ -2463,6 +2463,8 @@ createApp({
         };
       });
       // DEBUG: log run data to console
+      console.log('runs object keys:', Object.keys(submission.runs || {}));
+      console.log('runs raw:', JSON.stringify(submission.runs));
       console.table(result.map(p => ({ name: p.name, slotKey: p.slotKey, x: p.x, y: p.y, runX: p.runX?.toFixed(1), runY: p.runY?.toFixed(1), raw_run_x: p._rawRun?.x, raw_run_y: p._rawRun?.y })));
       return result;
     },
