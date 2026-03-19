@@ -119,14 +119,21 @@ const FORMATIONS = {
   '3421': ['GK','CB','CB','CB','WM','CM','CM','WM','AM','AM','CF'],
   '352':  ['GK','CB','CB','CB','WM','CM','CM','CM','WM','CF','CF'],
 };
-// Default slot positions per formation (x: 0=left,100=right; y: 0=attacking end, 100=defensive/GK end)
+// Default slot positions per formation — pitch coordinates: x 0–68 (left→right), y 0–105 (attacking→GK end)
+// Matches real football pitch dimensions (68m × 105m). Run x,y (0–100%) scale to same space.
 const FORMATION_SLOT_POS = {
-  '442':  [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:14,y:50},{x:38,y:50},{x:62,y:50},{x:86,y:50},{x:36,y:18},{x:64,y:18}],
-  '4411': [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:14,y:52},{x:38,y:52},{x:62,y:52},{x:86,y:52},{x:50,y:32},{x:50,y:12}],
-  '4231': [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:36,y:59},{x:64,y:59},{x:14,y:38},{x:50,y:38},{x:86,y:38},{x:50,y:14}],
-  '433':  [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:30,y:52},{x:50,y:52},{x:70,y:52},{x:14,y:26},{x:86,y:26},{x:50,y:12}],
-  '3421': [{x:50,y:88},{x:26,y:74},{x:50,y:74},{x:74,y:74},{x:12,y:56},{x:38,y:56},{x:62,y:56},{x:88,y:56},{x:35,y:32},{x:65,y:32},{x:50,y:14}],
-  '352':  [{x:50,y:88},{x:26,y:74},{x:50,y:74},{x:74,y:74},{x:12,y:54},{x:35,y:54},{x:50,y:54},{x:65,y:54},{x:88,y:54},{x:36,y:18},{x:64,y:18}],
+  // GK  LB           LCB          RCB          RB           LM           LCM          RCM          RM           LST          RST
+  '442':  [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:9,y:55},{x:24,y:55},{x:44,y:55},{x:59,y:55},{x:24,y:20},{x:44,y:20}],
+  // GK  LB           LCB          RCB          RB           LM           LCM          RCM          RM           SS           CF
+  '4411': [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:9,y:57},{x:24,y:57},{x:44,y:57},{x:59,y:57},{x:34,y:35},{x:34,y:13}],
+  // GK  LB           LCB          RCB          RB           DML          DMR          LAM          CAM          RAM          CF
+  '4231': [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:23,y:63},{x:45,y:63},{x:10,y:40},{x:34,y:40},{x:58,y:40},{x:34,y:13}],
+  // GK  LB           LCB          RCB          RB           LCM          CM           RCM          LW           RW           CF
+  '433':  [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:20,y:56},{x:34,y:56},{x:48,y:56},{x:10,y:28},{x:58,y:28},{x:34,y:13}],
+  // GK  LCB          CB           RCB          LWM          LCM          RCM          RWM          LAM          RAM          CF
+  '3421': [{x:34,y:97},{x:17,y:78},{x:34,y:78},{x:51,y:78},{x:8,y:59},{x:25,y:59},{x:43,y:59},{x:60,y:59},{x:24,y:35},{x:44,y:35},{x:34,y:13}],
+  // GK  LCB          CB           RCB          LWM          LCM          CM           RCM          RWM          LST          RST
+  '352':  [{x:34,y:97},{x:17,y:78},{x:34,y:78},{x:51,y:78},{x:7,y:58},{x:22,y:58},{x:34,y:58},{x:46,y:58},{x:61,y:58},{x:24,y:20},{x:44,y:20}],
 };
 
 // Position colors for SVG pitch (fill, stroke)
@@ -2402,7 +2409,8 @@ createApp({
         return {
           name: player.name, position: player.position || basePositions[i],
           bp, slotKey, x: pos.x, y: pos.y,
-          runX: run?.x ?? null, runY: run?.y ?? null,
+          runX: run !== null ? (run.x / 100) * 68 : null,
+          runY: run !== null ? (run.y / 100) * 105 : null,
           fill: colors.fill, stroke: colors.stroke, textColor: colors.text,
         };
       });
@@ -2798,8 +2806,6 @@ createApp({
       mv._awayFormation = awayFmt
                           || this.extractFormation(mv.reportNarrative, mv.away?.club)
                           || (mv.ratings && this.deriveFormation(mv.ratings.away));
-      mv._homeTactics = this.extractTactics(mv.reportNarrative, mv.home?.club);
-      mv._awayTactics = this.extractTactics(mv.reportNarrative, mv.away?.club);
       this.matchDetailLoading = false;
     },
   },
