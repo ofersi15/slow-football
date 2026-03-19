@@ -2429,23 +2429,39 @@ createApp({
       const code = String(submission.formation||'').replace(/-/g,'');
       const positions = FORMATION_SLOT_POS[code];
       if (!positions) return [];
-      const slotCounts = {};
-      return submission.xi.map((player, i) => {
+
+      // Pass 1: assign positions and collect slot groups
+      const players = submission.xi.map((player, i) => {
         const pos = positions[i] || {x:50,y:50};
-        // Use slot from API response (e.g. "WM", "CM", "FB") to build the run key
         const slotType = player.slot || (FORMATIONS[code]||[])[i] || 'CM';
-        slotCounts[slotType] = (slotCounts[slotType] || 0) + 1;
-        const slotKey = `${slotType}${slotCounts[slotType]}`;
-        const runPts = submission.runs?.[slotKey] || [];
-        const run = runPts[0] || null;
         const bp = this.basePos(player.position || slotType || 'CM');
         const colors = POS_COLORS[bp] || POS_COLORS.CM;
-        return {
-          name: player.name, position: player.position || slotType,
-          bp, slotKey, x: pos.x, y: pos.y,
+        return { name: player.name, position: player.position || slotType,
+                 bp, slotType, x: pos.x, y: pos.y,
+                 fill: colors.fill, stroke: colors.stroke, textColor: colors.text };
+      });
+
+      // Pass 2: number slots left-to-right on pitch (x ascending) so WM1=left WM, WM2=right WM
+      const slotGroups = {};
+      players.forEach((p, i) => {
+        if (!slotGroups[p.slotType]) slotGroups[p.slotType] = [];
+        slotGroups[p.slotType].push({ idx: i, x: p.x });
+      });
+      const slotKeyMap = {};
+      for (const [slotType, group] of Object.entries(slotGroups)) {
+        group.sort((a, b) => a.x - b.x);
+        group.forEach((item, rank) => { slotKeyMap[item.idx] = `${slotType}${rank + 1}`; });
+      }
+
+      // Pass 3: attach run targets using left-to-right slot numbering
+      // Game coords: x=0 right side (mirrored), y=0 GK end → flip both axes
+      return players.map((p, i) => {
+        const slotKey = slotKeyMap[i];
+        const runPts = submission.runs?.[slotKey] || [];
+        const run = runPts[0] || null;
+        return { ...p, slotKey,
           runX: run !== null ? 68 - (run.x / 100) * 68 : null,
-          runY: run !== null ? (run.y / 100) * 105 : null,
-          fill: colors.fill, stroke: colors.stroke, textColor: colors.text,
+          runY: run !== null ? 105 - (run.y / 100) * 105 : null,
         };
       });
     },
@@ -2601,6 +2617,8 @@ createApp({
       this.activeTab = 'clubs';
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
+      // Persist last visited club so page refresh restores it
+      try { localStorage.setItem('sf_last_club', clubName); } catch(e) {}
       // Always fetch fresh — bypasses bulk cache so we get the latest upcoming GW submission
       delete this.submissionsCache[clubName];
       await this._fetchClubSubmissions(clubName);
@@ -2899,6 +2917,11 @@ createApp({
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
     this.loadCachedSubmissions();
     this.loadMatchArchive();
+    // Restore last viewed club (after a brief delay to let espionage data load)
+    try {
+      const lastClub = localStorage.getItem('sf_last_club');
+      if (lastClub) setTimeout(() => this.openClubDetail(lastClub), 800);
+    } catch(e) {}
     // Fetch current game week proactively so the staff recruitment input shows the right week
     this.fetchCurrentGameWeek();
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental

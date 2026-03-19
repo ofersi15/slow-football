@@ -1426,6 +1426,7 @@
         <!-- Header card -->
         <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button class="btn" @click="selectedClubName=null" style="font-size:12px">← Back</button>
+          <button class="btn" @click="openClubDetail(selectedClubName)" style="font-size:12px" title="Reload latest submission">↺ Reload</button>
           <div style="flex:1;min-width:120px">
             <div style="font-size:20px;font-weight:800;color:#e6edf3;letter-spacing:-.3px">
               {{selectedClubName}}
@@ -1500,7 +1501,7 @@
                        @click="xiPlayerInfo(pl.name)&&openModal(xiPlayerInfo(pl.name))"
                        style="cursor:pointer">
                       <circle :cx="pl.x" :cy="pl.y" r="3.0" :fill="pl.stroke" opacity="0.1"/>
-                      <circle :cx="pl.x" :cy="pl.y" r="2.5" :fill="pl.fill" :stroke="pl.stroke" stroke-width="0.8"/>
+                      <circle :cx="pl.x" :cy="pl.y" r="2.5" :fill="pl.fill" :stroke="pl.stroke" stroke-width="0.5"/>
                       <text :x="pl.x" :y="pl.y+0.9" text-anchor="middle" font-size="2.2" fill="white" font-weight="800" font-family="system-ui,sans-serif">{{pl.bp}}</text>
                       <text :x="pl.x" :y="pl.y-4" text-anchor="middle" font-size="2.1" fill="rgba(255,255,255,0.9)" font-weight="700" font-family="system-ui,sans-serif">{{xiPlayerInfo(pl.name) ? (xiPlayerInfo(pl.name)._gameRating||xiPlayerInfo(pl.name).Rating||'') : ''}}</text>
                       <text :x="pl.x" :y="pl.y+5.8" text-anchor="middle" font-size="2.0" :fill="pl.textColor" font-weight="600" font-family="system-ui,sans-serif">{{pl.name.split(' ').pop().slice(0,11)}}</text>
@@ -2349,6 +2350,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>
