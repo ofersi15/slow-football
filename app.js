@@ -2458,10 +2458,12 @@ createApp({
         const runPts = submission.runs?.[slotKey] || [];
         const run = runPts[0] || null;
         const slotNum = parseInt(slotKey.replace(/\D/g, '')) || 1;
-        const flipY = slotNum % 2 === 0;
+        const isLeft = slotNum % 2 === 0; // slot2 = left-side players
+        // slot1 (right-side): y=0→attacking end, y=120→GK end (120-unit scale)
+        // slot2 (left-side): y=0→GK end, y=100→attacking end (flipped, 100-unit scale)
         return { ...p, slotKey,
           runX: run !== null ? (run.x / 100) * 68 : null,
-          runY: run !== null ? (flipY ? 105 - (run.y / 100) * 105 : (run.y / 100) * 105) : null,
+          runY: run !== null ? (isLeft ? 105 - (run.y / 100) * 105 : (run.y / 120) * 105) : null,
         };
       });
     },
