@@ -2716,7 +2716,7 @@ createApp({
         log(`${clubList.length} clubs to scan`);
         for (let i = 0; i < clubList.length; i += 6) {
           const batch = clubList.slice(i, i + 6);
-          this.matchArchiveProgress = Math.round((i / clubList.length) * 30);
+          this.matchArchiveProgress = Math.round((i / clubList.length) * 20);
           this.matchArchiveMsg = `Pass 1: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} fixtures`;
           await Promise.all(batch.map(async club => {
             try {
@@ -2738,7 +2738,7 @@ createApp({
         let fetchErrors = 0;
         for (let i = 0; i < fixtureIds.length; i += 10) {
           const batch = fixtureIds.slice(i, i + 10);
-          this.matchArchiveProgress = 30 + Math.round((i / fixtureIds.length) * 55);
+          this.matchArchiveProgress = 20 + Math.round((i / fixtureIds.length) * 40);
           this.matchArchiveMsg = `Pass 2: ${Math.min(i+10, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
           await Promise.all(batch.map(async id => {
             try {
@@ -2759,6 +2759,38 @@ createApp({
         fullMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
         log(`Pass 2 done: ${fullMatches.length} matches, ${fetchErrors} errors`);
 
+        // Pass 3: fetch all submissions for every club (formation + instructions + roles)
+        const subsByClub = {}; // club → { gw → submission }
+        let subErrors = 0;
+        log(`Pass 3: fetching submissions for ${clubList.length} clubs`);
+        for (let i = 0; i < clubList.length; i += 6) {
+          const batch = clubList.slice(i, i + 6);
+          this.matchArchiveProgress = 60 + Math.round((i / clubList.length) * 24);
+          this.matchArchiveMsg = `Pass 3: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · submissions`;
+          await Promise.all(batch.map(async club => {
+            try {
+              const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=200`).then(r => r.json());
+              const byGw = {};
+              for (const s of (d?.items || [])) {
+                const key = s.gameweek ?? 'upcoming';
+                if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
+              }
+              subsByClub[club] = byGw;
+            } catch(e) { subErrors++; log(`SUB ERROR ${club}: ${e.message}`); }
+          }));
+          await delay(80);
+        }
+        log(`Pass 3 done: ${Object.keys(subsByClub).length} clubs, ${subErrors} errors`);
+
+        // Augment full matches with submission data for both clubs
+        for (const m of fullMatches) {
+          const gw = m.gameweek;
+          const homeSub = gw != null ? subsByClub[m.home?.club]?.[gw] : null;
+          const awaySub = gw != null ? subsByClub[m.away?.club]?.[gw] : null;
+          if (homeSub) m.home.sub = { formation: homeSub.formation, instructions: homeSub.instructions, roles: homeSub.roles, xi: homeSub.xi, runs: homeSub.runs };
+          if (awaySub) m.away.sub = { formation: awaySub.formation, instructions: awaySub.instructions, roles: awaySub.roles, xi: awaySub.xi, runs: awaySub.runs };
+        }
+
         // Group full matches by gameweek for chunk storage
         const gwMap = new Map(); // gw → [matches]
         for (const m of fullMatches) {
@@ -2773,8 +2805,15 @@ createApp({
         const compactMatches = fullMatches.map(m => ({
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
-          home: { club: m.home?.club }, away: { club: m.away?.club },
+          home: { club: m.home?.club, formation: m.home?.sub?.formation || null, mentality: m.home?.sub?.instructions?.mentality || null, style: m.home?.sub?.instructions?.style || null },
+          away: { club: m.away?.club, formation: m.away?.sub?.formation || null, mentality: m.away?.sub?.instructions?.mentality || null, style: m.away?.sub?.instructions?.style || null },
           score: m.score, headline: m.headline,
+          // Key match stats for formation/style analysis (inline to avoid loading every chunk)
+          stats: m.stats ? {
+            xg: m.stats.xg,
+            shots: m.stats.shots ? { home: m.stats.shots.home?.total ?? null, away: m.stats.shots.away?.total ?? null } : null,
+            possession: m.stats.possession,
+          } : null,
           _homeManager: m._homeManager, _awayManager: m._awayManager,
           _gw: m.gameweek ?? 0,
         }));
@@ -2782,10 +2821,10 @@ createApp({
         const indexStr = JSON.stringify(indexData);
 
         // Save index (with retry)
-        this.matchArchiveProgress = 86;
+        this.matchArchiveProgress = 84;
         this.matchArchiveMsg = `Saving index (${(indexStr.length/1024).toFixed(0)}KB)…`;
         log(`Saving index: ${(indexStr.length/1024).toFixed(0)}KB`);
-        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v2?permanent=1`, indexStr);
+        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v3?permanent=1`, indexStr);
         if (idxErr !== true) throw new Error(`Index save failed: ${idxErr}`);
         log('Index saved OK');
 
@@ -2795,9 +2834,9 @@ createApp({
           const gw = sortedGws[gi];
           const gwMatches = gwMap.get(gw);
           const chunkStr = JSON.stringify({ gw, matches: gwMatches });
-          this.matchArchiveProgress = 86 + Math.round(((gi + 1) / sortedGws.length) * 13);
+          this.matchArchiveProgress = 84 + Math.round(((gi + 1) / sortedGws.length) * 16);
           this.matchArchiveMsg = `Saving GW${gw} (${gwMatches.length} matches, ${(chunkStr.length/1024).toFixed(0)}KB)…`;
-          const err = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v2_gw_${gw}?permanent=1`, chunkStr);
+          const err = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v3_gw_${gw}?permanent=1`, chunkStr);
           if (err === true) {
             log(`GW${gw}: ${gwMatches.length} matches saved OK (${(chunkStr.length/1024).toFixed(0)}KB)`);
           } else {
@@ -2827,7 +2866,7 @@ createApp({
 
     async loadMatchArchive() {
       try {
-        const raw = await serverCacheGet('sf_match_archive_v2');
+        const raw = await serverCacheGet('sf_match_archive_v3');
         if (!raw) return;
         const data = await parseAsync(raw);
         if (data?.matches?.length) {
@@ -2841,7 +2880,7 @@ createApp({
     async loadMatchChunk(gw) {
       if (this.matchChunks[gw]) return;
       try {
-        const raw = await serverCacheGet(`sf_match_archive_v2_gw_${gw}`);
+        const raw = await serverCacheGet(`sf_match_archive_v3_gw_${gw}`);
         if (raw) {
           const matches = (await parseAsync(raw)).matches || [];
           // Re-extract managers on load so old builds with broken regex are fixed
