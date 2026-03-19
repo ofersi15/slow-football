@@ -1669,13 +1669,15 @@
           <!-- Tactics table: home | label | away -->
           <div v-if="matchView._homeTactics||matchView._awayTactics" style="margin-top:10px;font-size:10px">
             <table style="width:100%;border-collapse:collapse">
-              <tr v-for="(label,key) in {mentality:'Mentality',style:'Style',structure:'Structure',pressing:'Pressing',defLine:'Def. Line',transition:'Transition',focus:'Focus'}" :key="key"
-                v-if="matchView._homeTactics?.[key]||matchView._awayTactics?.[key]"
-                style="border-bottom:1px solid #161b22">
-                <td style="padding:2px 6px;text-align:right;width:38%;color:#e6edf3;font-weight:500">{{matchView._homeTactics?.[key]||'—'}}</td>
-                <td style="padding:2px 4px;text-align:center;width:24%;color:#484f58;font-size:9px;white-space:nowrap">{{label}}</td>
-                <td style="padding:2px 6px;text-align:left;width:38%;color:#e6edf3;font-weight:500">{{matchView._awayTactics?.[key]||'—'}}</td>
-              </tr>
+              <tbody>
+                <template v-for="(label,key) in {mentality:'Mentality',style:'Style',structure:'Structure',pressing:'Pressing',defLine:'Def. Line',transition:'Transition',focus:'Focus'}" :key="key">
+                  <tr v-if="matchView._homeTactics?.[key]||matchView._awayTactics?.[key]" style="border-bottom:1px solid #161b22">
+                    <td style="padding:2px 6px;text-align:right;width:38%;color:#e6edf3;font-weight:500">{{matchView._homeTactics?.[key]||'—'}}</td>
+                    <td style="padding:2px 4px;text-align:center;width:24%;color:#484f58;font-size:9px;white-space:nowrap">{{label}}</td>
+                    <td style="padding:2px 6px;text-align:left;width:38%;color:#e6edf3;font-weight:500">{{matchView._awayTactics?.[key]||'—'}}</td>
+                  </tr>
+                </template>
+              </tbody>
             </table>
           </div>
         </div>
@@ -1770,8 +1772,10 @@
               </div>
               <!-- Instructions -->
               <div v-if="sub.instructions" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px;font-size:10px">
-                <span v-for="(val,key) in sub.instructions" :key="key" v-if="key!=='training_focus'"
-                  style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 4px;color:#8b949e">{{val}}</span>
+                <template v-for="(val,key) in sub.instructions" :key="key">
+                  <span v-if="key!=='training_focus'"
+                    style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 4px;color:#8b949e">{{val}}</span>
+                </template>
               </div>
               <!-- XI -->
               <div style="font-size:11px">
@@ -2107,6 +2111,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

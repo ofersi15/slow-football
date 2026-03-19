@@ -2250,9 +2250,10 @@ createApp({
     // Extract formation string from narrative text, looking near club name
     extractFormation(narrativeArr, club) {
       if (!club) return null;
-      const text = Array.isArray(narrativeArr)
-        ? (narrativeArr.find(p => typeof p === 'string' && p.startsWith('Pre-match')) || narrativeArr.join(' '))
-        : (narrativeArr || '');
+      // Join ALL Pre-match paragraphs (not just the first one)
+      const paras = Array.isArray(narrativeArr) ? narrativeArr : [narrativeArr || ''];
+      const text = paras.filter(p => typeof p === 'string' && p.startsWith('Pre-match')).join(' ')
+                   || paras.join(' ');
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const fmt = '(\\d-\\d(?:-\\d){0,2})';
       let m = text.match(new RegExp(`${esc}.{0,150}${fmt}`));
@@ -2630,8 +2631,10 @@ createApp({
       if (!this.matchChunks[gw]) await this.loadMatchChunk(gw);
       const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
       if (full) this.matchView = full;
-      // Compute formations and tactics from stored data (no API call)
+      // Compute managers, formations and tactics from stored narrative (no API call)
       const mv = this.matchView;
+      mv._homeManager = this.extractManager(mv.reportNarrative, mv.home?.club || '');
+      mv._awayManager = this.extractManager(mv.reportNarrative, mv.away?.club || '');
       mv._homeFormation = this.extractFormation(mv.reportNarrative, mv.home?.club)
                           || (mv.ratings && this.deriveFormation(mv.ratings.home));
       mv._awayFormation = this.extractFormation(mv.reportNarrative, mv.away?.club)
