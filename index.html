@@ -1449,35 +1449,78 @@
         <!-- Latest XI tab -->
         <div v-if="selectedClubSubTab==='xi'" style="display:flex;flex-direction:column;gap:10px">
           <template v-if="selectedClubSubmissions.length">
-            <div class="card" style="padding:12px">
-              <!-- Latest submission -->
-              <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px">
-                <span style="color:#79c0ff;font-size:16px;font-weight:700">{{fmtFormation(selectedClubSubmissions[0].formation)}}</span>
-                <span class="c-gray" style="font-size:11px">GW{{selectedClubSubmissions[0]._gw}}</span>
-                <template v-for="(val,key) in selectedClubSubmissions[0].instructions||{}" :key="key">
-                  <span v-if="key!=='training_focus'" style="background:#21262d;border-radius:4px;padding:2px 7px;font-size:11px;color:#c9d1d9">{{val}}</span>
-                </template>
-              </div>
-              <!-- Starting XI -->
-              <div style="margin-bottom:6px">
-                <div style="font-size:10px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Starting XI</div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <template v-for="(p,i) in (selectedClubSubmissions[0].xi||[])" :key="i">
-                    <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #161b22">
-                      <span :class="'pos-badge pos-'+basePos(p.position)" style="min-width:32px;text-align:center;font-size:10px">{{p.position}}</span>
-                      <span style="color:#e6edf3;font-size:12px">{{p.name}}</span>
-                    </div>
+            <!-- Tactics badges -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline">
+              <span style="color:#79c0ff;font-size:16px;font-weight:700">{{fmtFormation(selectedClubSubmissions[0].formation)}}</span>
+              <span class="c-gray" style="font-size:11px">GW{{selectedClubSubmissions[0]._gw}}</span>
+              <template v-for="(val,key) in selectedClubSubmissions[0].instructions||{}" :key="key">
+                <span v-if="key!=='training_focus'" style="background:#21262d;border-radius:4px;padding:2px 7px;font-size:11px;color:#c9d1d9">{{val}}</span>
+              </template>
+            </div>
+
+            <!-- Pitch + list side by side -->
+            <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+
+              <!-- SVG Pitch -->
+              <div style="flex:0 0 auto;width:min(280px,100%)">
+                <svg :viewBox="'-5 -5 110 110'" style="width:100%;background:#1a4a1a;border-radius:6px;border:1px solid #21262d" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Arrow marker -->
+                  <defs>
+                    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                      <path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,255,255,0.8)"/>
+                    </marker>
+                  </defs>
+                  <!-- Pitch border -->
+                  <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.8"/>
+                  <!-- Center line -->
+                  <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.2)" stroke-width="0.6"/>
+                  <!-- Center circle -->
+                  <circle cx="50" cy="50" r="9.5" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.6"/>
+                  <circle cx="50" cy="50" r="0.8" fill="rgba(255,255,255,0.3)"/>
+                  <!-- Attacking penalty area (top) -->
+                  <rect x="16.5" y="0" width="67" height="17" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.6"/>
+                  <!-- Defensive penalty area (bottom) -->
+                  <rect x="16.5" y="83" width="67" height="17" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.6"/>
+                  <!-- Attacking 6-yard box -->
+                  <rect x="36.8" y="0" width="26.4" height="5.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.6"/>
+                  <!-- Defensive 6-yard box -->
+                  <rect x="36.8" y="94.5" width="26.4" height="5.5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.6"/>
+                  <!-- Penalty spots -->
+                  <circle cx="50" cy="11" r="0.8" fill="rgba(255,255,255,0.3)"/>
+                  <circle cx="50" cy="89" r="0.8" fill="rgba(255,255,255,0.3)"/>
+
+                  <!-- Run arrows (drawn first, behind players) -->
+                  <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'run'+i">
+                    <line v-if="pl.runX!==null"
+                      :x1="pl.x" :y1="pl.y" :x2="pl.runX" :y2="pl.runY"
+                      stroke="rgba(255,255,255,0.65)" stroke-width="1" stroke-dasharray="3,2"
+                      marker-end="url(#arrowhead)"/>
                   </template>
-                </div>
+
+                  <!-- Player circles + labels -->
+                  <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'pl'+i">
+                    <circle :cx="pl.x" :cy="pl.y" r="4.2" :fill="pl.fill" :stroke="pl.stroke" stroke-width="1.2"/>
+                    <text :x="pl.x" :y="pl.y+7.8" text-anchor="middle" font-size="3.2" :fill="pl.textColor" font-family="system-ui,sans-serif" font-weight="600">{{pl.name.split(' ').pop()}}</text>
+                    <text :x="pl.x" :y="pl.y+0.8" text-anchor="middle" font-size="2.8" fill="rgba(255,255,255,0.95)" font-family="system-ui,sans-serif" font-weight="700">{{pl.bp}}</text>
+                  </template>
+                </svg>
               </div>
-              <!-- Subs -->
-              <div v-if="selectedClubSubmissions[0].subs?.length">
-                <div style="font-size:10px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Substitutes</div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <template v-for="(p,i) in selectedClubSubmissions[0].subs" :key="i">
-                    <div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid #161b22">
-                      <span :class="'pos-badge pos-'+basePos(p.position)" style="min-width:32px;text-align:center;font-size:10px">{{p.position}}</span>
-                      <span style="color:#8b949e;font-size:12px">{{p.name}}</span>
+
+              <!-- Player list -->
+              <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:2px">
+                <div style="font-size:10px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Starting XI</div>
+                <template v-for="(p,i) in (selectedClubSubmissions[0].xi||[])" :key="i">
+                  <div style="display:flex;align-items:center;gap:7px;padding:3px 0;border-bottom:1px solid #161b22">
+                    <span :class="'pos-badge pos-'+basePos(p.position)" style="min-width:28px;text-align:center;font-size:10px">{{p.position}}</span>
+                    <span style="color:#e6edf3;font-size:12px">{{p.name}}</span>
+                  </div>
+                </template>
+                <div v-if="selectedClubSubmissions[0].subs?.length" style="margin-top:8px">
+                  <div style="font-size:10px;color:#8b949e;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Substitutes</div>
+                  <template v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i">
+                    <div style="display:flex;align-items:center;gap:7px;padding:2px 0;border-bottom:1px solid #0d1117">
+                      <span :class="'pos-badge pos-'+basePos(p.position)" style="min-width:28px;text-align:center;font-size:10px">{{p.position}}</span>
+                      <span style="color:#8b949e;font-size:11px">{{p.name}}</span>
                     </div>
                   </template>
                 </div>
@@ -2270,6 +2313,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

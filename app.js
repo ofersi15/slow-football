@@ -119,6 +119,29 @@ const FORMATIONS = {
   '3421': ['GK','CB','CB','CB','WM','CM','CM','WM','AM','AM','CF'],
   '352':  ['GK','CB','CB','CB','WM','CM','CM','CM','WM','CF','CF'],
 };
+// Default slot positions per formation (x: 0=left,100=right; y: 0=attacking end, 100=defensive/GK end)
+const FORMATION_SLOT_POS = {
+  '442':  [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:14,y:50},{x:38,y:50},{x:62,y:50},{x:86,y:50},{x:36,y:18},{x:64,y:18}],
+  '4411': [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:14,y:52},{x:38,y:52},{x:62,y:52},{x:86,y:52},{x:50,y:32},{x:50,y:12}],
+  '4231': [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:36,y:59},{x:64,y:59},{x:14,y:38},{x:50,y:38},{x:86,y:38},{x:50,y:14}],
+  '433':  [{x:50,y:88},{x:12,y:72},{x:36,y:72},{x:64,y:72},{x:88,y:72},{x:30,y:52},{x:50,y:52},{x:70,y:52},{x:14,y:26},{x:86,y:26},{x:50,y:12}],
+  '3421': [{x:50,y:88},{x:26,y:74},{x:50,y:74},{x:74,y:74},{x:12,y:56},{x:38,y:56},{x:62,y:56},{x:88,y:56},{x:35,y:32},{x:65,y:32},{x:50,y:14}],
+  '352':  [{x:50,y:88},{x:26,y:74},{x:50,y:74},{x:74,y:74},{x:12,y:54},{x:35,y:54},{x:50,y:54},{x:65,y:54},{x:88,y:54},{x:36,y:18},{x:64,y:18}],
+};
+
+// Position colors for SVG pitch (fill, stroke)
+const POS_COLORS = {
+  GK: {fill:'#2d4a1a',stroke:'#7ee787',text:'#7ee787'},
+  FB: {fill:'#1a3a5e',stroke:'#79c0ff',text:'#79c0ff'},
+  CB: {fill:'#1a3060',stroke:'#79c0ff',text:'#79c0ff'},
+  DM: {fill:'#3a2a6b',stroke:'#d2a8ff',text:'#d2a8ff'},
+  CM: {fill:'#3a2a1a',stroke:'#ffa657',text:'#ffa657'},
+  WM: {fill:'#3a1a3a',stroke:'#d2a8ff',text:'#d2a8ff'},
+  AM: {fill:'#4a3a10',stroke:'#ffa657',text:'#ffa657'},
+  WF: {fill:'#3a1a1a',stroke:'#ff7b72',text:'#ff7b72'},
+  CF: {fill:'#5a1010',stroke:'#ff7b72',text:'#ff7b72'},
+};
+
 // Slot → compatible player positions (Bfe function from game source)
 const SLOT_COMPAT = {
   GK: ['GK'],
@@ -153,6 +176,14 @@ const DEFAULT_MENTAL_ATTRS = ['Mentality','Experience','Work rate'];
 // Attrs to check for "incomplete stats" detection (youth promotions / newly added players)
 // If fewer than 5 of these 12 standard physical attrs are non-zero, player has limited data
 const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+
+// Build slot key array for a formation code: '433' → ['GK1','FB1','CB1','CB2','FB2','CM1','CM2','CM3','WF1','WF2','CF1']
+function buildSlotKeys(code) {
+  const slots = FORMATIONS[code];
+  if (!slots) return [];
+  const counts = {};
+  return slots.map(s => { counts[s] = (counts[s]||0)+1; return `${s}${counts[s]}`; });
+}
 
 function calcGameRating(p, pos) {
   const attrs = GAME_ATTRS[pos];
@@ -2350,6 +2381,30 @@ createApp({
         LCF:'CF', RCF:'CF',
       };
       return map[pos] || pos;
+    },
+
+    // Build layout array for pitch visualization: maps each xi player to their slot position + run target
+    pitchLayout(submission) {
+      if (!submission?.xi?.length) return [];
+      const code = String(submission.formation||'').replace(/-/g,'');
+      const positions = FORMATION_SLOT_POS[code];
+      if (!positions) return [];
+      const slotKeys = buildSlotKeys(code);
+      const basePositions = FORMATIONS[code] || [];
+      return submission.xi.map((player, i) => {
+        const pos = positions[i] || {x:50,y:50};
+        const slotKey = slotKeys[i] || '';
+        const runPts = submission.runs?.[slotKey] || [];
+        const run = runPts[0] || null;
+        const bp = this.basePos(player.position || basePositions[i] || 'CM');
+        const colors = POS_COLORS[bp] || POS_COLORS.CM;
+        return {
+          name: player.name, position: player.position || basePositions[i],
+          bp, slotKey, x: pos.x, y: pos.y,
+          runX: run?.x ?? null, runY: run?.y ?? null,
+          fill: colors.fill, stroke: colors.stroke, textColor: colors.text,
+        };
+      });
     },
 
     // Return starters in raw API order with position label, plus subs sorted by time on
