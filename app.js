@@ -465,33 +465,34 @@ createApp({
         const q = this.espionageSearch.trim().toLowerCase();
         list = list.filter(c => c.club.toLowerCase().includes(q));
       }
-      const s = this.espionageSort;
-      const getRating = (c, role) => c.current?.[role]?.rating || 0;
-      const getLvl = (c, key) => c.levels?.[key] || 0;
-      if (s === 'ceo_d')      list.sort((a,b) => getRating(b,'CEO') - getRating(a,'CEO'));
-      else if (s === 'td_d')  list.sort((a,b) => getRating(b,'Technical Director') - getRating(a,'Technical Director'));
-      else if (s === 'asst_d') list.sort((a,b) => getRating(b,'Assistant') - getRating(a,'Assistant'));
-      else if (s === 'physio_d') list.sort((a,b) => getRating(b,'Physio') - getRating(a,'Physio'));
-      else if (s === 'training_d') list.sort((a,b) => getLvl(b,'training') - getLvl(a,'training'));
-      else if (s === 'scouting_d') list.sort((a,b) => getLvl(b,'scouting') - getLvl(a,'scouting'));
-      else if (s === 'academy_d') list.sort((a,b) => getLvl(b,'academy') - getLvl(a,'academy'));
-      else if (s === 'medical_d') list.sort((a,b) => getLvl(b,'medical') - getLvl(a,'medical'));
-      else if (s === 'analytics_d') list.sort((a,b) => getLvl(b,'analytics') - getLvl(a,'analytics'));
-      else if (s === 'stadium_d') list.sort((a,b) => getLvl(b,'stadium') - getLvl(a,'stadium'));
-      else if (s === 'ads_d') list.sort((a,b) => (b.openAds?.length||0) - (a.openAds?.length||0));
-      else if (s === 'club_d') list.sort((a,b) => b.club.localeCompare(a.club));
-      else if (s === 'ceo_a') list.sort((a,b) => getRating(a,'CEO') - getRating(b,'CEO'));
-      else if (s === 'td_a') list.sort((a,b) => getRating(a,'Technical Director') - getRating(b,'Technical Director'));
-      else if (s === 'asst_a') list.sort((a,b) => getRating(a,'Assistant') - getRating(b,'Assistant'));
-      else if (s === 'physio_a') list.sort((a,b) => getRating(a,'Physio') - getRating(b,'Physio'));
-      else if (s === 'training_a') list.sort((a,b) => getLvl(a,'training') - getLvl(b,'training'));
-      else if (s === 'scouting_a') list.sort((a,b) => getLvl(a,'scouting') - getLvl(b,'scouting'));
-      else if (s === 'academy_a') list.sort((a,b) => getLvl(a,'academy') - getLvl(b,'academy'));
-      else if (s === 'medical_a') list.sort((a,b) => getLvl(a,'medical') - getLvl(b,'medical'));
-      else if (s === 'analytics_a') list.sort((a,b) => getLvl(a,'analytics') - getLvl(b,'analytics'));
-      else if (s === 'stadium_a') list.sort((a,b) => getLvl(a,'stadium') - getLvl(b,'stadium'));
-      else if (s === 'ads_a') list.sort((a,b) => (a.openAds?.length||0) - (b.openAds?.length||0));
-      else list.sort((a,b) => a.club.localeCompare(b.club));
+      const r = (c, role) => c.current?.[role]?.rating || 0;
+      const lv = (c, key) => c.levels?.[key] || 0;
+      const SORTS = {
+        ceo_d:      (a,b) => r(b,'CEO')-r(a,'CEO'),
+        ceo_a:      (a,b) => r(a,'CEO')-r(b,'CEO'),
+        td_d:       (a,b) => r(b,'Technical Director')-r(a,'Technical Director'),
+        td_a:       (a,b) => r(a,'Technical Director')-r(b,'Technical Director'),
+        asst_d:     (a,b) => r(b,'Assistant')-r(a,'Assistant'),
+        asst_a:     (a,b) => r(a,'Assistant')-r(b,'Assistant'),
+        physio_d:   (a,b) => r(b,'Physio')-r(a,'Physio'),
+        physio_a:   (a,b) => r(a,'Physio')-r(b,'Physio'),
+        training_d: (a,b) => lv(b,'training')-lv(a,'training'),
+        training_a: (a,b) => lv(a,'training')-lv(b,'training'),
+        scouting_d: (a,b) => lv(b,'scouting')-lv(a,'scouting'),
+        scouting_a: (a,b) => lv(a,'scouting')-lv(b,'scouting'),
+        academy_d:  (a,b) => lv(b,'academy')-lv(a,'academy'),
+        academy_a:  (a,b) => lv(a,'academy')-lv(b,'academy'),
+        medical_d:  (a,b) => lv(b,'medical')-lv(a,'medical'),
+        medical_a:  (a,b) => lv(a,'medical')-lv(b,'medical'),
+        analytics_d:(a,b) => lv(b,'analytics')-lv(a,'analytics'),
+        analytics_a:(a,b) => lv(a,'analytics')-lv(b,'analytics'),
+        stadium_d:  (a,b) => lv(b,'stadium')-lv(a,'stadium'),
+        stadium_a:  (a,b) => lv(a,'stadium')-lv(b,'stadium'),
+        ads_d:      (a,b) => (b.openAds?.length||0)-(a.openAds?.length||0),
+        ads_a:      (a,b) => (a.openAds?.length||0)-(b.openAds?.length||0),
+        club_d:     (a,b) => b.club.localeCompare(a.club),
+      };
+      list.sort(SORTS[this.espionageSort] || ((a,b) => a.club.localeCompare(b.club)));
       return list;
     },
     espionageNegoFiltered() {
@@ -2488,6 +2489,22 @@ createApp({
       return Object.keys(t).length ? t : null;
     },
 
+    // ── Shared submissions fetch helper ──────────────────────────────────────
+    // Fetches all submissions for a club from the API and populates submissionsCache.
+    // All callers (getClubFormation, loadEspionageSubmissions, openClubDetail, fetchMySubmission)
+    // go through this single method so there's no duplicated fetch/normalize logic.
+    async _fetchClubSubmissions(club) {
+      if (!club || this.submissionsCache[club] !== undefined) return;
+      try {
+        const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
+        const byGw = {};
+        for (const s of (d?.items || []).filter(s => s.gameweek != null)) {
+          if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+        }
+        this.submissionsCache[club] = byGw;
+      } catch(e) { this.submissionsCache[club] = {}; }
+    },
+
     async loadCachedSubmissions() {
       try {
         const raw = await serverCacheGet(SUBMISSIONS_CACHE_KEY);
@@ -2506,20 +2523,7 @@ createApp({
     async loadEspionageSubmissions() {
       const clubs = (this.espionageClubs || []).map(c => c.club).filter(Boolean);
       if (!clubs.length) return;
-      await Promise.all(clubs.map(async club => {
-        if (this.submissionsCache[club] !== undefined) return;
-        try {
-          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
-          const items = (d?.items || []).filter(s => s.gameweek != null);
-          const byGw = {};
-          for (const s of items) {
-            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
-          }
-          this.submissionsCache[club] = byGw;
-        } catch(e) {
-          this.submissionsCache[club] = {};
-        }
-      }));
+      await Promise.all(clubs.map(club => this._fetchClubSubmissions(club)));
       const result = {};
       for (const club of clubs) {
         const byGw = this.submissionsCache[club] || {};
@@ -2537,37 +2541,16 @@ createApp({
     async openClubDetail(clubName) {
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
-      // Ensure submissions are loaded for this club
-      if (!this.submissionsCache[clubName]) {
-        try {
-          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(clubName)}`).then(r => r.json());
-          const items = (d?.items || []).filter(s => s.gameweek != null);
-          const byGw = {};
-          for (const s of items) {
-            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
-          }
-          this.submissionsCache[clubName] = byGw;
-        } catch(e) {
-          this.submissionsCache[clubName] = {};
-        }
-      }
+      await this._fetchClubSubmissions(clubName);
     },
 
     async fetchMySubmission() {
       if (this.mySubmissionLoading) return;
       this.mySubmissionLoading = true;
-      try {
-        const d = await fetch(`${API}/submissions?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
-        const items = (d?.items || []).filter(s => s.gameweek != null);
-        // For each GW keep the latest submission (highest createdAt)
-        const byGw = {};
-        for (const s of items) {
-          if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
-        }
-        // Keep the 3 most recent GWs
-        const recentGws = Object.keys(byGw).map(Number).sort((a,b)=>b-a).slice(0,3);
-        this.mySubmissions = recentGws.map(gw => byGw[gw]);
-      } catch(e) {}
+      await this._fetchClubSubmissions(MY_CLUB);
+      const byGw = this.submissionsCache[MY_CLUB] || {};
+      const recentGws = Object.keys(byGw).map(Number).sort((a,b)=>b-a).slice(0,3);
+      this.mySubmissions = recentGws.map(gw => byGw[gw]);
       this.mySubmissionLoading = false;
     },
 
@@ -2786,22 +2769,10 @@ createApp({
       } catch(e) {}
     },
 
-    // Fetch all submissions for a club, cache by gw, return formatted formation for given gw
+    // Return formatted formation for a club/gameweek from submissions (fetches if not cached)
     async getClubFormation(club, gameweek) {
       if (!club || !gameweek) return null;
-      if (!this.submissionsCache[club]) {
-        try {
-          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}`).then(r => r.json());
-          const items = (d?.items || []).filter(s => s.gameweek != null);
-          const byGw = {};
-          for (const s of items) {
-            if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
-          }
-          this.submissionsCache[club] = byGw;
-        } catch(e) {
-          this.submissionsCache[club] = {};
-        }
-      }
+      await this._fetchClubSubmissions(club);
       const sub = this.submissionsCache[club]?.[gameweek];
       return sub?.formation ? this.fmtFormation(sub.formation) : null;
     },
