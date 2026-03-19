@@ -308,6 +308,7 @@ createApp({
       analysisLoading: false, analysisLoaded: false, analysisMsg: '', analysisProgress: 0,
       analysisMatches: [], analysisFilterFormation: '',
       subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
+      matchArchiveFmSrc: null,
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
@@ -2969,7 +2970,7 @@ createApp({
           }; // close return object
         }); // close fullMatches.map
         log(`Formation sources: sub=${fmSrc.sub} narr=${fmSrc.narr} derived=${fmSrc.derived} none=${fmSrc.none} (of ${fullMatches.length*2} sides)`);
-        const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, gwCount: sortedGws.length, gameweeks: sortedGws, matches: compactMatches };
+        const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, gwCount: sortedGws.length, gameweeks: sortedGws, fmSrc, matches: compactMatches };
         const indexStr = JSON.stringify(indexData);
 
         // Save index (with retry)
@@ -3025,6 +3026,7 @@ createApp({
           this.matchArchive = data.matches;
           this.matchArchiveChunkCount = data.gwCount || 0;
           this.matchArchiveCacheDate = new Date(data.builtAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+          if (data.fmSrc) this.matchArchiveFmSrc = data.fmSrc;
         }
       } catch(e) {}
     },
