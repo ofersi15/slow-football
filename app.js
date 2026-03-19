@@ -2287,26 +2287,14 @@ createApp({
       return labels?.[idx] ?? pos;
     },
 
-    // Return starters sorted by field position with L/R/C labels, plus subs list
+    // Return starters in raw API order with position label, plus subs sorted by time on
     lineupDisplay(ratings) {
       if (!ratings?.length) return { starters: [], subs: [] };
-      const POS_ORDER = { GK:0, CB:1, FB:2, DM:3, CM:4, WM:5, AM:6, WF:7, CF:8 };
-      const starters = ratings
-        .filter(p => p.minutes > 0 && !p.subbedOnAt)
-        .sort((a, b) => (POS_ORDER[a.position] ?? 9) - (POS_ORDER[b.position] ?? 9));
+      const starters = ratings.filter(p => p.minutes > 0 && !p.subbedOnAt);
       const subs = ratings
         .filter(p => p.minutes > 0 && p.subbedOnAt)
         .sort((a, b) => (a.subbedOnAt ?? 0) - (b.subbedOnAt ?? 0));
-      // Count positions among starters for side labelling
-      const counts = {};
-      for (const p of starters) counts[p.position] = (counts[p.position] || 0) + 1;
-      const posIdx = {};
-      const label = (p) => {
-        if (p.subbedOnAt) return { ...p, _posLabel: p.position };
-        const i = posIdx[p.position] = (posIdx[p.position] || 0);
-        posIdx[p.position]++;
-        return { ...p, _posLabel: this.posLabel(p.position, i, counts[p.position]) };
-      };
+      const label = (p) => ({ ...p, _posLabel: p.position });
       return { starters: starters.map(label), subs: subs.map(label) };
     },
 
@@ -2338,12 +2326,16 @@ createApp({
 
     extractManager(narrativeArr, club) {
       const text = Array.isArray(narrativeArr) ? narrativeArr.join(' ') : (narrativeArr || '');
-      // Match "First Last's ClubName" — handles accented chars
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      // Use explicit safe ranges to avoid × (U+00D7) and ÷ (U+00F7) in character classes
-      const pat = new RegExp(`([A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF]+(?:[- ][A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF]+)+)'s (?:${esc})\\b`);
-      const m = text.match(pat);
-      return m ? m[1] : null;
+      // Word chars including accented letters, single or multi-word names
+      const name = `([A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF\u00DF\w]*(?:[- ][A-Z\u00C0-\u00D6\u00D8-\u00DD][a-z\u00E0-\u00F6\u00F8-\u00FF\w]*)*)`;
+      // Try "Name's Club" (with straight or curly apostrophe)
+      let m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
+      if (m) return m[1];
+      // Try "Club manager Name" or "managed by Name"
+      m = text.match(new RegExp(`(?:${esc} manager|managed by) ${name}`));
+      if (m) return m[1];
+      return null;
     },
 
     matchResultFor(match, club) {
@@ -2522,7 +2514,23 @@ createApp({
       if (this.matchChunks[gw]) return;
       try {
         const raw = await serverCacheGet(`sf_match_archive_v2_gw_${gw}`);
-        if (raw) this.matchChunks[gw] = JSON.parse(raw).matches || [];
+        if (raw) {
+          const matches = JSON.parse(raw).matches || [];
+          // Re-extract managers on load so old builds with broken regex are fixed
+          for (const m of matches) {
+            m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
+            m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
+          }
+          this.matchChunks[gw] = matches;
+          // Back-fill the compact index so the match list shows correct managers
+          if (this.matchArchive) {
+            const byId = new Map(matches.map(m => [m.fixtureId, m]));
+            for (const e of this.matchArchive) {
+              const full = byId.get(e.fixtureId);
+              if (full) { e._homeManager = full._homeManager; e._awayManager = full._awayManager; }
+            }
+          }
+        }
       } catch(e) {}
     },
 
