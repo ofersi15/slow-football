@@ -2932,6 +2932,15 @@ createApp({
         // Build compact index — _gw field points to the gameweek chunk
         // Formation fallback chain: submission → extracted from narrative → derived from ratings
         const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
+        const fmSrc = { sub:0, narr:0, derived:0, none:0 };
+        const getFm = (sub, narrative, club, ratingsArr) => {
+          if (sub?.formation) { fmSrc.sub++; return sub.formation; }
+          const fromNarr = stripDashes(this.extractFormation(narrative, club));
+          if (fromNarr) { fmSrc.narr++; return fromNarr; }
+          const fromRatings = stripDashes(this.deriveFormation(ratingsArr));
+          if (fromRatings) { fmSrc.derived++; return fromRatings; }
+          fmSrc.none++; return null;
+        };
         const compactMatches = fullMatches.map(m => {
           const hNarInstr = this.parseInstructions(m.reportNarrative, m.home?.club);
           const aNarInstr = this.parseInstructions(m.reportNarrative, m.away?.club);
@@ -2939,12 +2948,12 @@ createApp({
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
           home: { club: m.home?.club,
-            formation: m.home?.sub?.formation || stripDashes(this.extractFormation(m.reportNarrative, m.home?.club)) || stripDashes(this.deriveFormation(m.ratings?.home)) || null,
+            formation: getFm(m.home?.sub, m.reportNarrative, m.home?.club, m.ratings?.home),
             mentality: m.home?.sub?.instructions?.mentality || hNarInstr?.mentality || null,
             style: m.home?.sub?.instructions?.style || hNarInstr?.style || null,
             sqRtg: computeSquadRatings(m.home?.sub) },
           away: { club: m.away?.club,
-            formation: m.away?.sub?.formation || stripDashes(this.extractFormation(m.reportNarrative, m.away?.club)) || stripDashes(this.deriveFormation(m.ratings?.away)) || null,
+            formation: getFm(m.away?.sub, m.reportNarrative, m.away?.club, m.ratings?.away),
             mentality: m.away?.sub?.instructions?.mentality || aNarInstr?.mentality || null,
             style: m.away?.sub?.instructions?.style || aNarInstr?.style || null,
             sqRtg: computeSquadRatings(m.away?.sub) },
@@ -2959,6 +2968,7 @@ createApp({
           _gw: m.gameweek ?? 0,
           }; // close return object
         }); // close fullMatches.map
+        log(`Formation sources: sub=${fmSrc.sub} narr=${fmSrc.narr} derived=${fmSrc.derived} none=${fmSrc.none} (of ${fullMatches.length*2} sides)`);
         const indexData = { builtAt: Date.now(), matchCount: fullMatches.length, gwCount: sortedGws.length, gameweeks: sortedGws, matches: compactMatches };
         const indexStr = JSON.stringify(indexData);
 
