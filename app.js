@@ -2801,12 +2801,35 @@ createApp({
         const sortedGws = [...gwMap.keys()].sort((a,b) => a - b);
         log(`Gameweeks: ${sortedGws.length} (GW${sortedGws[0]}–GW${sortedGws[sortedGws.length-1]})`);
 
+        // Helper: compute section ratings (def/mid/att/overall) from submission xi + allPlayers attributes
+        // Slot → section mapping (GK excluded from overall section breakdown)
+        const SLOT_SECTION = { CB:'def', FB:'def', DM:'mid', CM:'mid', WM:'mid', AM:'att', WF:'att', CF:'att' };
+        const playerByName = new Map(this.allPlayers.map(p => [(p.Player||'').toLowerCase().trim(), p]));
+        const avgArr = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
+        const computeSquadRatings = (sub) => {
+          if (!sub?.xi?.length) return null;
+          const secs = { def:[], mid:[], att:[] };
+          const all = [];
+          for (const slot of sub.xi) {
+            const name = (slot.name || slot.player || '').toLowerCase().trim();
+            const p = playerByName.get(name);
+            if (!p) continue;
+            const slotBase = (slot.slot || '').replace(/\d+$/, '') || p.Position || 'CM';
+            const pos = p.Position || slotBase;
+            const r = calcGameRating(p, pos);
+            if (!r) continue;
+            all.push(r);
+            if (SLOT_SECTION[slotBase]) secs[SLOT_SECTION[slotBase]].push(r);
+          }
+          return { overall: avgArr(all), def: avgArr(secs.def), mid: avgArr(secs.mid), att: avgArr(secs.att) };
+        };
+
         // Build compact index — _gw field points to the gameweek chunk
         const compactMatches = fullMatches.map(m => ({
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
-          home: { club: m.home?.club, formation: m.home?.sub?.formation || null, mentality: m.home?.sub?.instructions?.mentality || null, style: m.home?.sub?.instructions?.style || null },
-          away: { club: m.away?.club, formation: m.away?.sub?.formation || null, mentality: m.away?.sub?.instructions?.mentality || null, style: m.away?.sub?.instructions?.style || null },
+          home: { club: m.home?.club, formation: m.home?.sub?.formation || null, mentality: m.home?.sub?.instructions?.mentality || null, style: m.home?.sub?.instructions?.style || null, sqRtg: computeSquadRatings(m.home?.sub) },
+          away: { club: m.away?.club, formation: m.away?.sub?.formation || null, mentality: m.away?.sub?.instructions?.mentality || null, style: m.away?.sub?.instructions?.style || null, sqRtg: computeSquadRatings(m.away?.sub) },
           score: m.score, headline: m.headline,
           // Key match stats for formation/style analysis (inline to avoid loading every chunk)
           stats: m.stats ? {
