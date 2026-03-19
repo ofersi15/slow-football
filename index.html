@@ -1666,18 +1666,17 @@
             </div>
           </div>
           <div class="c-gray" style="font-size:11px;margin-top:6px;font-style:italic">{{matchView.headline}}</div>
-          <!-- Tactics row -->
-          <div v-if="matchView._homeTactics||matchView._awayTactics" style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;gap:8px">
-            <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-start">
-              <template v-if="matchView._homeTactics" v-for="(val,key) in matchView._homeTactics" :key="key">
-                <span style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 5px;color:#8b949e">{{val}}</span>
-              </template>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end">
-              <template v-if="matchView._awayTactics" v-for="(val,key) in matchView._awayTactics" :key="key">
-                <span style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 5px;color:#8b949e">{{val}}</span>
-              </template>
-            </div>
+          <!-- Tactics table: home | label | away -->
+          <div v-if="matchView._homeTactics||matchView._awayTactics" style="margin-top:10px;font-size:10px">
+            <table style="width:100%;border-collapse:collapse">
+              <tr v-for="(label,key) in {mentality:'Mentality',style:'Style',structure:'Structure',pressing:'Pressing',defLine:'Def. Line',transition:'Transition',focus:'Focus'}" :key="key"
+                v-if="matchView._homeTactics?.[key]||matchView._awayTactics?.[key]"
+                style="border-bottom:1px solid #161b22">
+                <td style="padding:2px 6px;text-align:right;width:38%;color:#e6edf3;font-weight:500">{{matchView._homeTactics?.[key]||'—'}}</td>
+                <td style="padding:2px 4px;text-align:center;width:24%;color:#484f58;font-size:9px;white-space:nowrap">{{label}}</td>
+                <td style="padding:2px 6px;text-align:left;width:38%;color:#e6edf3;font-weight:500">{{matchView._awayTactics?.[key]||'—'}}</td>
+              </tr>
+            </table>
           </div>
         </div>
         <!-- Stats bar -->
@@ -1757,39 +1756,39 @@
         <!-- Sub-tab switcher -->
         <div style="display:flex;gap:4px;margin-bottom:12px">
           <button @click="matchSubTab='list'" :style="{background:matchSubTab==='list'?'#238636':'#21262d',color:matchSubTab==='list'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Match List</button>
-          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmission&&!mySubmissionLoading)fetchMySubmission()" :style="{background:matchSubTab==='lineups'?'#238636':'#21262d',color:matchSubTab==='lineups'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Club Lineups</button>
+          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmissions.length&&!mySubmissionLoading)fetchMySubmission()" :style="{background:matchSubTab==='lineups'?'#238636':'#21262d',color:matchSubTab==='lineups'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Club Lineups</button>
         </div>
 
         <!-- Club Lineups panel -->
         <div v-if="matchSubTab==='lineups'">
-          <!-- My submitted lineup -->
-          <div v-if="mySubmission" class="card" style="padding:12px;margin-bottom:12px;border:1px solid #388bfd44">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-              <span style="font-weight:700;font-size:13px;color:#79c0ff">My Lineup · GW{{mySubmission.gameweek}}</span>
-              <span style="background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{fmtFormation(mySubmission.formation)}}</span>
-              <span class="c-gray" style="font-size:10px">{{mySubmission.createdAt ? new Date(mySubmission.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}}</span>
-            </div>
-            <!-- Instructions -->
-            <div v-if="mySubmission.instructions" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;font-size:10px">
-              <span v-for="(val,key) in mySubmission.instructions" :key="key"
-                v-if="key!=='training_focus'"
-                style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 5px;color:#8b949e">{{val}}</span>
-            </div>
-            <!-- XI -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:11px">
-              <div v-for="p in mySubmission.xi" :key="p.order" style="display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid #161b22">
-                <span style="font-size:10px;font-weight:700;min-width:28px"
-                  :class="p.slot==='GK'?'c-green':['CB','FB'].includes(p.slot)?'c-blue':['DM','CM','WM','AM'].includes(p.slot)?'c-orange':'c-red'">{{p.position}}</span>
-                <span>{{p.name}}</span>
+          <!-- My submitted lineups (last 3 GWs) -->
+          <div v-if="mySubmissions.length" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div v-for="sub in mySubmissions" :key="sub.submissionId" class="card" style="padding:12px;flex:1;min-width:220px;border:1px solid #388bfd44">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                <span style="font-weight:700;font-size:12px;color:#79c0ff">GW{{sub.gameweek}}</span>
+                <span style="background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{fmtFormation(sub.formation)}}</span>
               </div>
-            </div>
-            <!-- Subs -->
-            <div v-if="mySubmission.subs?.length" style="margin-top:6px;font-size:10px;color:#8b949e">
-              <span v-for="s in mySubmission.subs" :key="s.order" style="margin-right:8px">↑{{s.name}} ({{s.plan}})</span>
-            </div>
-            <!-- Roles -->
-            <div v-if="mySubmission.roles" style="margin-top:4px;font-size:10px;color:#8b949e">
-              ©{{mySubmission.roles.captain}} · FK:{{mySubmission.roles.freekick}} · Pen:{{mySubmission.roles.penalty}}
+              <!-- Instructions -->
+              <div v-if="sub.instructions" style="display:flex;flex-wrap:wrap;gap:2px;margin-bottom:6px;font-size:10px">
+                <span v-for="(val,key) in sub.instructions" :key="key" v-if="key!=='training_focus'"
+                  style="background:#21262d;border:1px solid #30363d;border-radius:3px;padding:1px 4px;color:#8b949e">{{val}}</span>
+              </div>
+              <!-- XI -->
+              <div style="font-size:11px">
+                <div v-for="p in sub.xi" :key="p.order" style="display:flex;align-items:center;gap:4px;padding:1px 0;border-bottom:1px solid #161b22">
+                  <span style="font-size:10px;font-weight:700;min-width:30px"
+                    :class="p.slot==='GK'?'c-green':['CB','FB'].includes(p.slot)?'c-blue':['DM','CM','WM','AM'].includes(p.slot)?'c-orange':'c-red'">{{p.position}}</span>
+                  <span>{{p.name}}</span>
+                </div>
+              </div>
+              <!-- Subs -->
+              <div v-if="sub.subs?.length" style="margin-top:5px;font-size:10px;color:#8b949e">
+                <div v-for="s in sub.subs" :key="s.order">↑{{s.name}} <span class="c-gray">({{s.plan}} · {{s.time}})</span></div>
+              </div>
+              <!-- Roles -->
+              <div v-if="sub.roles" style="margin-top:4px;font-size:10px;color:#484f58">
+                ©{{sub.roles.captain}} · FK:{{sub.roles.freekick}} · Pen:{{sub.roles.penalty}}
+              </div>
             </div>
           </div>
 
@@ -2108,6 +2107,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

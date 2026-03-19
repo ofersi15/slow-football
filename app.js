@@ -255,7 +255,7 @@ createApp({
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
       matchSort: 'gw_d', matchSubTab: 'list',
       clubLineups: {}, clubLineupsLoaded: false,
-      mySubmission: null, mySubmissionLoading: false,
+      mySubmissions: [], mySubmissionLoading: false,
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
@@ -2394,8 +2394,16 @@ createApp({
       if (this.mySubmissionLoading) return;
       this.mySubmissionLoading = true;
       try {
-        const d = await fetch(`${API}/submissions/last?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
-        if (d?.xi) this.mySubmission = d;
+        const d = await fetch(`${API}/submissions?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
+        const items = (d?.items || []).filter(s => s.gameweek != null);
+        // For each GW keep the latest submission (highest createdAt)
+        const byGw = {};
+        for (const s of items) {
+          if (!byGw[s.gameweek] || s.createdAt > byGw[s.gameweek].createdAt) byGw[s.gameweek] = s;
+        }
+        // Keep the 3 most recent GWs
+        const recentGws = Object.keys(byGw).map(Number).sort((a,b)=>b-a).slice(0,3);
+        this.mySubmissions = recentGws.map(gw => byGw[gw]);
       } catch(e) {}
       this.mySubmissionLoading = false;
     },
@@ -2412,9 +2420,10 @@ createApp({
       let m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
       if (m) return m[1];
       // "Name [optional interruption ≤40 chars] Club" within same sentence
-      // Handles: "Name sends Club", "Name, by contrast, sent Club", "Name answers with Club"
+      // Exclude paragraph-starter words (Pre, Half, Full, The, A, From, In, At...)
+      const EXCLUDE = /^(?:Pre|Half|Full|The|An?|From|In|At|By|It|As|But|And|Or)\b/;
       m = text.match(new RegExp(`${name}[^.]{2,40}?\\b${esc}\\b`));
-      if (m) return m[1];
+      if (m && !EXCLUDE.test(m[1])) return m[1];
       return null;
     },
 
