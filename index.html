@@ -1399,12 +1399,12 @@
     </div>
       </div>
 
-  <!-- ── ESPIONAGE TAB ── -->
-      <div v-if="activeTab==='espionage'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+  <!-- ── CLUBS TAB ── -->
+      <div v-if="activeTab==='clubs'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
 
     <!-- Loading -->
     <div v-if="espionageLoading" class="card" style="text-align:center;padding:40px">
-      <div style="font-size:30px;margin-bottom:10px">🕵</div>
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
       <div class="c-gray" style="margin-bottom:12px">{{espionageMsg||'Loading all clubs…'}}</div>
       <div style="width:260px;margin:0 auto">
         <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
@@ -1413,12 +1413,9 @@
       </div>
       <div class="c-gray" style="font-size:11px;margin-top:8px">{{espionageProgress}}% · first load ~30 seconds · cached 30 min</div>
     </div>
-
-    <!-- Auto-loading spinner (tab watcher triggers loadEspionage automatically) -->
     <div v-else-if="!espionageLoaded" class="card" style="text-align:center;padding:40px">
-      <div style="font-size:30px;margin-bottom:10px">🕵</div>
-      <div class="c-gray">Loading espionage data…</div>
-      <div class="c-gray" style="font-size:11px;margin-top:6px">First load ~30 seconds · cached 30 min</div>
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">Loading clubs data…</div>
     </div>
 
     <!-- Loaded -->
@@ -1615,104 +1612,175 @@
         </div>
       </div>
 
+      <!-- All Clubs browser -->
       <div v-else>
-      <!-- Header row -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:#e6edf3">💰 Transfer Negotiations</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="text" v-model="espionageSearch" placeholder="Search club…" style="width:180px">
+          <select v-model="espionageSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+            <option value="club">Club A→Z</option>
+            <option value="ceo_d">CEO rating ↓</option>
+            <option value="td_d">TD rating ↓</option>
+            <option value="asst_d">Assistant ↓</option>
+            <option value="physio_d">Physio ↓</option>
+            <option value="training_d">Training Lv ↓</option>
+            <option value="scouting_d">Scouting Lv ↓</option>
+            <option value="academy_d">Academy Lv ↓</option>
+          </select>
+          <span class="c-gray" style="font-size:11px">{{espionageFiltered.length}} clubs · click a row to view</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            <span v-if="espionageCacheDate" class="c-gray" style="font-size:10px">cached {{espionageCacheDate}}</span>
+            <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table style="font-size:11px">
+            <thead>
+              <tr style="cursor:pointer">
+                <th style="min-width:120px" @click="espSortBy('club')">Club{{espSortIcon('club')}}</th>
+                <th title="CEO rating" @click="espSortBy('ceo')">CEO{{espSortIcon('ceo')}}</th>
+                <th title="Technical Director rating" @click="espSortBy('td')">TD{{espSortIcon('td')}}</th>
+                <th title="Assistant rating" @click="espSortBy('asst')">Asst{{espSortIcon('asst')}}</th>
+                <th title="Physio rating" @click="espSortBy('physio')">Physio{{espSortIcon('physio')}}</th>
+                <th title="Training facility level" @click="espSortBy('training')">Trn{{espSortIcon('training')}}</th>
+                <th title="Scouting facility level" @click="espSortBy('scouting')">Sct{{espSortIcon('scouting')}}</th>
+                <th title="Academy facility level" @click="espSortBy('academy')">Aca{{espSortIcon('academy')}}</th>
+                <th title="Medical facility level" @click="espSortBy('medical')">Med{{espSortIcon('medical')}}</th>
+                <th title="Analytics facility level" @click="espSortBy('analytics')">Ana{{espSortIcon('analytics')}}</th>
+                <th title="Stadium facility level" @click="espSortBy('stadium')">Std{{espSortIcon('stadium')}}</th>
+                <th title="Active open job ads" @click="espSortBy('ads')">Ads{{espSortIcon('ads')}}</th>
+                <th title="Latest submitted formation & tactics">Sub</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in espionageFiltered" :key="c.club"
+                  @click="openClubDetail(c.club)" style="cursor:pointer"
+                  :style="{background:c.club===myClub?'#1f3a1f':'transparent'}">
+                <td style="font-weight:600">
+                  {{c.club}}
+                  <span v-if="c.club===myClub" style="color:#ffa657;font-size:10px"> ★</span>
+                  <span v-if="c.project" class="c-orange" style="font-size:10px" :title="'Upgrading '+c.project.key+' Lv'+c.project.from+'→'+c.project.to"> 🔨</span>
+                </td>
+                <td :class="espRatingClass(c.current?.CEO?.rating)">{{c.current?.CEO?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.['Technical Director']?.rating)">{{c.current?.['Technical Director']?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Assistant?.rating)">{{c.current?.Assistant?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Physio?.rating)">{{c.current?.Physio?.rating||'—'}}</td>
+                <td :class="espFacClass(c.levels?.training)" style="text-align:center">{{c.levels?.training||'—'}}</td>
+                <td :class="espFacClass(c.levels?.scouting)" style="text-align:center">{{c.levels?.scouting||'—'}}</td>
+                <td :class="espFacClass(c.levels?.academy)" style="text-align:center">{{c.levels?.academy||'—'}}</td>
+                <td :class="espFacClass(c.levels?.medical)" style="text-align:center">{{c.levels?.medical||'—'}}</td>
+                <td :class="espFacClass(c.levels?.analytics)" style="text-align:center">{{c.levels?.analytics||'—'}}</td>
+                <td :class="espFacClass(c.levels?.stadium)" style="text-align:center">{{c.levels?.stadium||'—'}}</td>
+                <td style="text-align:center">
+                  <span v-if="c.ads && c.ads.length" class="c-orange" style="font-size:10px;font-weight:700">{{c.ads.length}}</span>
+                  <span v-else class="c-gray">—</span>
+                </td>
+                <td style="min-width:90px">
+                  <template v-if="espionageSubmissions[c.club]">
+                    <span style="color:#79c0ff;font-weight:600;font-size:11px">{{fmtFormation(espionageSubmissions[c.club].formation)}}</span>
+                    <span class="c-gray" style="font-size:9px"> GW{{espionageSubmissions[c.club]._gw}}</span>
+                    <div style="font-size:9px;color:#8b949e;margin-top:1px;line-height:1.4">
+                      <span v-if="espionageSubmissions[c.club].instructions?.mentality">{{espionageSubmissions[c.club].instructions.mentality}}</span>
+                      <span v-if="espionageSubmissions[c.club].instructions?.style"> · {{espionageSubmissions[c.club].instructions.style}}</span>
+                    </div>
+                  </template>
+                  <span v-else class="c-gray">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+      </div>
+
+  <!-- ── TRANSFERS TAB ── -->
+      <div v-if="activeTab==='espionage'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+    <div v-if="espionageLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">💰</div>
+      <div class="c-gray" style="margin-bottom:12px">{{espionageMsg||'Loading…'}}</div>
+      <div style="width:260px;margin:0 auto">
+        <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+          <div :style="{width:espionageProgress+'%',height:'100%',background:'linear-gradient(90deg,#1f6feb,#8957e5)',borderRadius:'4px',transition:'width .3s'}"></div>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="!espionageLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">💰</div>
+      <div class="c-gray">Loading transfer data…</div>
+    </div>
+    <template v-if="espionageLoaded">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-size:13px;font-weight:700;color:#e6edf3">Transfer Negotiations</div>
         <div style="display:flex;align-items:center;gap:8px">
           <span v-if="espionageCacheDate" class="c-gray" style="font-size:10px">cached {{espionageCacheDate}}</span>
           <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
         </div>
       </div>
-
-      <!-- NEGOTIATIONS -->
-      <div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-          <input type="text" v-model="espionageNegoSearch" placeholder="Search player, club…" style="width:200px">
-          <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} negotiations · last 2 weeks</span>
-        </div>
-        <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
-          <table style="font-size:11px">
-            <thead>
-              <tr style="cursor:pointer">
-                <th style="min-width:110px" @click="negoSortBy('player')">Player{{negoSortIcon('player')}}</th>
-                <th @click="negoSortBy('parties')">Seller → Buyer{{negoSortIcon('parties')}}</th>
-                <th @click="negoSortBy('fee')">Amount{{negoSortIcon('fee')}}</th>
-                <th @click="negoSortBy('status')">State{{negoSortIcon('status')}}</th>
-                <th style="min-width:80px">Outcome</th>
-                <th @click="negoSortBy('date')">Updated{{negoSortIcon('date')}}</th>
-                <th style="width:28px"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <template v-for="n in espionageNegoFiltered" :key="n.id">
-                <tr :style="{cursor:n.history&&n.history.length>1?'pointer':'default',background:negoExpandedId===n.id?'#161b22':'transparent'}"
-                    @click="n.history&&n.history.length>1 && (negoExpandedId = negoExpandedId===n.id ? null : n.id)">
-                  <!-- Player — click opens profile -->
-                  <td style="font-weight:600">
-                    <span @click.stop="openPlayerByName(n.playerName)"
-                          style="cursor:pointer;color:#79c0ff;border-bottom:1px dotted #79c0ff40">
-                      {{n.playerName||'?'}}
-                    </span>
-                  </td>
-                  <!-- Seller → Buyer (clickable to open club detail) -->
-                  <td style="white-space:nowrap">
-                    <span @click.stop="openClubDetail(n.seller)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.seller===myClub?'#ffa657':'#e6edf3'}">{{n.seller||'?'}}</span>
-                    <span class="c-gray"> → </span>
-                    <span @click.stop="openClubDetail(n.buyer)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.buyer===myClub?'#7ee787':'#e6edf3'}">{{n.buyer||'?'}}</span>
-                  </td>
-                  <!-- Amount -->
-                  <td style="font-weight:700">{{n.amount&&n.amount>1?fmtVal(n.amount):'—'}}</td>
-                  <!-- State: pending = offer sent, counter = back-and-forth in progress -->
-                  <td style="white-space:nowrap">
-                    <span v-if="n.status==='pending'" :style="{background:'#1f3a5a',color:'#79c0ff',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">📨 Offer out</span>
-                    <span v-else-if="n.status==='counter'||n.status==='countered'" :style="{background:'#4a3a10',color:'#ffa657',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">
-                      🔄 {{n.lastActionBy==='buyer'?'Buyer':'Seller'}} countered
-                    </span>
-                    <span v-else-if="n.status==='accepted'" :style="{background:'#1a4a2e',color:'#7ee787',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✓ Accepted</span>
-                    <span v-else-if="n.status==='rejected'" :style="{background:'#3a1212',color:'#ff7b72',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✗ Rejected</span>
-                    <span v-else :style="negoStatusStyle(n.status)">{{n.status||'—'}}</span>
-                  </td>
-                  <!-- Outcome / sub-status -->
-                  <td style="font-size:10px;white-space:nowrap">
-                    <span v-if="n.subStatus" :style="negoSubStatusStyle(n.subStatus)">{{fmtSubStatus(n.subStatus)}}</span>
-                    <span v-else-if="n.via" class="c-gray">via {{n.via}}</span>
-                    <span v-else class="c-gray">—</span>
-                  </td>
-                  <!-- Last activity -->
-                  <td class="c-gray" style="font-size:10px;white-space:nowrap">{{fmtNegoDate(n.updatedAt)}}</td>
-                  <!-- History toggle — only show if >1 bid so it's actually useful -->
-                  <td style="text-align:center;color:#8b949e;font-size:10px">
-                    <span v-if="n.history&&n.history.length>1" style="cursor:pointer">
-                      {{negoExpandedId===n.id?'▲':'▼'}}{{n.history.length}}
-                    </span>
-                  </td>
-                </tr>
-                <!-- Bid history expansion — shows the back-and-forth -->
-                <tr v-if="negoExpandedId===n.id&&n.history&&n.history.length>1" :key="'h-'+n.id">
-                  <td colspan="7" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
-                    <div style="font-size:10px;font-weight:600;color:#8b949e;margin-bottom:6px">Bid history ({{n.history.length}} rounds)</div>
-                    <div style="display:flex;flex-direction:column;gap:5px">
-                      <div v-for="(h,hi) in n.history" :key="hi"
-                           style="display:flex;align-items:center;gap:10px">
-                        <span class="c-gray" style="font-size:9px;min-width:55px">{{fmtNegoDate(h.ts)}}</span>
-                        <span :style="{
-                          color: h.type==='counter'?'#ffa657': h.type==='offer'?'#79c0ff':'#8b949e',
-                          fontSize:'10px', fontWeight:'700', minWidth:'55px'
-                        }">{{h.type==='counter'?'↩ Counter':h.type==='offer'?'📨 Offer':h.type||'—'}}</span>
-                        <span style="font-weight:700;font-size:11px">{{h.amount&&h.amount>1?fmtVal(h.amount):'—'}}</span>
-                        <span v-if="h.by" class="c-gray" style="font-size:9px">by {{h.by}}</span>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-        </div>
-        <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found in the last 2 weeks.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <input type="text" v-model="espionageNegoSearch" placeholder="Search player, club…" style="width:200px">
+        <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} negotiations · last 2 weeks</span>
       </div>
-      </div><!-- end v-else (club detail hidden) -->
+      <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
+        <table style="font-size:11px">
+          <thead>
+            <tr style="cursor:pointer">
+              <th style="min-width:110px" @click="negoSortBy('player')">Player{{negoSortIcon('player')}}</th>
+              <th @click="negoSortBy('parties')">Seller → Buyer{{negoSortIcon('parties')}}</th>
+              <th @click="negoSortBy('fee')">Amount{{negoSortIcon('fee')}}</th>
+              <th @click="negoSortBy('status')">State{{negoSortIcon('status')}}</th>
+              <th style="min-width:80px">Outcome</th>
+              <th @click="negoSortBy('date')">Updated{{negoSortIcon('date')}}</th>
+              <th style="width:28px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="n in espionageNegoFiltered" :key="n.id">
+              <tr :style="{cursor:n.history&&n.history.length>1?'pointer':'default',background:negoExpandedId===n.id?'#161b22':'transparent'}"
+                  @click="n.history&&n.history.length>1 && (negoExpandedId = negoExpandedId===n.id ? null : n.id)">
+                <td style="font-weight:600">
+                  <span @click.stop="openPlayerByName(n.playerName)" style="cursor:pointer;color:#79c0ff;border-bottom:1px dotted #79c0ff40">{{n.playerName||'?'}}</span>
+                </td>
+                <td style="white-space:nowrap">
+                  <span @click.stop="openClubDetail(n.seller)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.seller===myClub?'#ffa657':'#e6edf3'}">{{n.seller||'?'}}</span>
+                  <span class="c-gray"> → </span>
+                  <span @click.stop="openClubDetail(n.buyer)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.buyer===myClub?'#7ee787':'#e6edf3'}">{{n.buyer||'?'}}</span>
+                </td>
+                <td style="font-weight:700">{{n.amount&&n.amount>1?fmtVal(n.amount):'—'}}</td>
+                <td style="white-space:nowrap">
+                  <span v-if="n.status==='pending'" :style="{background:'#1f3a5a',color:'#79c0ff',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">📨 Offer out</span>
+                  <span v-else-if="n.status==='counter'||n.status==='countered'" :style="{background:'#4a3a10',color:'#ffa657',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">🔄 {{n.lastActionBy==='buyer'?'Buyer':'Seller'}} countered</span>
+                  <span v-else-if="n.status==='accepted'" :style="{background:'#1a4a2e',color:'#7ee787',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✓ Accepted</span>
+                  <span v-else-if="n.status==='rejected'" :style="{background:'#3a1212',color:'#ff7b72',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✗ Rejected</span>
+                  <span v-else :style="negoStatusStyle(n.status)">{{n.status||'—'}}</span>
+                </td>
+                <td style="font-size:10px;white-space:nowrap">
+                  <span v-if="n.subStatus" :style="negoSubStatusStyle(n.subStatus)">{{fmtSubStatus(n.subStatus)}}</span>
+                  <span v-else-if="n.via" class="c-gray">via {{n.via}}</span>
+                  <span v-else class="c-gray">—</span>
+                </td>
+                <td class="c-gray" style="font-size:10px;white-space:nowrap">{{fmtNegoDate(n.updatedAt)}}</td>
+                <td style="text-align:center;color:#8b949e;font-size:10px">
+                  <span v-if="n.history&&n.history.length>1" style="cursor:pointer">{{negoExpandedId===n.id?'▲':'▼'}}{{n.history.length}}</span>
+                </td>
+              </tr>
+              <tr v-if="negoExpandedId===n.id&&n.history&&n.history.length>1" :key="'h-'+n.id">
+                <td colspan="7" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
+                  <div style="font-size:10px;font-weight:600;color:#8b949e;margin-bottom:6px">Bid history ({{n.history.length}} rounds)</div>
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <div v-for="(h,hi) in n.history" :key="hi" style="display:flex;align-items:center;gap:10px">
+                      <span class="c-gray" style="font-size:9px;min-width:55px">{{fmtNegoDate(h.ts)}}</span>
+                      <span :style="{color:h.type==='counter'?'#ffa657':h.type==='offer'?'#79c0ff':'#8b949e',fontSize:'10px',fontWeight:'700',minWidth:'55px'}">{{h.type==='counter'?'↩ Counter':h.type==='offer'?'📨 Offer':h.type||'—'}}</span>
+                      <span style="font-weight:700;font-size:11px">{{h.amount&&h.amount>1?fmtVal(h.amount):'—'}}</span>
+                      <span v-if="h.by" class="c-gray" style="font-size:9px">by {{h.by}}</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found in the last 2 weeks.</div>
     </template>
       </div>
 
@@ -2224,6 +2292,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

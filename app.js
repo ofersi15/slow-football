@@ -249,7 +249,7 @@ createApp({
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: localStorage.getItem('sf_activeTab') || 'squad',
-      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 Club'},{id:'espionage',label:'🕵 Espionage'},{id:'matches',label:'📺 Matches'}],
+      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
       attrFiltersOpen: false,
@@ -781,7 +781,7 @@ createApp({
         if (v === 'club') {
           if (!this.clubLoaded && !this.clubLoading) this.loadClub();
         }
-        if (v === 'espionage') {
+        if (v === 'espionage' || v === 'clubs') {
           if (!this.espionageLoaded && !this.espionageLoading) this.loadEspionage(false);
         }
         if (v === 'squad') {
@@ -2547,6 +2547,7 @@ createApp({
     },
 
     async openClubDetail(clubName) {
+      this.activeTab = 'clubs';
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
       await this._fetchClubSubmissions(clubName);
