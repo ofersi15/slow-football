@@ -2443,7 +2443,7 @@ createApp({
         return {
           name: player.name, position: player.position || slotType,
           bp, slotKey, x: pos.x, y: pos.y,
-          runX: run !== null ? 68 - (run.x / 100) * 68 : null,
+          runX: run !== null ? (run.x / 100) * 68 : null,
           runY: run !== null ? (run.y / 100) * 105 : null,
           fill: colors.fill, stroke: colors.stroke, textColor: colors.text,
         };
