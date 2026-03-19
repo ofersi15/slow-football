@@ -2987,10 +2987,10 @@ createApp({
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
     this.loadCachedSubmissions();
     this.loadMatchArchive();
-    // Restore last viewed club (after a brief delay to let espionage data load)
+    // Restore last viewed club only if the active tab is clubs
     try {
       const lastClub = localStorage.getItem('sf_last_club');
-      if (lastClub) setTimeout(() => this.openClubDetail(lastClub), 800);
+      if (lastClub && this.activeTab === 'clubs') setTimeout(() => this.openClubDetail(lastClub), 800);
     } catch(e) {}
     // Fetch current game week proactively so the staff recruitment input shows the right week
     this.fetchCurrentGameWeek();

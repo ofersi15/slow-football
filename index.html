@@ -1920,30 +1920,52 @@
           </div>
           <div class="c-gray" style="font-size:11px;margin-top:6px;font-style:italic">{{matchView.headline}}</div>
         </div>
-        <!-- Stats bar -->
-        <div v-if="matchView.stats" style="display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;font-size:11px;color:#8b949e">
-          <span>xG: <b :class="matchView.stats.xg?.home>matchView.stats.xg?.away?'c-green':'c-orange'">{{matchView.stats.xg?.home?.toFixed(2)}}</b> – <b :class="matchView.stats.xg?.away>matchView.stats.xg?.home?'c-green':'c-orange'">{{matchView.stats.xg?.away?.toFixed(2)}}</b></span>
-          <span>Shots: {{matchView.stats.shots?.home?.total}} – {{matchView.stats.shots?.away?.total}}</span>
-          <span>Poss: {{matchView.stats.possession?.home}}% – {{matchView.stats.possession?.away}}%</span>
-          <span>Pass%: {{matchView.stats.passAccuracy?.home}} – {{matchView.stats.passAccuracy?.away}}</span>
-        </div>
-        <!-- Tactics panel: instructions + roles, label in centre, home left / away right -->
-        <div v-if="matchView.home?.sub || matchView.away?.sub" style="margin-bottom:14px;font-size:11px">
-          <template v-for="key in ['mentality','style','structure','defensive_line','pressing_intensity','attacking_focus','transition_speed']" :key="key">
-            <div v-if="matchView.home?.sub?.instructions?.[key] || matchView.away?.sub?.instructions?.[key]"
-                 style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #161b22">
-              <span style="color:#e6edf3;font-weight:600;text-align:right">{{matchView.home?.sub?.instructions?.[key]||'—'}}</span>
-              <span style="color:#6e7681;font-size:10px;text-align:center;white-space:nowrap;min-width:80px">{{({mentality:'Mentality',style:'Style',structure:'Structure',defensive_line:'Def. Line',pressing_intensity:'Pressing',attacking_focus:'Attack Focus',transition_speed:'Transition'})[key]}}</span>
-              <span style="color:#e6edf3;font-weight:600;text-align:left">{{matchView.away?.sub?.instructions?.[key]||'—'}}</span>
-            </div>
+        <!-- Stats + tactics: home value | label | away value -->
+        <div style="display:grid;grid-template-columns:1fr 110px 1fr;font-size:11px;margin-bottom:14px">
+          <!-- Match stats -->
+          <template v-if="matchView.stats">
+            <template v-if="matchView.stats.xg?.home!=null||matchView.stats.xg?.away!=null">
+              <span style="text-align:right;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">
+                <b :class="(matchView.stats.xg?.home||0)>=(matchView.stats.xg?.away||0)?'c-green':'c-orange'">{{matchView.stats.xg?.home?.toFixed(2)??'—'}}</b>
+              </span>
+              <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">xG</span>
+              <span style="text-align:left;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">
+                <b :class="(matchView.stats.xg?.away||0)>=(matchView.stats.xg?.home||0)?'c-green':'c-orange'">{{matchView.stats.xg?.away?.toFixed(2)??'—'}}</b>
+              </span>
+            </template>
+            <template v-if="matchView.stats.shots">
+              <span style="text-align:right;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">{{matchView.stats.shots?.home?.total??matchView.stats.shots?.home??'—'}}</span>
+              <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">Shots</span>
+              <span style="text-align:left;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">{{matchView.stats.shots?.away?.total??matchView.stats.shots?.away??'—'}}</span>
+            </template>
+            <template v-if="matchView.stats.possession?.home!=null">
+              <span style="text-align:right;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">{{matchView.stats.possession?.home}}%</span>
+              <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">Possession</span>
+              <span style="text-align:left;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">{{matchView.stats.possession?.away}}%</span>
+            </template>
+            <template v-if="matchView.stats.passAccuracy?.home!=null">
+              <span style="text-align:right;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">{{matchView.stats.passAccuracy?.home}}</span>
+              <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">Pass %</span>
+              <span style="text-align:left;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">{{matchView.stats.passAccuracy?.away}}</span>
+            </template>
           </template>
-          <template v-for="role in ['captain','penalty','freekick','corner']" :key="role">
-            <div v-if="matchView.home?.sub?.roles?.[role] || matchView.away?.sub?.roles?.[role]"
-                 style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #161b22">
-              <span style="color:#8b949e;text-align:right">{{matchView.home?.sub?.roles?.[role]||'—'}}</span>
-              <span style="color:#6e7681;font-size:10px;text-align:center;white-space:nowrap;min-width:80px">{{({captain:'Captain ©',penalty:'Penalty',freekick:'Free Kick',corner:'Corner'})[role]}}</span>
-              <span style="color:#8b949e;text-align:left">{{matchView.away?.sub?.roles?.[role]||'—'}}</span>
-            </div>
+          <!-- Tactics: instructions -->
+          <template v-if="matchView.home?.sub || matchView.away?.sub">
+            <template v-for="key in ['mentality','style','structure','defensive_line','pressing_intensity','attacking_focus','transition_speed']" :key="key">
+              <template v-if="matchView.home?.sub?.instructions?.[key] || matchView.away?.sub?.instructions?.[key]">
+                <span style="text-align:right;color:#e6edf3;font-weight:600;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">{{matchView.home?.sub?.instructions?.[key]||'—'}}</span>
+                <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">{{({mentality:'Mentality',style:'Style',structure:'Structure',defensive_line:'Def. Line',pressing_intensity:'Pressing',attacking_focus:'Attack Focus',transition_speed:'Transition'})[key]}}</span>
+                <span style="text-align:left;color:#e6edf3;font-weight:600;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">{{matchView.away?.sub?.instructions?.[key]||'—'}}</span>
+              </template>
+            </template>
+            <!-- Roles -->
+            <template v-for="role in ['captain','penalty','freekick','corner']" :key="role">
+              <template v-if="matchView.home?.sub?.roles?.[role] || matchView.away?.sub?.roles?.[role]">
+                <span style="text-align:right;color:#8b949e;padding:3px 6px 3px 0;border-bottom:1px solid #161b22">{{matchView.home?.sub?.roles?.[role]||'—'}}</span>
+                <span style="text-align:center;color:#6e7681;font-size:10px;padding:3px 0;border-bottom:1px solid #161b22">{{({captain:'Captain ©',penalty:'Penalty',freekick:'Free Kick',corner:'Corner'})[role]}}</span>
+                <span style="text-align:left;color:#8b949e;padding:3px 0 3px 6px;border-bottom:1px solid #161b22">{{matchView.away?.sub?.roles?.[role]||'—'}}</span>
+              </template>
+            </template>
           </template>
         </div>
         <!-- Lineups -->
