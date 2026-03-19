@@ -1458,13 +1458,12 @@
         <!-- Latest XI tab -->
         <div v-if="selectedClubSubTab==='xi'" style="display:flex;flex-direction:column;gap:12px">
           <template v-if="selectedClubSubmissions.length">
-            <!-- Pitch + list side by side -->
-            <div class="card" style="padding:14px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+            <!-- Pitch + Subs side by side -->
+            <div style="display:flex;gap:12px;align-items:flex-start">
 
-              <!-- SVG Pitch — 68×105m coordinate space -->
-              <div style="flex:0 0 auto;width:min(220px,100%)">
-                <svg viewBox="-3 -3 74 111" style="width:100%;border-radius:8px;border:1px solid #2d3748" xmlns="http://www.w3.org/2000/svg">
-                  <!-- Grass gradient -->
+              <!-- Big interactive pitch -->
+              <div style="flex:1;min-width:260px;position:relative">
+                <svg viewBox="-3 -3 74 111" style="width:100%;border-radius:8px;border:1px solid #2d3748;display:block" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <marker id="arr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
                       <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(255,255,255,0.85)"/>
@@ -1476,22 +1475,14 @@
                     </linearGradient>
                   </defs>
                   <rect x="-3" y="-3" width="74" height="111" fill="url(#grass)"/>
-                  <!-- Pitch border -->
                   <rect x="0" y="0" width="68" height="105" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.7"/>
-                  <!-- Center line -->
                   <line x1="0" y1="52.5" x2="68" y2="52.5" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
-                  <!-- Center circle (r=9.15m) -->
                   <circle cx="34" cy="52.5" r="9.15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
                   <circle cx="34" cy="52.5" r="0.7" fill="rgba(255,255,255,0.5)"/>
-                  <!-- Attacking penalty area (y=0 side, 40.32×16.5m) -->
                   <rect x="13.84" y="0" width="40.32" height="16.5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
-                  <!-- Defensive penalty area (y=105 side) -->
                   <rect x="13.84" y="88.5" width="40.32" height="16.5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
-                  <!-- Attacking 6-yard box (18.32×5.5m) -->
                   <rect x="24.84" y="0" width="18.32" height="5.5" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-                  <!-- Defensive 6-yard box -->
                   <rect x="24.84" y="99.5" width="18.32" height="5.5" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
-                  <!-- Penalty spots (11m from goal line) -->
                   <circle cx="34" cy="11" r="0.7" fill="rgba(255,255,255,0.5)"/>
                   <circle cx="34" cy="94" r="0.7" fill="rgba(255,255,255,0.5)"/>
 
@@ -1499,54 +1490,85 @@
                   <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'run'+i">
                     <line v-if="pl.runX!==null"
                       :x1="pl.x" :y1="pl.y" :x2="pl.runX" :y2="pl.runY"
-                      stroke="rgba(255,255,255,0.6)" stroke-width="0.8" stroke-dasharray="2.5,1.5"
+                      stroke="rgba(255,255,255,0.55)" stroke-width="0.9" stroke-dasharray="2.5,1.5"
                       marker-end="url(#arr)"/>
                   </template>
 
-                  <!-- Player circles + labels -->
+                  <!-- Interactive player nodes -->
                   <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'pl'+i">
-                    <circle :cx="pl.x" :cy="pl.y" r="3.4" :fill="pl.fill" :stroke="pl.stroke" stroke-width="1"/>
-                    <text :x="pl.x" :y="pl.y+0.7" text-anchor="middle" font-size="2.5" fill="rgba(255,255,255,0.95)" font-family="system-ui,sans-serif" font-weight="700">{{pl.bp}}</text>
-                    <text :x="pl.x" :y="pl.y+6.5" text-anchor="middle" font-size="2.7" :fill="pl.textColor" font-family="system-ui,sans-serif" font-weight="600">{{pl.name.split(' ').pop()}}</text>
+                    <g @mouseenter="hoveredPitchPlayer=pl" @mouseleave="hoveredPitchPlayer=null"
+                       @click="xiPlayerInfo(pl.name)&&openModal(xiPlayerInfo(pl.name))"
+                       style="cursor:pointer">
+                      <circle :cx="pl.x" :cy="pl.y" r="7" :fill="pl.stroke" opacity="0.12"/>
+                      <circle :cx="pl.x" :cy="pl.y" r="5.2" :fill="pl.fill" :stroke="pl.stroke" stroke-width="1.2"/>
+                      <text :x="pl.x" :y="pl.y+2" text-anchor="middle" font-size="3.5" fill="white" font-weight="800" font-family="system-ui,sans-serif">{{pl.bp}}</text>
+                      <text :x="pl.x" :y="pl.y-7" text-anchor="middle" font-size="3.2" fill="rgba(255,255,255,0.9)" font-weight="700" font-family="system-ui,sans-serif">{{xiPlayerInfo(pl.name) ? (xiPlayerInfo(pl.name)._gameRating||xiPlayerInfo(pl.name).Rating||'') : ''}}</text>
+                      <text :x="pl.x" :y="pl.y+10" text-anchor="middle" font-size="2.9" :fill="pl.textColor" font-weight="600" font-family="system-ui,sans-serif">{{pl.name.split(' ').pop().slice(0,11)}}</text>
+                    </g>
                   </template>
                 </svg>
-              </div>
 
-              <!-- Player list -->
-              <div style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:0">
-                <div style="font-size:10px;color:#8b949e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">Starting XI</div>
-                <template v-for="(p,i) in (selectedClubSubmissions[0].xi||[])" :key="i">
-                  <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #161b22">
-                    <span style="font-size:11px;color:#6e7681;min-width:16px;text-align:right">{{i+1}}</span>
-                    <span :class="'pos-badge pos-'+basePos(p.position)" style="min-width:30px;text-align:center;font-size:10px">{{p.position}}</span>
-                    <span style="color:#e6edf3;font-size:12px;font-weight:500;flex:1">{{p.name}}</span>
-                    <template v-if="xiPlayerInfo(p.name)">
-                      <span style="color:#ffa657;font-size:11px;font-weight:700">{{xiPlayerInfo(p.name)._gameRating||xiPlayerInfo(p.name).Rating||''}}</span>
-                      <span v-if="xiPlayerInfo(p.name)[({GK:'Reflexes',FB:'Speed',CB:'Marking',DM:'Tackling',CM:'Passing',WM:'Dribbling',AM:'Vision',WF:'Dribbling',CF:'Shooting'})[basePos(p.position)]||'Rating']" style="color:#6e7681;font-size:10px">
-                        {{({GK:'Ref',FB:'Spd',CB:'Mrk',DM:'Tck',CM:'Pas',WM:'Dri',AM:'Vis',WF:'Dri',CF:'Sht'})[basePos(p.position)]}}
-                        <span style="color:#c9d1d9">{{xiPlayerInfo(p.name)[({GK:'Reflexes',FB:'Speed',CB:'Marking',DM:'Tackling',CM:'Passing',WM:'Dribbling',AM:'Vision',WF:'Dribbling',CF:'Shooting'})[basePos(p.position)]||'Rating']}}</span>
-                      </span>
+                <!-- Hover tooltip -->
+                <div v-if="hoveredPitchPlayer && xiPlayerInfo(hoveredPitchPlayer.name)"
+                  :style="{
+                    position:'absolute',
+                    left: (hoveredPitchPlayer.x+3)/74 < 0.55 ? (((hoveredPitchPlayer.x+3)/74*100+8)+'%') : 'auto',
+                    right: (hoveredPitchPlayer.x+3)/74 >= 0.55 ? (((1-(hoveredPitchPlayer.x+3)/74)*100+8)+'%') : 'auto',
+                    top: Math.max(2, (hoveredPitchPlayer.y+3)/111*100-20)+'%',
+                    zIndex: '20',
+                    pointerEvents: 'none',
+                    background: 'rgba(13,17,23,0.97)',
+                    border: '1px solid #30363d',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    minWidth: '175px',
+                    maxWidth: '215px',
+                    fontSize: '11px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.6)'
+                  }">
+                  <div style="font-weight:700;color:#e6edf3;font-size:13px;margin-bottom:3px">{{xiPlayerInfo(hoveredPitchPlayer.name).Player}}</div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+                    <span :class="'pos-badge pos-'+hoveredPitchPlayer.bp" style="font-size:9px">{{hoveredPitchPlayer.position}}</span>
+                    <span style="color:#ffa657;font-weight:700;font-size:14px">{{xiPlayerInfo(hoveredPitchPlayer.name)._gameRating||xiPlayerInfo(hoveredPitchPlayer.name).Rating}}</span>
+                    <span style="color:#6e7681;font-size:11px">Age {{xiPlayerInfo(hoveredPitchPlayer.name).Age}}</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px">
+                    <template v-for="attr in ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']" :key="attr">
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span :style="{color: attr===({GK:'Reflexes',FB:'Speed',CB:'Marking',DM:'Tackling',CM:'Passing',WM:'Dribbling',AM:'Vision',WF:'Dribbling',CF:'Shooting'})[hoveredPitchPlayer.bp] ? '#ffa657' : '#6e7681', fontSize:'10px'}">{{attr.slice(0,3)}}</span>
+                        <span style="color:#e6edf3;font-weight:600;font-size:11px">{{xiPlayerInfo(hoveredPitchPlayer.name)[attr]||'—'}}</span>
+                      </div>
                     </template>
                   </div>
-                </template>
-                <!-- Roles -->
-                <div v-if="selectedClubSubmissions[0].roles" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
-                  <template v-for="(name,role) in selectedClubSubmissions[0].roles" :key="role">
-                    <span style="background:#161b22;border-radius:6px;padding:2px 8px;font-size:10px">
-                      <span style="color:#6e7681;text-transform:capitalize">{{role}}</span>
-                      <span style="color:#e6edf3;margin-left:4px">{{name}}</span>
-                    </span>
+                  <template v-if="xiPlayerInfo(hoveredPitchPlayer.name).Fitness||xiPlayerInfo(hoveredPitchPlayer.name).Form||xiPlayerInfo(hoveredPitchPlayer.name).Morale">
+                    <div style="margin-top:7px;border-top:1px solid #21262d;padding-top:6px;display:flex;gap:12px">
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Fitness" style="color:#8b949e;font-size:10px">Fit <span style="color:#3fb950;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Fitness}}</span></span>
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Form" style="color:#8b949e;font-size:10px">Form <span style="color:#79c0ff;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Form}}</span></span>
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Morale" style="color:#8b949e;font-size:10px">Mor <span style="color:#d2a8ff;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Morale}}</span></span>
+                    </div>
                   </template>
                 </div>
-                <!-- Substitutes -->
-                <div v-if="selectedClubSubmissions[0].subs?.length" style="margin-top:10px">
-                  <div style="font-size:10px;color:#8b949e;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;font-weight:600">Substitutes</div>
-                  <template v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i">
-                    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0d1117;flex-wrap:wrap">
-                      <span style="color:#8b949e;font-size:11px;font-weight:600;min-width:130px">{{p.name}}</span>
-                      <span v-if="p.off" style="font-size:10px;color:#6e7681">↔ {{p.off}}</span>
-                      <span v-if="p.plan" style="background:#21262d;border-radius:4px;padding:1px 6px;font-size:9px;color:#ffa657">{{p.plan}}</span>
-                      <span v-if="p.time" class="c-gray" style="font-size:9px">{{p.time}}</span>
+              </div>
+
+              <!-- Subs + Roles panel (right side) -->
+              <div style="flex:0 0 190px;display:flex;flex-direction:column;gap:8px">
+                <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
+                  <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
+                  <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
+                    <div style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name}}</div>
+                    <div v-if="p.off||p.plan||p.time" style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;align-items:center">
+                      <span v-if="p.off" style="font-size:10px;color:#8b949e">↔ {{p.off}}</span>
+                      <span v-if="p.plan" style="background:#21262d;border-radius:3px;padding:1px 5px;font-size:9px;color:#ffa657">{{p.plan}}</span>
+                      <span v-if="p.time" style="font-size:9px;color:#6e7681">{{p.time}}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="selectedClubSubmissions[0].roles" class="card" style="padding:10px">
+                  <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Roles</div>
+                  <template v-for="(name,role) in selectedClubSubmissions[0].roles" :key="role">
+                    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #161b22;gap:6px">
+                      <span style="color:#6e7681;text-transform:capitalize;font-size:11px;white-space:nowrap">{{role}}</span>
+                      <span style="color:#e6edf3;font-size:11px;text-align:right">{{name}}</span>
                     </div>
                   </template>
                 </div>
@@ -2325,6 +2347,6 @@
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

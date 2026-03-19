@@ -121,20 +121,21 @@ const FORMATIONS = {
   '352':  ['GK','CB','CB','CB','WM','CM','CM','CM','WM','CF','CF'],
 };
 // Default slot positions per formation — pitch coordinates: x 0–68 (left→right), y 0–105 (attacking→GK end)
+// API sends right-side players first, then left-side. x values are flipped (68-x) to match.
 // Matches real football pitch dimensions (68m × 105m). Run x,y (0–100%) scale to same space.
 const FORMATION_SLOT_POS = {
-  // GK  LB           LCB          RCB          RB           LM           LCM          RCM          RM           LST          RST
-  '442':  [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:9,y:55},{x:24,y:55},{x:44,y:55},{x:59,y:55},{x:24,y:20},{x:44,y:20}],
-  // GK  LB           LCB          RCB          RB           LM           LCM          RCM          RM           SS           CF
-  '4411': [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:9,y:57},{x:24,y:57},{x:44,y:57},{x:59,y:57},{x:34,y:35},{x:34,y:13}],
-  // GK  LB           LCB          RCB          RB           DML          DMR          LAM          CAM          RAM          CF
-  '4231': [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:23,y:63},{x:45,y:63},{x:10,y:40},{x:34,y:40},{x:58,y:40},{x:34,y:13}],
-  // GK  LB           LCB          RCB          RB           LCM          CM           RCM          LW           RW           CF
-  '433':  [{x:34,y:97},{x:8,y:78},{x:23,y:78},{x:45,y:78},{x:60,y:78},{x:20,y:56},{x:34,y:56},{x:48,y:56},{x:10,y:28},{x:58,y:28},{x:34,y:13}],
-  // GK  LCB          CB           RCB          LWM          LCM          RCM          RWM          LAM          RAM          CF
-  '3421': [{x:34,y:97},{x:17,y:78},{x:34,y:78},{x:51,y:78},{x:8,y:59},{x:25,y:59},{x:43,y:59},{x:60,y:59},{x:24,y:35},{x:44,y:35},{x:34,y:13}],
-  // GK  LCB          CB           RCB          LWM          LCM          CM           RCM          RWM          LST          RST
-  '352':  [{x:34,y:97},{x:17,y:78},{x:34,y:78},{x:51,y:78},{x:7,y:58},{x:22,y:58},{x:34,y:58},{x:46,y:58},{x:61,y:58},{x:24,y:20},{x:44,y:20}],
+  // GK  RB           RCB          LCB          LB           RM           RCM          LCM          LM           RST          LST
+  '442':  [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:59,y:55},{x:44,y:55},{x:24,y:55},{x:9,y:55},{x:44,y:20},{x:24,y:20}],
+  // GK  RB           RCB          LCB          LB           RM           RCM          LCM          LM           SS           CF
+  '4411': [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:59,y:57},{x:44,y:57},{x:24,y:57},{x:9,y:57},{x:34,y:35},{x:34,y:13}],
+  // GK  RB           RCB          LCB          LB           DMR          DML          RAM          CAM          LAM          CF
+  '4231': [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:45,y:63},{x:23,y:63},{x:58,y:40},{x:34,y:40},{x:10,y:40},{x:34,y:13}],
+  // GK  RB           RCB          LCB          LB           RCM          CM           LCM          RW           LW           CF
+  '433':  [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:48,y:56},{x:34,y:56},{x:20,y:56},{x:58,y:28},{x:10,y:28},{x:34,y:13}],
+  // GK  RCB          CB           LCB          RWM          RCM          LCM          LWM          RAM          LAM          CF
+  '3421': [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:60,y:59},{x:43,y:59},{x:25,y:59},{x:8,y:59},{x:44,y:35},{x:24,y:35},{x:34,y:13}],
+  // GK  RCB          CB           LCB          RWM          RCM          CM           LCM          LWM          RST          LST
+  '352':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:61,y:58},{x:46,y:58},{x:34,y:58},{x:22,y:58},{x:7,y:58},{x:44,y:20},{x:24,y:20}],
 };
 
 // Key attribute to display per base position in club XI view
@@ -311,6 +312,7 @@ createApp({
       selectedClubName: null,
       selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'transfers'
       clubSquadSort: 'pos',
+      hoveredPitchPlayer: null,
       allSubmissionsLoaded: false,
       clubTransferMap: {},
       // Espionage tab
@@ -2441,7 +2443,7 @@ createApp({
         return {
           name: player.name, position: player.position || slotType,
           bp, slotKey, x: pos.x, y: pos.y,
-          runX: run !== null ? (run.x / 100) * 68 : null,
+          runX: run !== null ? 68 - (run.x / 100) * 68 : null,
           runY: run !== null ? (run.y / 100) * 105 : null,
           fill: colors.fill, stroke: colors.stroke, textColor: colors.text,
         };
