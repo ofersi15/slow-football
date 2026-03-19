@@ -499,11 +499,20 @@ createApp({
         acc(lineVtrans, hLine && aTrans ? `${hLine} vs ${aTrans}` : null, hRes, hs, as_, hXg, aXg, sqD);
         acc(lineVtrans, aLine && hTrans ? `${aLine} vs ${hTrans}` : null, aRes, as_, hs, aXg, hXg, -sqD);
       }
+      // Coverage stats
+      const total = this.matchArchive.length;
+      const bothFormations = this.matchArchive.filter(m => m.home?.formation && m.away?.formation).length;
+      const bothMentality = this.matchArchive.filter(m => m.home?.mentality && m.away?.mentality).length;
+      const withInstr = this.analysisMatches.length; // both sides have instructions
+      const withPress = this.analysisMatches.filter(m => m.home?.sub?.instructions?.pressing_intensity || m.away?.sub?.instructions?.pressing_intensity).length;
+      const withDefLine = this.analysisMatches.filter(m => m.home?.sub?.instructions?.defensive_line || m.away?.sub?.instructions?.defensive_line).length;
+      const withTrans = this.analysisMatches.filter(m => m.home?.sub?.instructions?.transition_speed || m.away?.sub?.instructions?.transition_speed).length;
       return {
         formations: summarise(fmVfm),
         mentalities: summarise(menVmen),
         pressing: summarise(preVsty),
         defLine: summarise(lineVtrans),
+        coverage: { total, bothFormations, bothMentality, withInstr, withPress, withDefLine, withTrans },
       };
     },
     filterableAttrs() {

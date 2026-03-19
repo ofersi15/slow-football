@@ -2176,7 +2176,35 @@
               <span v-if="analysisLoaded" style="margin-left:8px;color:#484f58">{{analysisMsg}}</span>
             </div>
 
-            <!-- Shared table helper template (used inline per card) -->
+            <!-- Data coverage stats -->
+            <div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:11px">
+              <div style="color:#8b949e;font-weight:600;margin-bottom:6px">Data coverage ({{tacticsAnalysis.coverage.total}} matches)</div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap">
+                <div>
+                  <span class="c-gray">Both formations: </span>
+                  <span :style="{color:tacticsAnalysis.coverage.bothFormations/tacticsAnalysis.coverage.total>=0.7?'#7ee787':'#ffa657'}">{{tacticsAnalysis.coverage.bothFormations}}</span>
+                  <span class="c-gray"> ({{Math.round(tacticsAnalysis.coverage.bothFormations/tacticsAnalysis.coverage.total*100)}}%)</span>
+                </div>
+                <div>
+                  <span class="c-gray">Both mentalities: </span>
+                  <span :style="{color:tacticsAnalysis.coverage.bothMentality/tacticsAnalysis.coverage.total>=0.7?'#7ee787':'#ffa657'}">{{tacticsAnalysis.coverage.bothMentality}}</span>
+                  <span class="c-gray"> ({{Math.round(tacticsAnalysis.coverage.bothMentality/tacticsAnalysis.coverage.total*100)}}%)</span>
+                </div>
+                <div>
+                  <span class="c-gray">Both sides submitted </span>
+                  <span v-if="!analysisLoaded" class="c-gray">(load chunks first)</span>
+                  <template v-else>
+                    <span :style="{color:tacticsAnalysis.coverage.withInstr/tacticsAnalysis.coverage.total>=0.7?'#7ee787':'#ffa657'}">{{tacticsAnalysis.coverage.withInstr}}</span>
+                    <span class="c-gray"> ({{Math.round(tacticsAnalysis.coverage.withInstr/tacticsAnalysis.coverage.total*100)}}%)</span>
+                  </template>
+                </div>
+                <template v-if="analysisLoaded">
+                  <div><span class="c-gray">Has pressing: </span><span>{{tacticsAnalysis.coverage.withPress}}</span></div>
+                  <div><span class="c-gray">Has def. line: </span><span>{{tacticsAnalysis.coverage.withDefLine}}</span></div>
+                  <div><span class="c-gray">Has transition: </span><span>{{tacticsAnalysis.coverage.withTrans}}</span></div>
+                </template>
+              </div>
+            </div>
 
             <!-- Card 1: Formation vs Formation -->
             <div class="card" style="padding:14px;margin-bottom:14px">
