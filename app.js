@@ -2451,22 +2451,19 @@ createApp({
       });
 
       // Pass 3: attach run targets
-      // Game coords: x=0 right side (mirrored), y=0 GK end → flip both axes
-      const result = players.map((p, i) => {
+      // Coordinate system: slot1 (right-side) uses top-left origin (no flip needed).
+      // slot2 (left-side) uses y-flipped origin → flip y only. No x-flip for either.
+      return players.map((p, i) => {
         const slotKey = slotKeys[i];
         const runPts = submission.runs?.[slotKey] || [];
         const run = runPts[0] || null;
+        const slotNum = parseInt(slotKey.replace(/\D/g, '')) || 1;
+        const flipY = slotNum % 2 === 0;
         return { ...p, slotKey,
-          runX: run !== null ? 68 - (run.x / 100) * 68 : null,
-          runY: run !== null ? 105 - (run.y / 100) * 105 : null,
-          _rawRun: run,
+          runX: run !== null ? (run.x / 100) * 68 : null,
+          runY: run !== null ? (flipY ? 105 - (run.y / 100) * 105 : (run.y / 100) * 105) : null,
         };
       });
-      // DEBUG: log run data to console
-      console.log('runs object keys:', Object.keys(submission.runs || {}));
-      console.log('runs raw:', JSON.stringify(submission.runs));
-      console.table(result.map(p => ({ name: p.name, slotKey: p.slotKey, x: p.x, y: p.y, runX: p.runX?.toFixed(1), runY: p.runY?.toFixed(1), raw_run_x: p._rawRun?.x, raw_run_y: p._rawRun?.y })));
-      return result;
     },
 
     // Return starters in raw API order with position label, plus subs sorted by time on
