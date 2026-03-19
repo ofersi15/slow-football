@@ -2441,22 +2441,19 @@ createApp({
                  fill: colors.fill, stroke: colors.stroke, textColor: colors.text };
       });
 
-      // Pass 2: number slots left-to-right on pitch (x ascending) so WM1=left WM, WM2=right WM
-      const slotGroups = {};
-      players.forEach((p, i) => {
-        if (!slotGroups[p.slotType]) slotGroups[p.slotType] = [];
-        slotGroups[p.slotType].push({ idx: i, x: p.x });
+      // Pass 2: number slots in xi array order (WM1=first WM in xi, WM2=second, etc.)
+      // This matches the API runs object key convention
+      const slotCount = {};
+      const slotKeys = players.map((p) => {
+        const t = p.slotType;
+        slotCount[t] = (slotCount[t] || 0) + 1;
+        return `${t}${slotCount[t]}`;
       });
-      const slotKeyMap = {};
-      for (const [slotType, group] of Object.entries(slotGroups)) {
-        group.sort((a, b) => a.x - b.x);
-        group.forEach((item, rank) => { slotKeyMap[item.idx] = `${slotType}${rank + 1}`; });
-      }
 
-      // Pass 3: attach run targets using left-to-right slot numbering
+      // Pass 3: attach run targets
       // Game coords: x=0 right side (mirrored), y=0 GK end → flip both axes
       return players.map((p, i) => {
-        const slotKey = slotKeyMap[i];
+        const slotKey = slotKeys[i];
         const runPts = submission.runs?.[slotKey] || [];
         const run = runPts[0] || null;
         return { ...p, slotKey,
