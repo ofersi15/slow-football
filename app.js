@@ -262,7 +262,7 @@ createApp({
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: localStorage.getItem('sf_activeTab') || 'squad',
-      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'tactics',label:'🧠 Tactics'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'}],
+      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'analysis',label:'🔬 Analysis'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
       attrFiltersOpen: false,
@@ -308,7 +308,11 @@ createApp({
       matchFilterClub: '', matchFilterManager: '', matchFilterComp: '',
       matchSort: 'gw_d', matchSubTab: 'list',
       analysisLoading: false, analysisLoaded: false, analysisMsg: '', analysisProgress: 0,
-      analysisMatches: [], analysisFilterFormation: '',
+      analysisMatches: [], analysisFilterFormation: '', analysisFilterOpp: '',
+      analysisFilterMentality: '', analysisFilterMentalityOpp: '',
+      analysisFilterPressing: '', analysisFilterPressingOpp: '',
+      analysisFilterLine: '', analysisFilterLineOpp: '',
+      fmDrillDown: null,
       subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       matchArchiveFmSrc: null,
       fmDiag: null, fmDiagRunning: false,
@@ -921,6 +925,7 @@ createApp({
         if (v === 'squad') {
           this.loadSavedLineup();
         }
+        if (v === 'analysis') this.loadAnalysisChunks();
       },
       flush: 'sync',
     },
