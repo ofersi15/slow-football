@@ -625,9 +625,9 @@
                   </thead>
                   <tbody>
                     <template v-for="m in (matchArchive||[])" :key="m.fixtureId">
-                      <tr v-if="String(m.home&&m.home.formation)===String(fmDrillDown)" style="border-bottom:1px solid #0d1117">
+                      <tr v-if="String(m.home&&m.home.formation)===fmDrillDown.replace(/-/g,'')" class="clickable" @click="activeTab='matches';openMatch(m)" style="border-bottom:1px solid #0d1117">
                         <td style="padding:3px 6px;color:#e6edf3">{{m.home&&m.home.club}} vs {{m.away&&m.away.club}}</td>
-                        <td style="padding:3px 6px;color:#8b949e">{{m._gw}}</td>
+                        <td style="padding:3px 6px;color:#8b949e">GW{{m._gw}}</td>
                         <td style="padding:3px 6px;color:#ffa657">Home</td>
                         <td style="padding:3px 6px;color:#ffa657">{{fmtFormation(m.home&&m.home.formation)}}</td>
                         <td style="padding:3px 6px;color:#79c0ff">{{fmtFormation(m.away&&m.away.formation)}}</td>
@@ -636,9 +636,9 @@
                           {{(m.score&&m.score.home)>(m.score&&m.score.away)?'W':(m.score&&m.score.home)<(m.score&&m.score.away)?'L':'D'}}
                         </td>
                       </tr>
-                      <tr v-if="String(m.away&&m.away.formation)===String(fmDrillDown)" style="border-bottom:1px solid #0d1117">
+                      <tr v-if="String(m.away&&m.away.formation)===fmDrillDown.replace(/-/g,'')" class="clickable" @click="activeTab='matches';openMatch(m)" style="border-bottom:1px solid #0d1117">
                         <td style="padding:3px 6px;color:#e6edf3">{{m.away&&m.away.club}} vs {{m.home&&m.home.club}}</td>
-                        <td style="padding:3px 6px;color:#8b949e">{{m._gw}}</td>
+                        <td style="padding:3px 6px;color:#8b949e">GW{{m._gw}}</td>
                         <td style="padding:3px 6px;color:#79c0ff">Away</td>
                         <td style="padding:3px 6px;color:#ffa657">{{fmtFormation(m.away&&m.away.formation)}}</td>
                         <td style="padding:3px 6px;color:#79c0ff">{{fmtFormation(m.home&&m.home.formation)}}</td>
@@ -712,7 +712,7 @@
           <div class="card" style="padding:14px">
             <div style="font-weight:700;font-size:13px;margin-bottom:2px">Pressing vs Opponent Passing Style</div>
             <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How the pressing team performs depending on opponent's passing style</div>
-            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">{{analysisLoading ? analysisMsg || 'Loading chunks…' : (!matchArchive ? 'Waiting for archive…' : 'Loading chunks…')}}</div>
             <div v-else-if="!tacticsAnalysis.pressing.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
             <div v-else style="overflow-x:auto">
               <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -769,7 +769,7 @@
           <div class="card" style="padding:14px">
             <div style="font-weight:700;font-size:13px;margin-bottom:2px">Passing Style vs Opponent Pressing</div>
             <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How teams with each passing style perform against different pressing intensities</div>
-            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">{{analysisLoading ? analysisMsg || 'Loading chunks…' : (!matchArchive ? 'Waiting for archive…' : 'Loading chunks…')}}</div>
             <div v-else-if="!tacticsAnalysis.styleVpress.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
             <div v-else style="overflow-x:auto">
               <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -826,7 +826,7 @@
           <div class="card" style="padding:14px">
             <div style="font-weight:700;font-size:13px;margin-bottom:2px">Defensive Line vs Opponent Transition</div>
             <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How teams with each defensive line cope against fast/slow transition</div>
-            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">{{analysisLoading ? analysisMsg || 'Loading chunks…' : (!matchArchive ? 'Waiting for archive…' : 'Loading chunks…')}}</div>
             <div v-else-if="!tacticsAnalysis.defLine.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
             <div v-else style="overflow-x:auto">
               <table style="width:100%;border-collapse:collapse;font-size:11px">
@@ -883,7 +883,7 @@
           <div class="card" style="padding:14px">
             <div style="font-weight:700;font-size:13px;margin-bottom:2px">Transition Speed vs Opponent Def. Line</div>
             <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How teams with each transition speed perform against different defensive lines</div>
-            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">{{analysisLoading ? analysisMsg || 'Loading chunks…' : (!matchArchive ? 'Waiting for archive…' : 'Loading chunks…')}}</div>
             <div v-else-if="!tacticsAnalysis.transVline.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
             <div v-else style="overflow-x:auto">
               <table style="width:100%;border-collapse:collapse;font-size:11px">

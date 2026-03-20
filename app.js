@@ -937,6 +937,9 @@ createApp({
       },
       flush: 'sync',
     },
+    matchArchive(v) {
+      if (v && this.activeTab === 'analysis') this.loadAnalysisChunks();
+    },
   },
 
   methods: {
