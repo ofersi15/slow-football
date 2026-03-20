@@ -59,6 +59,11 @@ export default {
       const permanent = url.searchParams.get('permanent') === '1';
       const opts = permanent ? {} : { expirationTtl: 7 * 24 * 3600 };
       await env.SF_CACHE.put(key, body, opts);
+      // Purge CF edge cache so the next GET reads fresh KV data
+      try {
+        const getUrl = `${url.origin}/sf-cache/${key}`;
+        await caches.default.delete(new Request(getUrl));
+      } catch(e) {}
       return new Response('ok', { headers: cors });
     }
 

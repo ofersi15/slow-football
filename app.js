@@ -309,6 +309,7 @@ createApp({
       analysisMatches: [], analysisFilterFormation: '',
       subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       matchArchiveFmSrc: null,
+      fmDiag: null, fmDiagRunning: false,
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
@@ -3077,6 +3078,37 @@ createApp({
       this.analysisLoaded = true;
       this.analysisLoading = false;
       this.analysisMsg = `${results.length} matches with full tactical data`;
+    },
+
+    // Runs formation derivation on all loaded chunks — no API calls, no rebuild
+    async runFmDiag() {
+      if (this.fmDiagRunning) return;
+      this.fmDiagRunning = true;
+      // Load any missing chunks first
+      if (this.matchArchive) {
+        const gws = [...new Set(this.matchArchive.map(m => m._gw))].sort((a,b)=>a-b);
+        for (let i = 0; i < gws.length; i++) {
+          if (!this.matchChunks[gws[i]]) await this.loadMatchChunk(gws[i]);
+          if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+        }
+      }
+      const src = { sub:0, narr:0, derived:0, none:0, noRatings:0 };
+      const stripDashes = s => s ? String(s).replace(/-/g,'') : null;
+      for (const gw of Object.keys(this.matchChunks)) {
+        for (const m of (this.matchChunks[gw] || [])) {
+          for (const side of ['home','away']) {
+            const s = m[side];
+            if (s?.sub?.formation) { src.sub++; continue; }
+            const fromNarr = stripDashes(this.extractFormation(m.reportNarrative, s?.club));
+            if (fromNarr) { src.narr++; continue; }
+            if (!m.ratings?.[side]) { src.noRatings++; continue; }
+            const fromRatings = stripDashes(this.deriveFormation(m.ratings[side]));
+            if (fromRatings) { src.derived++; } else { src.none++; }
+          }
+        }
+      }
+      this.fmDiag = src;
+      this.fmDiagRunning = false;
     },
 
     async loadSubsDb() {
