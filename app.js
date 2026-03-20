@@ -63,10 +63,12 @@ const SUBMISSIONS_LS_KEY = 'sf_subs_ls'; // localStorage key — no TTL, persist
 const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
   ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
   : '/sf-cache';
-async function serverCacheGet(key) {
+async function serverCacheGet(key, noStore = false) {
   if (location.protocol === 'file:') return null;  // no server when opened from disk
   try {
-    const r = await fetch(`${SF_CACHE_BASE}/${key}`, {signal: AbortSignal.timeout(3000)});
+    const opts = {signal: AbortSignal.timeout(3000)};
+    if (noStore) opts.cache = 'no-store';
+    const r = await fetch(`${SF_CACHE_BASE}/${key}`, opts);
     if (!r.ok) return null;
     return await r.text();
   } catch(e) { return null; }
@@ -2839,14 +2841,21 @@ createApp({
         }
         log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
 
-        // Pass 2: fetch full match detail (10 at a time)
+        // Pass 2: fetch full match detail — reuse cached chunks, only fetch new fixtures
         const fixtureIds = Array.from(fixtureMap.keys());
-        const fullMatches = [];
+        // Build a map of already-loaded full match data from chunks
+        const cachedFull = new Map();
+        for (const gw of Object.keys(this.matchChunks)) {
+          for (const m of (this.matchChunks[gw] || [])) cachedFull.set(m.fixtureId, m);
+        }
+        const toFetch = fixtureIds.filter(id => !cachedFull.has(id));
+        const fullMatches = fixtureIds.filter(id => cachedFull.has(id)).map(id => cachedFull.get(id));
+        log(`Pass 2: ${toFetch.length} new fixtures to fetch, ${fullMatches.length} reused from cache`);
         let fetchErrors = 0;
-        for (let i = 0; i < fixtureIds.length; i += 25) {
-          const batch = fixtureIds.slice(i, i + 25);
-          this.matchArchiveProgress = 20 + Math.round((i / fixtureIds.length) * 40);
-          this.matchArchiveMsg = `Pass 2: ${Math.min(i+25, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
+        for (let i = 0; i < toFetch.length; i += 25) {
+          const batch = toFetch.slice(i, i + 25);
+          this.matchArchiveProgress = 20 + Math.round((i / Math.max(toFetch.length, 1)) * 40);
+          this.matchArchiveMsg = `Pass 2: ${Math.min(i+25, toFetch.length)}/${toFetch.length} new fixtures · ${fetchErrors} errors`;
           await Promise.all(batch.map(async id => {
             try {
               const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
@@ -3021,7 +3030,7 @@ createApp({
 
     async loadMatchArchive() {
       try {
-        const raw = await serverCacheGet('sf_match_archive_v3');
+        const raw = await serverCacheGet('sf_match_archive_v3', true);
         if (!raw) return;
         const data = await parseAsync(raw);
         if (data?.matches?.length) {
