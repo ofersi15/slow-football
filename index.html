@@ -708,9 +708,9 @@
             </div>
           </div>
 
-          <!-- Card 3: Pressing vs Opponent Style -->
+          <!-- Card 3: Pressing vs Opponent Passing Style -->
           <div class="card" style="padding:14px">
-            <div style="font-weight:700;font-size:13px;margin-bottom:2px">Pressing vs Opponent Style</div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:2px">Pressing vs Opponent Passing Style</div>
             <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How the pressing team performs depending on opponent's passing style</div>
             <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
             <div v-else-if="!tacticsAnalysis.pressing.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
@@ -726,7 +726,7 @@
                       </select>
                     </th>
                     <th style="text-align:left;padding:5px 8px">
-                      Opp Style
+                      Opp Passing Style
                       <select v-model="analysisFilterPressingOpp" @click.stop style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:3px;padding:1px 3px;font-size:10px;margin-left:4px;cursor:pointer">
                         <option value="">▼ All</option>
                         <option v-for="v in [...new Set((tacticsAnalysis.pressing||[]).map(r=>r.key.split(' vs ')[1]))].sort()" :key="v" :value="v">{{v}}</option>
@@ -746,6 +746,63 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.pressing||[]).filter(x=>(!analysisFilterPressing||x.key.split(' vs ')[0]===analysisFilterPressing)&&(!analysisFilterPressingOpp||x.key.split(' vs ')[1]===analysisFilterPressingOpp)), 'pre')"
+                      :key="r.key" style="border-bottom:1px solid #161b22">
+                    <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
+                    <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
+                    <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#7ee787">{{r.W}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#8b949e">{{r.D}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#ff7b72">{{r.L}}</td>
+                    <td style="padding:4px 6px;text-align:right;font-weight:600" :style="{color:r.winPct>=55?'#7ee787':r.winPct<=40?'#ff7b72':'#8b949e'}">{{r.winPct}}%</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.ppg}}</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.avgGF}}</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.avgGA}}</td>
+                    <td style="padding:4px 6px;text-align:right;font-weight:600" :style="{color:r.avgXgDiff>0?'#7ee787':r.avgXgDiff<0?'#ff7b72':'#8b949e'}">{{r.avgXgDiff>0?'+':''}}{{r.avgXgDiff}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#8b949e">{{r.avgSqDiff>0?'+':''}}{{r.avgSqDiff}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 3b: Passing Style vs Opponent Pressing -->
+          <div class="card" style="padding:14px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:2px">Passing Style vs Opponent Pressing</div>
+            <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How teams with each passing style perform against different pressing intensities</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-else-if="!tacticsAnalysis.styleVpress.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
+            <div v-else style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:11px">
+                <thead>
+                  <tr style="color:#8b949e;border-bottom:1px solid #21262d;white-space:nowrap;user-select:none">
+                    <th style="text-align:left;padding:5px 8px">
+                      Passing Style
+                      <select v-model="analysisFilterStyle" @click.stop style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:3px;padding:1px 3px;font-size:10px;margin-left:4px;cursor:pointer">
+                        <option value="">▼ All</option>
+                        <option v-for="v in [...new Set((tacticsAnalysis.styleVpress||[]).map(r=>r.key.split(' vs ')[0]))].sort()" :key="v" :value="v">{{v}}</option>
+                      </select>
+                    </th>
+                    <th style="text-align:left;padding:5px 8px">
+                      Opp Pressing
+                      <select v-model="analysisFilterStyleOpp" @click.stop style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:3px;padding:1px 3px;font-size:10px;margin-left:4px;cursor:pointer">
+                        <option value="">▼ All</option>
+                        <option v-for="v in [...new Set((tacticsAnalysis.styleVpress||[]).map(r=>r.key.split(' vs ')[1]))].sort()" :key="v" :value="v">{{v}}</option>
+                      </select>
+                    </th>
+                    <th @click="tblSortBy('sty','n')" style="text-align:right;padding:5px 6px;cursor:pointer">n{{tblSortIcon('sty','n')}}</th>
+                    <th @click="tblSortBy('sty','W')" style="text-align:right;padding:5px 6px;cursor:pointer">W{{tblSortIcon('sty','W')}}</th>
+                    <th @click="tblSortBy('sty','D')" style="text-align:right;padding:5px 6px;cursor:pointer">D{{tblSortIcon('sty','D')}}</th>
+                    <th @click="tblSortBy('sty','L')" style="text-align:right;padding:5px 6px;cursor:pointer">L{{tblSortIcon('sty','L')}}</th>
+                    <th @click="tblSortBy('sty','winPct')" style="text-align:right;padding:5px 6px;cursor:pointer">Win%{{tblSortIcon('sty','winPct')}}</th>
+                    <th @click="tblSortBy('sty','ppg')" style="text-align:right;padding:5px 6px;cursor:pointer">PPG{{tblSortIcon('sty','ppg')}}</th>
+                    <th @click="tblSortBy('sty','avgGF')" style="text-align:right;padding:5px 6px;cursor:pointer">GF{{tblSortIcon('sty','avgGF')}}</th>
+                    <th @click="tblSortBy('sty','avgGA')" style="text-align:right;padding:5px 6px;cursor:pointer">GA{{tblSortIcon('sty','avgGA')}}</th>
+                    <th @click="tblSortBy('sty','avgXgDiff')" style="text-align:right;padding:5px 6px;cursor:pointer">xG±{{tblSortIcon('sty','avgXgDiff')}}</th>
+                    <th @click="tblSortBy('sty','avgSqDiff')" style="text-align:right;padding:5px 6px;cursor:pointer">Sq±{{tblSortIcon('sty','avgSqDiff')}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in tblSorted((tacticsAnalysis.styleVpress||[]).filter(x=>(!analysisFilterStyle||x.key.split(' vs ')[0]===analysisFilterStyle)&&(!analysisFilterStyleOpp||x.key.split(' vs ')[1]===analysisFilterStyleOpp)), 'sty')"
                       :key="r.key" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
@@ -803,6 +860,63 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.defLine||[]).filter(x=>(!analysisFilterLine||x.key.split(' vs ')[0]===analysisFilterLine)&&(!analysisFilterLineOpp||x.key.split(' vs ')[1]===analysisFilterLineOpp)), 'line')"
+                      :key="r.key" style="border-bottom:1px solid #161b22">
+                    <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
+                    <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
+                    <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#7ee787">{{r.W}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#8b949e">{{r.D}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#ff7b72">{{r.L}}</td>
+                    <td style="padding:4px 6px;text-align:right;font-weight:600" :style="{color:r.winPct>=55?'#7ee787':r.winPct<=40?'#ff7b72':'#8b949e'}">{{r.winPct}}%</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.ppg}}</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.avgGF}}</td>
+                    <td style="padding:4px 6px;text-align:right">{{r.avgGA}}</td>
+                    <td style="padding:4px 6px;text-align:right;font-weight:600" :style="{color:r.avgXgDiff>0?'#7ee787':r.avgXgDiff<0?'#ff7b72':'#8b949e'}">{{r.avgXgDiff>0?'+':''}}{{r.avgXgDiff}}</td>
+                    <td style="padding:4px 6px;text-align:right;color:#8b949e">{{r.avgSqDiff>0?'+':''}}{{r.avgSqDiff}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 4b: Transition vs Opponent Def. Line -->
+          <div class="card" style="padding:14px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:2px">Transition Speed vs Opponent Def. Line</div>
+            <div style="font-size:11px;color:#8b949e;margin-bottom:10px">How teams with each transition speed perform against different defensive lines</div>
+            <div v-if="!analysisLoaded" style="color:#484f58;font-size:11px">Chunks loading…</div>
+            <div v-else-if="!tacticsAnalysis.transVline.length" style="color:#484f58;font-size:11px">Not enough data (n ≥ 3 required)</div>
+            <div v-else style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;font-size:11px">
+                <thead>
+                  <tr style="color:#8b949e;border-bottom:1px solid #21262d;white-space:nowrap;user-select:none">
+                    <th style="text-align:left;padding:5px 8px">
+                      Transition
+                      <select v-model="analysisFilterTrans" @click.stop style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:3px;padding:1px 3px;font-size:10px;margin-left:4px;cursor:pointer">
+                        <option value="">▼ All</option>
+                        <option v-for="v in [...new Set((tacticsAnalysis.transVline||[]).map(r=>r.key.split(' vs ')[0]))].sort()" :key="v" :value="v">{{v}}</option>
+                      </select>
+                    </th>
+                    <th style="text-align:left;padding:5px 8px">
+                      Opp Def. Line
+                      <select v-model="analysisFilterTransOpp" @click.stop style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:3px;padding:1px 3px;font-size:10px;margin-left:4px;cursor:pointer">
+                        <option value="">▼ All</option>
+                        <option v-for="v in [...new Set((tacticsAnalysis.transVline||[]).map(r=>r.key.split(' vs ')[1]))].sort()" :key="v" :value="v">{{v}}</option>
+                      </select>
+                    </th>
+                    <th @click="tblSortBy('tvl','n')" style="text-align:right;padding:5px 6px;cursor:pointer">n{{tblSortIcon('tvl','n')}}</th>
+                    <th @click="tblSortBy('tvl','W')" style="text-align:right;padding:5px 6px;cursor:pointer">W{{tblSortIcon('tvl','W')}}</th>
+                    <th @click="tblSortBy('tvl','D')" style="text-align:right;padding:5px 6px;cursor:pointer">D{{tblSortIcon('tvl','D')}}</th>
+                    <th @click="tblSortBy('tvl','L')" style="text-align:right;padding:5px 6px;cursor:pointer">L{{tblSortIcon('tvl','L')}}</th>
+                    <th @click="tblSortBy('tvl','winPct')" style="text-align:right;padding:5px 6px;cursor:pointer">Win%{{tblSortIcon('tvl','winPct')}}</th>
+                    <th @click="tblSortBy('tvl','ppg')" style="text-align:right;padding:5px 6px;cursor:pointer">PPG{{tblSortIcon('tvl','ppg')}}</th>
+                    <th @click="tblSortBy('tvl','avgGF')" style="text-align:right;padding:5px 6px;cursor:pointer">GF{{tblSortIcon('tvl','avgGF')}}</th>
+                    <th @click="tblSortBy('tvl','avgGA')" style="text-align:right;padding:5px 6px;cursor:pointer">GA{{tblSortIcon('tvl','avgGA')}}</th>
+                    <th @click="tblSortBy('tvl','avgXgDiff')" style="text-align:right;padding:5px 6px;cursor:pointer">xG±{{tblSortIcon('tvl','avgXgDiff')}}</th>
+                    <th @click="tblSortBy('tvl','avgSqDiff')" style="text-align:right;padding:5px 6px;cursor:pointer">Sq±{{tblSortIcon('tvl','avgSqDiff')}}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in tblSorted((tacticsAnalysis.transVline||[]).filter(x=>(!analysisFilterTrans||x.key.split(' vs ')[0]===analysisFilterTrans)&&(!analysisFilterTransOpp||x.key.split(' vs ')[1]===analysisFilterTransOpp)), 'tvl')"
                       :key="r.key" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>

@@ -312,6 +312,8 @@ createApp({
       analysisFilterMentality: '', analysisFilterMentalityOpp: '',
       analysisFilterPressing: '', analysisFilterPressingOpp: '',
       analysisFilterLine: '', analysisFilterLineOpp: '',
+      analysisFilterStyle: '', analysisFilterStyleOpp: '',
+      analysisFilterTrans: '', analysisFilterTransOpp: '',
       fmDrillDown: null,
       subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       matchArchiveFmSrc: null,
@@ -491,7 +493,7 @@ createApp({
         acc(menVmen, hMen && aMen ? `${hMen} vs ${aMen}` : null, hRes, hs, as_, hXg, aXg, sqD);
         acc(menVmen, hMen && aMen ? `${aMen} vs ${hMen}` : null, aRes, as_, hs, aXg, hXg, -sqD);
       }
-      const preVsty = {}, lineVtrans = {};
+      const preVsty = {}, styVpre = {}, lineVtrans = {}, transVline = {};
       for (const m of this.analysisMatches) {
         const hs = m.score?.home ?? 0, as_ = m.score?.away ?? 0;
         const hRes = hs > as_ ? 'W' : hs < as_ ? 'L' : 'D';
@@ -503,10 +505,14 @@ createApp({
         const hStyle = hInstr.style, aStyle = aInstr.style;
         const hLine = hInstr.defensive_line, aLine = aInstr.defensive_line;
         const hTrans = hInstr.transition_speed, aTrans = aInstr.transition_speed;
-        acc(preVsty, hPress && aStyle ? `${hPress} vs ${aStyle}` : null, hRes, hs, as_, hXg, aXg, sqD);
-        acc(preVsty, aPress && hStyle ? `${aPress} vs ${hStyle}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+        acc(preVsty,   hPress && aStyle ? `${hPress} vs ${aStyle}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(preVsty,   aPress && hStyle ? `${aPress} vs ${hStyle}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+        acc(styVpre,   hStyle && aPress ? `${hStyle} vs ${aPress}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(styVpre,   aStyle && hPress ? `${aStyle} vs ${hPress}` : null, aRes, as_, hs, aXg, hXg, -sqD);
         acc(lineVtrans, hLine && aTrans ? `${hLine} vs ${aTrans}` : null, hRes, hs, as_, hXg, aXg, sqD);
         acc(lineVtrans, aLine && hTrans ? `${aLine} vs ${hTrans}` : null, aRes, as_, hs, aXg, hXg, -sqD);
+        acc(transVline, hTrans && aLine ? `${hTrans} vs ${aLine}` : null, hRes, hs, as_, hXg, aXg, sqD);
+        acc(transVline, aTrans && hLine ? `${aTrans} vs ${hLine}` : null, aRes, as_, hs, aXg, hXg, -sqD);
       }
       // Coverage stats
       const total = this.matchArchive.length;
@@ -520,7 +526,9 @@ createApp({
         formations: summarise(fmVfm),
         mentalities: summarise(menVmen),
         pressing: summarise(preVsty),
+        styleVpress: summarise(styVpre),
         defLine: summarise(lineVtrans),
+        transVline: summarise(transVline),
         coverage: { total, bothFormations, bothMentality, withInstr, withPress, withDefLine, withTrans },
       };
     },
