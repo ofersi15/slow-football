@@ -66,7 +66,7 @@ const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
 async function serverCacheGet(key) {
   if (location.protocol === 'file:') return null;  // no server when opened from disk
   try {
-    const r = await fetch(`${SF_CACHE_BASE}/${key}`, {cache: 'no-store', signal: AbortSignal.timeout(3000)});
+    const r = await fetch(`${SF_CACHE_BASE}/${key}`, {signal: AbortSignal.timeout(3000)});
     if (!r.ok) return null;
     return await r.text();
   } catch(e) { return null; }
@@ -2821,10 +2821,10 @@ createApp({
         const fixtureMap = new Map();
         const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
         log(`${clubList.length} clubs to scan`);
-        for (let i = 0; i < clubList.length; i += 6) {
-          const batch = clubList.slice(i, i + 6);
+        for (let i = 0; i < clubList.length; i += 10) {
+          const batch = clubList.slice(i, i + 10);
           this.matchArchiveProgress = Math.round((i / clubList.length) * 20);
-          this.matchArchiveMsg = `Pass 1: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} fixtures`;
+          this.matchArchiveMsg = `Pass 1: ${Math.min(i+10, clubList.length)}/${clubList.length} clubs · ${fixtureMap.size} fixtures`;
           await Promise.all(batch.map(async club => {
             try {
               const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=200`).then(r=>r.json());
@@ -2835,7 +2835,7 @@ createApp({
               if (added) log(`${club}: +${added} (${fixtureMap.size} total)`);
             } catch(e) { log(`ERROR ${club}: ${e.message}`); }
           }));
-          await delay(100);
+          await delay(50);
         }
         log(`Pass 1 done: ${fixtureMap.size} unique fixtures`);
 
@@ -2843,10 +2843,10 @@ createApp({
         const fixtureIds = Array.from(fixtureMap.keys());
         const fullMatches = [];
         let fetchErrors = 0;
-        for (let i = 0; i < fixtureIds.length; i += 10) {
-          const batch = fixtureIds.slice(i, i + 10);
+        for (let i = 0; i < fixtureIds.length; i += 25) {
+          const batch = fixtureIds.slice(i, i + 25);
           this.matchArchiveProgress = 20 + Math.round((i / fixtureIds.length) * 40);
-          this.matchArchiveMsg = `Pass 2: ${Math.min(i+10, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
+          this.matchArchiveMsg = `Pass 2: ${Math.min(i+25, fixtureIds.length)}/${fixtureIds.length} fixtures · ${fetchErrors} errors`;
           await Promise.all(batch.map(async id => {
             try {
               const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
@@ -2861,7 +2861,7 @@ createApp({
               }
             } catch(e) { fetchErrors++; log(`ERROR fixture ${id}: ${e.message}`); }
           }));
-          await delay(80);
+          await delay(30);
         }
         fullMatches.sort((a,b) => (b.kickoff||'').localeCompare(a.kickoff||''));
         log(`Pass 2 done: ${fullMatches.length} matches, ${fetchErrors} errors`);
@@ -2870,10 +2870,10 @@ createApp({
         const subsByClub = {}; // club → { gw → submission }
         let subErrors = 0;
         log(`Pass 3: fetching submissions for ${clubList.length} clubs`);
-        for (let i = 0; i < clubList.length; i += 6) {
-          const batch = clubList.slice(i, i + 6);
+        for (let i = 0; i < clubList.length; i += 10) {
+          const batch = clubList.slice(i, i + 10);
           this.matchArchiveProgress = 60 + Math.round((i / clubList.length) * 24);
-          this.matchArchiveMsg = `Pass 3: ${Math.min(i+6, clubList.length)}/${clubList.length} clubs · submissions`;
+          this.matchArchiveMsg = `Pass 3: ${Math.min(i+10, clubList.length)}/${clubList.length} clubs · submissions`;
           await Promise.all(batch.map(async club => {
             try {
               const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=200`).then(r => r.json());
@@ -2885,7 +2885,7 @@ createApp({
               subsByClub[club] = byGw;
             } catch(e) { subErrors++; log(`SUB ERROR ${club}: ${e.message}`); }
           }));
-          await delay(80);
+          await delay(50);
         }
         log(`Pass 3 done: ${Object.keys(subsByClub).length} clubs, ${subErrors} errors`);
 
@@ -2997,7 +2997,7 @@ createApp({
             chunksFailed++;
             log(`ERROR GW${gw}: ${err}`);
           }
-          await delay(150);
+          await delay(30);
         }
 
         this.matchArchive = compactMatches;
