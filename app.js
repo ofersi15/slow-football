@@ -2819,6 +2819,15 @@ createApp({
       };
 
       try {
+        // Pre-load all existing GW chunks so Pass 2 can reuse them instead of re-fetching
+        if (this.matchArchive?.length) {
+          const existingGws = [...new Set(this.matchArchive.map(m => m._gw))].filter(Boolean);
+          this.matchArchiveMsg = `Loading ${existingGws.length} cached chunks…`;
+          log(`Pre-loading ${existingGws.length} GW chunks from KV`);
+          await Promise.all(existingGws.map(gw => this.loadMatchChunk(gw)));
+          log(`Chunks loaded: ${Object.keys(this.matchChunks).length} GWs in memory`);
+        }
+
         // Pass 1: collect unique fixture IDs by club (API doesn't support ?gameweek filter)
         const fixtureMap = new Map();
         const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
