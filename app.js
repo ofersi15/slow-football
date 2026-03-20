@@ -3094,9 +3094,34 @@ createApp({
         await new Promise(r => setTimeout(r, 20));
       }
       this.analysisMatches = results;
+
+      // Backfill formations + mentalities into compact index from chunk data
+      // so Formation/Mentality cards work without a rebuild
+      const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
+      const chunkById = new Map();
+      for (const gw of Object.keys(this.matchChunks)) {
+        for (const m of (this.matchChunks[gw] || [])) chunkById.set(m.fixtureId, m);
+      }
+      let backfilled = 0;
+      for (const cm of (this.matchArchive || [])) {
+        const full = chunkById.get(cm.fixtureId);
+        if (!full) continue;
+        for (const side of ['home', 'away']) {
+          if (!cm[side]) continue;
+          if (!cm[side].formation) {
+            let fm = full[side]?.sub?.formation || null;
+            if (!fm) fm = stripDashes(this.extractFormation(full.reportNarrative, full[side]?.club));
+            if (!fm) fm = stripDashes(this.deriveFormation(full.ratings?.[side]));
+            if (fm) { cm[side].formation = fm; backfilled++; }
+          }
+          if (!cm[side].mentality && full[side]?.sub?.instructions?.mentality) {
+            cm[side].mentality = full[side].sub.instructions.mentality;
+          }
+        }
+      }
       this.analysisLoaded = true;
       this.analysisLoading = false;
-      this.analysisMsg = `${results.length} matches with full tactical data`;
+      this.analysisMsg = `${results.length} matches with full tactical data · ${backfilled} formations backfilled`;
     },
 
     // Runs formation derivation on all loaded chunks — no API calls, no rebuild
