@@ -66,7 +66,7 @@ const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
 async function serverCacheGet(key) {
   if (location.protocol === 'file:') return null;  // no server when opened from disk
   try {
-    const r = await fetch(`${SF_CACHE_BASE}/${key}`, {signal: AbortSignal.timeout(3000)});
+    const r = await fetch(`${SF_CACHE_BASE}/${key}`, {cache: 'no-store', signal: AbortSignal.timeout(3000)});
     if (!r.ok) return null;
     return await r.text();
   } catch(e) { return null; }
@@ -3003,6 +3003,7 @@ createApp({
         this.matchArchive = compactMatches;
         this.matchArchiveChunkCount = sortedGws.length;
         this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        this.matchArchiveFmSrc = fmSrc;
         this.matchArchiveProgress = 100;
         if (chunksFailed > 0) {
           this.matchArchiveMsg = `Done (${chunksFailed} GW save errors) — ${fullMatches.length} matches`;
