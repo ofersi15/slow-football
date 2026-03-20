@@ -2470,7 +2470,7 @@ createApp({
       const text = paras.filter(p => typeof p === 'string' && p.startsWith('Pre-match')).join(' ')
                    || paras.join(' ');
       const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const fmt = '(\\d-\\d(?:-\\d){0,2})';
+      const fmt = '([345]-\\d(?:-\\d){1,2})';
       let m = text.match(new RegExp(`${esc}.{0,150}${fmt}`));
       if (m) return m[1];
       m = text.match(new RegExp(`${fmt}.{0,150}${esc}`));
@@ -2486,15 +2486,20 @@ createApp({
       const c = {};
       for (const p of starters) { const bp = this.basePos(p.position); c[bp] = (c[bp] || 0) + 1; }
       const def = (c.CB || 0) + (c.FB || 0);
-      const dm = c.DM || 0;
-      const cm = (c.CM || 0) + (c.WM || 0);
+      const mid = (c.DM || 0) + (c.CM || 0) + (c.WM || 0); // DM+CM+RM/LM all one mid layer
+      const wf = c.WF || 0;  // RW/LW
       const am = c.AM || 0;
-      const att = (c.WF || 0) + (c.CF || 0);
+      const cf = c.CF || 0;
       const parts = [def];
-      if (dm) parts.push(dm);
-      if (cm) parts.push(cm);
-      if (am) parts.push(am);
-      parts.push(att);
+      if (mid) parts.push(mid);
+      // RW/LW group with AM when AM exists (4-2-3-1), otherwise group with CF (4-3-3)
+      if (am && wf) {
+        parts.push(am + wf);
+        if (cf) parts.push(cf);
+      } else {
+        if (am) parts.push(am);
+        if (wf + cf) parts.push(wf + cf);
+      }
       return parts.join('-');
     },
 
@@ -2512,6 +2517,7 @@ createApp({
     // Strip L/R/C side prefix from API position codes → base game position
     basePos(pos) {
       if (!pos) return pos;
+      const p = pos.split('/')[0]; // handle compound labels like LW/SS
       const map = {
         LB:'FB', RB:'FB',
         LCB:'CB', RCB:'CB',
@@ -2520,9 +2526,9 @@ createApp({
         LM:'WM', RM:'WM', LWM:'WM', RWM:'WM',
         LAM:'AM', RAM:'AM',
         LW:'WF', RW:'WF', LWF:'WF', RWF:'WF',
-        LCF:'CF', RCF:'CF',
+        ST:'CF', SS:'CF', LCF:'CF', RCF:'CF',
       };
-      return map[pos] || pos;
+      return map[p] || p;
     },
 
     // Look up player data from allPlayers by name (case-insensitive)
