@@ -1,4 +1,4 @@
-// Cloudflare Worker — persistent cache for Slow Football app
+// Cloudflare Worker — persistent cache for Slow Football app (v2)
 // Mirrors the /sf-cache GET/POST/DELETE interface of server.py
 // Setup: create a KV namespace named SF_CACHE and bind it to this worker
 // Deploy URL: https://sf-cache.<account>.workers.dev
