@@ -1,0 +1,8 @@
+name = "sf-game-proxy"
+main = "proxy.js"
+compatibility_date = "2024-01-01"
+account_id = "ec690ff1a976f8d1f3fcd76d3f5f303b"
+
+[[kv_namespaces]]
+binding = "SF_KV"
+id = "d067b15052c942d4bdc252d9979e2623"

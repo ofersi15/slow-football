@@ -302,6 +302,7 @@ createApp({
       // Matches archive tab
       matchArchive: null,         // null=not loaded, []=loaded
       matchArchiveBuilding: false, matchArchiveProgress: 0, matchArchiveMsg: '',
+      appendGwBuilding: false, appendGwMsg: '', appendGwProgress: 0,
       matchArchiveCacheDate: null,
       matchView: null, matchDetailLoading: false,
       matchChunks: {}, matchArchiveChunkCount: 0, matchBuildLog: [],
@@ -3057,6 +3058,201 @@ createApp({
         log(`FATAL: ${e.message || e}`);
       }
       this.matchArchiveBuilding = false;
+    },
+
+    async appendLatestGw() {
+      if (this.appendGwBuilding || this.matchArchiveBuilding) return;
+      if (!this.matchArchive?.length) { alert('Load the archive first'); return; }
+      this.appendGwBuilding = true;
+      this.appendGwProgress = 0;
+      this.appendGwMsg = 'Starting…';
+      const log = m => { this.matchBuildLog.push(m); console.log('[AppendGW]', m); };
+      const delay = ms => new Promise(r => setTimeout(r, ms));
+      const saveWithRetry = async (url, body, tries=3) => {
+        for (let t = 0; t < tries; t++) {
+          try { const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body }); if (r.ok) return true; } catch(e) {}
+          await delay(500);
+        }
+        return 'save failed';
+      };
+      try {
+        // Identify fixture IDs already in archive
+        const knownIds = new Set(this.matchArchive.map(m => m.fixtureId));
+        const maxGw = Math.max(...this.matchArchive.map(m => m._gw || 0).filter(g => g > 0));
+        log(`Archive has ${knownIds.size} fixtures up to GW${maxGw}`);
+
+        // Pass 1: scan all clubs for new fixture IDs
+        this.appendGwMsg = 'Scanning clubs for new fixtures…';
+        const clubList = [...new Set(this.allPlayers.map(p => p.Club).filter(Boolean))].sort();
+        const newFixtureMap = new Map();
+        for (let i = 0; i < clubList.length; i += 10) {
+          const batch = clubList.slice(i, i + 10);
+          this.appendGwProgress = Math.round((i / clubList.length) * 30);
+          this.appendGwMsg = `Scanning ${Math.min(i+10, clubList.length)}/${clubList.length} clubs… ${newFixtureMap.size} new`;
+          await Promise.all(batch.map(async club => {
+            try {
+              const d = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=50`).then(r => r.json());
+              for (const m of (d?.matches || [])) {
+                if (m.fixtureId && !knownIds.has(m.fixtureId) && !newFixtureMap.has(m.fixtureId)) {
+                  newFixtureMap.set(m.fixtureId, m);
+                }
+              }
+            } catch(e) { log(`ERROR ${club}: ${e.message}`); }
+          }));
+          await delay(50);
+        }
+        log(`Found ${newFixtureMap.size} new fixtures`);
+        if (newFixtureMap.size === 0) { this.appendGwMsg = 'No new fixtures found.'; this.appendGwBuilding = false; return; }
+
+        // Pass 2: fetch full match detail for new fixtures only
+        const toFetch = Array.from(newFixtureMap.keys());
+        const fullNew = [];
+        let fetchErrors = 0;
+        for (let i = 0; i < toFetch.length; i += 25) {
+          const batch = toFetch.slice(i, i + 25);
+          this.appendGwProgress = 30 + Math.round((i / toFetch.length) * 30);
+          this.appendGwMsg = `Fetching ${Math.min(i+25, toFetch.length)}/${toFetch.length} match details…`;
+          await Promise.all(batch.map(async id => {
+            try {
+              const d = await fetch(`${API}/matches/${id}`).then(r => r.json());
+              if (d?.match) {
+                const m = d.match;
+                m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
+                m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
+                fullNew.push(m);
+              } else { fetchErrors++; }
+            } catch(e) { fetchErrors++; log(`ERROR fixture ${id}: ${e.message}`); }
+          }));
+          await delay(30);
+        }
+        log(`Fetched ${fullNew.length} full matches, ${fetchErrors} errors`);
+
+        // Identify new GWs
+        const newGws = [...new Set(fullNew.map(m => m.gameweek).filter(g => g != null))];
+        log(`New GWs: ${newGws.join(', ')}`);
+
+        // Pass 3: fetch submissions only for clubs involved in new GWs
+        this.appendGwMsg = `Fetching submissions for new GWs…`;
+        const involvedClubs = [...new Set(fullNew.flatMap(m => [m.home?.club, m.away?.club]).filter(Boolean))];
+        const subsByClub = {};
+        for (let i = 0; i < involvedClubs.length; i += 10) {
+          const batch = involvedClubs.slice(i, i + 10);
+          this.appendGwProgress = 60 + Math.round((i / involvedClubs.length) * 20);
+          this.appendGwMsg = `Submissions: ${Math.min(i+10, involvedClubs.length)}/${involvedClubs.length} clubs…`;
+          await Promise.all(batch.map(async club => {
+            try {
+              const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=50`).then(r => r.json());
+              const byGw = {};
+              for (const s of (d?.items || [])) {
+                const key = s.gameweek ?? 'upcoming';
+                if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
+              }
+              subsByClub[club] = byGw;
+            } catch(e) { log(`SUB ERROR ${club}: ${e.message}`); }
+          }));
+          await delay(50);
+        }
+
+        // Augment new matches with submission data
+        for (const m of fullNew) {
+          const gw = m.gameweek;
+          const homeSub = gw != null ? subsByClub[m.home?.club]?.[gw] : null;
+          const awaySub = gw != null ? subsByClub[m.away?.club]?.[gw] : null;
+          if (homeSub) m.home.sub = { formation: homeSub.formation, instructions: homeSub.instructions, roles: homeSub.roles, xi: homeSub.xi, runs: homeSub.runs };
+          if (awaySub) m.away.sub = { formation: awaySub.formation, instructions: awaySub.instructions, roles: awaySub.roles, xi: awaySub.xi, runs: awaySub.runs };
+        }
+
+        // Build compact entries for new matches
+        const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
+        const playerByName = new Map(this.allPlayers.map(p => [(p.Player||'').toLowerCase().trim(), p]));
+        const avgArr = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
+        const SLOT_SECTION = { CB:'def', FB:'def', DM:'mid', CM:'mid', WM:'mid', AM:'att', WF:'att', CF:'att' };
+        const computeSquadRatings = (sub) => {
+          if (!sub?.xi?.length) return null;
+          const secs = { def:[], mid:[], att:[] }; const all = [];
+          for (const slot of sub.xi) {
+            const name = (slot.name || slot.player || '').toLowerCase().trim();
+            const p = playerByName.get(name); if (!p) continue;
+            const slotBase = (slot.slot || '').replace(/\d+$/, '') || p.Position || 'CM';
+            const r = calcGameRating(p, p.Position || slotBase); if (!r) continue;
+            all.push(r); if (SLOT_SECTION[slotBase]) secs[SLOT_SECTION[slotBase]].push(r);
+          }
+          return { overall: avgArr(all), def: avgArr(secs.def), mid: avgArr(secs.mid), att: avgArr(secs.att) };
+        };
+        const newCompact = fullNew.map(m => {
+          const hNarInstr = this.parseInstructions(m.reportNarrative, m.home?.club);
+          const aNarInstr = this.parseInstructions(m.reportNarrative, m.away?.club);
+          const getFm = (sub, club, ratingsArr) => {
+            if (sub?.formation) return stripDashes(sub.formation);
+            const fromNarr = stripDashes(this.extractFormation(m.reportNarrative, club));
+            if (fromNarr) return fromNarr;
+            return stripDashes(this.deriveFormation(ratingsArr)) || null;
+          };
+          return {
+            fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
+            competition: m.competition,
+            home: { club: m.home?.club, formation: getFm(m.home?.sub, m.home?.club, m.ratings?.home), mentality: m.home?.sub?.instructions?.mentality || hNarInstr?.mentality || null, style: m.home?.sub?.instructions?.style || hNarInstr?.style || null, sqRtg: computeSquadRatings(m.home?.sub) },
+            away: { club: m.away?.club, formation: getFm(m.away?.sub, m.away?.club, m.ratings?.away), mentality: m.away?.sub?.instructions?.mentality || aNarInstr?.mentality || null, style: m.away?.sub?.instructions?.style || aNarInstr?.style || null, sqRtg: computeSquadRatings(m.away?.sub) },
+            score: m.score, headline: m.headline,
+            stats: m.stats ? { xg: m.stats.xg, shots: m.stats.shots ? { home: m.stats.shots.home?.total ?? null, away: m.stats.shots.away?.total ?? null } : null, possession: m.stats.possession } : null,
+            _homeManager: m._homeManager, _awayManager: m._awayManager,
+            _gw: m.gameweek ?? 0,
+          };
+        });
+
+        // Group new matches by GW and save chunks (load existing chunk first to merge)
+        this.appendGwProgress = 80;
+        const gwMap = new Map();
+        for (const m of fullNew) {
+          const gw = m.gameweek ?? 0;
+          if (!gwMap.has(gw)) gwMap.set(gw, []);
+          gwMap.get(gw).push(m);
+        }
+        for (const [gw, matches] of gwMap) {
+          // Merge with any existing chunk data for this GW
+          let existing = [];
+          if (this.matchChunks[gw]) existing = this.matchChunks[gw];
+          else {
+            try { const raw = await serverCacheGet(`sf_match_archive_v3_gw_${gw}`); if (raw) existing = JSON.parse(raw).matches || []; } catch(e) {}
+          }
+          const existingIds = new Set(existing.map(m => m.fixtureId));
+          const merged = [...existing, ...matches.filter(m => !existingIds.has(m.fixtureId))];
+          this.matchChunks[gw] = merged;
+          const chunkStr = JSON.stringify({ gw, matches: merged });
+          this.appendGwMsg = `Saving GW${gw} chunk (${merged.length} matches)…`;
+          await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v3_gw_${gw}?permanent=1`, chunkStr);
+          log(`GW${gw} chunk saved: ${merged.length} matches`);
+        }
+
+        // Update archive index: merge new compact matches + update gameweeks list
+        this.appendGwProgress = 92;
+        this.appendGwMsg = 'Updating archive index…';
+        const updatedMatches = [...this.matchArchive, ...newCompact];
+        const allGws = [...new Set(updatedMatches.map(m => m._gw).filter(g => g > 0))].sort((a,b) => a-b);
+        const indexData = {
+          builtAt: Date.now(),
+          matchCount: updatedMatches.length,
+          gwCount: allGws.length,
+          gameweeks: allGws,
+          fmSrc: this.matchArchiveFmSrc || {},
+          matches: updatedMatches,
+        };
+        const idxErr = await saveWithRetry(`${SF_CACHE_BASE}/sf_match_archive_v3?permanent=1`, JSON.stringify(indexData));
+        if (idxErr !== true) throw new Error('Index save failed');
+
+        // Update in-memory state
+        this.matchArchive = updatedMatches;
+        this.matchArchiveChunkCount = allGws.length;
+        this.matchArchiveCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        this.analysisLoaded = false; // invalidate analysis so it reloads
+        this.appendGwProgress = 100;
+        this.appendGwMsg = `Done — added ${newCompact.length} matches (GW${newGws.join(', GW')})`;
+        log(`Append complete: +${newCompact.length} matches across GW${newGws.join(', GW')}`);
+      } catch(e) {
+        this.appendGwMsg = 'Error: ' + (e.message || e);
+        log(`FATAL: ${e.message || e}`);
+      }
+      this.appendGwBuilding = false;
     },
 
     async loadMatchArchive() {

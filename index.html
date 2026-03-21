@@ -2115,10 +2115,24 @@
           <span v-if="matchArchiveCacheDate" class="c-gray" style="font-size:10px;margin-left:6px">· built {{matchArchiveCacheDate}}</span>
           <span v-if="matchArchiveFmSrc" class="c-gray" style="font-size:10px;margin-left:6px">· fm: sub={{matchArchiveFmSrc.sub}} narr={{matchArchiveFmSrc.narr}} derived={{matchArchiveFmSrc.derived}} none={{matchArchiveFmSrc.none}}</span>
         </div>
-        <button @click="buildMatchArchive" :disabled="matchArchiveBuilding"
-          style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:5px;padding:4px 12px;font-size:11px;cursor:pointer">
-          {{matchArchiveBuilding ? '⏳ Rebuilding…' : '🔄 Rebuild'}}
-        </button>
+        <div style="display:flex;gap:6px">
+          <button @click="appendLatestGw" :disabled="appendGwBuilding || matchArchiveBuilding"
+            style="background:#0d419d;color:#79c0ff;border:1px solid #1f6feb;border-radius:5px;padding:4px 12px;font-size:11px;cursor:pointer">
+            {{appendGwBuilding ? '⏳ Appending…' : '➕ Append GW'}}
+          </button>
+          <button @click="buildMatchArchive" :disabled="matchArchiveBuilding || appendGwBuilding"
+            style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:5px;padding:4px 12px;font-size:11px;cursor:pointer">
+            {{matchArchiveBuilding ? '⏳ Rebuilding…' : '🔄 Rebuild'}}
+          </button>
+        </div>
+      </div>
+
+      <!-- Append GW progress -->
+      <div v-if="appendGwBuilding || appendGwMsg" class="card" style="padding:10px">
+        <div style="font-size:11px;color:#8b949e;margin-bottom:4px">{{appendGwMsg}}</div>
+        <div style="background:#21262d;border-radius:4px;height:5px;overflow:hidden">
+          <div :style="{width:appendGwProgress+'%',height:'100%',background:'linear-gradient(90deg,#1f6feb,#79c0ff)',transition:'width .4s'}"></div>
+        </div>
       </div>
 
       <!-- Rebuild progress -->
