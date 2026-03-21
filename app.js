@@ -2985,8 +2985,8 @@ createApp({
           fmSrc.none++; return null;
         };
         const compactMatches = fullMatches.map(m => {
-          const hNarInstr = this.parseInstructions(m.reportNarrative, m.home?.club);
-          const aNarInstr = this.parseInstructions(m.reportNarrative, m.away?.club);
+          const hNarInstr = this.extractTactics(m.reportNarrative, m.home?.club);
+          const aNarInstr = this.extractTactics(m.reportNarrative, m.away?.club);
           return {
           fixtureId: m.fixtureId, kickoff: m.kickoff, gameweek: m.gameweek,
           competition: m.competition,
@@ -3180,8 +3180,8 @@ createApp({
           return { overall: avgArr(all), def: avgArr(secs.def), mid: avgArr(secs.mid), att: avgArr(secs.att) };
         };
         const newCompact = fullNew.map(m => {
-          const hNarInstr = this.parseInstructions(m.reportNarrative, m.home?.club);
-          const aNarInstr = this.parseInstructions(m.reportNarrative, m.away?.club);
+          const hNarInstr = this.extractTactics(m.reportNarrative, m.home?.club);
+          const aNarInstr = this.extractTactics(m.reportNarrative, m.away?.club);
           const getFm = (sub, club, ratingsArr) => {
             if (sub?.formation) return stripDashes(sub.formation);
             const fromNarr = stripDashes(this.extractFormation(m.reportNarrative, club));
