@@ -654,6 +654,12 @@ createApp({
       else list.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)); // date_d default
       return list;
     },
+    selectedPlayerNegos() {
+      if (!this.selectedPlayer) return [];
+      const name = (this.selectedPlayer.Player||this.selectedPlayer.name||'').toLowerCase();
+      if (!name) return [];
+      return this.espionageNegos.filter(n => (n.playerName||'').toLowerCase() === name);
+    },
     mySquadByPosition() {
       const order = ['GK','FB','CB','DM','CM','AM','WF','CF'];
       const groups = {};
@@ -1006,7 +1012,16 @@ createApp({
       else { this.sortCol=col; this.sortDir=-1; }
       this.page=0;
     },
-    openModal(p, jobCtx=null) { this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null; },
+    async openModal(p, jobCtx=null) {
+      this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null;
+      // Load negos history if not already populated
+      if (this.espionageNegos.length === 0) {
+        try {
+          const raw = await serverCacheGet('sf_negos_history_v1');
+          if (raw) this.espionageNegos = JSON.parse(raw);
+        } catch(e) {}
+      }
+    },
     closeModal() { this.selectedPlayer=null; this.selectedJobCtx=null; },
 
     async loadData() {
@@ -1309,8 +1324,8 @@ createApp({
           });
           players.forEach(p=>{
             const key=(p.Player||'').toLowerCase();
-            // Transfer history (limit to last 5 entries to keep cache small)
-            if (allTxMap[key]?.length) p._transferHistory=allTxMap[key].slice(0,5);
+            // Transfer history — keep all entries (no limit)
+            if (allTxMap[key]?.length) p._transferHistory=allTxMap[key];
             const realTxs=realTxMap[key];
             if (realTxs?.length){
               p._lastTransfer=realTxs[0];
@@ -2374,6 +2389,11 @@ createApp({
       if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
       if (diff < 7*86400000) return Math.floor(diff/86400000) + 'd ago';
       return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+    },
+    playerByName(name) {
+      if (!name) return null;
+      const lc = name.toLowerCase();
+      return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc) || null;
     },
     openPlayerByName(name) {
       if (!name) return;
