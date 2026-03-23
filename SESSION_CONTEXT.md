@@ -1,6 +1,7 @@
 # Session Context — Slow Football Analytics
 
 > Use this file at the start of a new Claude Code session to get up to speed instantly.
+> **Keep this file updated after every session.**
 
 ---
 
@@ -24,6 +25,32 @@ Files: `index.html` (template), `app.js` (all logic), `style.css`, `cf-worker/in
 - **Youth** — scouting jobs, academy, history scan
 - **Auction Draft** — budget tracker
 - **Clubs tab** — includes "Latest XI" sub-tab with interactive pitch visualization
+- **Analysis tab** (top-level) — tactical matchup stats across all historical GWs
+- **Matches tab** — match archive with detail view, filters, rebuild/append tools
+
+---
+
+## Analysis Tab
+
+6 matchup cards, each with dual dropdowns + drill-down table:
+1. Formation Matchups
+2. Mentality Matchups
+3. Pressing Matchups
+4. Passing Style vs Pressing
+5. Defensive Line Matchups
+6. Transition Speed vs Defensive Line
+
+Data loaded from GW chunks in match archive. Invalidates and reloads after Append GW.
+
+---
+
+## Match Archive
+
+- **Cache key**: `sf_match_archive_v3` (compact index), `sf_match_archive_v3_gw_{N}` (one chunk per GW)
+- **Build flow**: Pass 1 collect fixture IDs → Pass 2 fetch full match details (reuses cached chunks) → Pass 3 fetch submissions → save chunks + index
+- **🔄 Rebuild** button: full rebuild (reuses cached chunks for speed)
+- **➕ Append GW** button: lightweight incremental update — only fetches new fixtures, only fetches submissions for involved clubs, patches index in place. Use this after each new gameweek. Located in the Matches tab header.
+- `extractTactics(narrativeArr, club)` — the correct method name for parsing narrative tactics (NOT `parseInstructions` which doesn't exist)
 
 ---
 
@@ -83,6 +110,21 @@ SVG coords: x 0–68 (left→right), y 0–105 (attacking→GK). API sends right
 
 ---
 
+## Agent / Tamagotchi Feature
+
+Game endpoint: `GET /api/agents/status?club=Leverkusen` — returns `{ lastFed, streak, giftsCount, fedToday, activeOffer, awardedToday, serverProgress }`
+Game endpoint: `GET /api/agents/gifts?club=Leverkusen` — returns `{ gifts: [...] }`
+Feed action: `POST /api/agents/feed?club=Leverkusen` — feeds the agent (one per day, resets at UTC midnight)
+Claim action: `POST /api/agents/claim?club=Leverkusen` body `{ id: giftId }` — claims a gift player to squad
+
+**How it works**: Feed daily for 7 days → on day 7 feed triggers a random player gift. Gift expires in 48h.
+**Reroll**: Not possible. No reject/decline/reroll endpoint exists (tested: all return 403/not_found).
+**WARNING**: Do NOT call POST endpoints speculatively. Feed and claim are irreversible real game actions.
+
+**Incident (2026-03-23)**: Claude accidentally called `/feed` while probing endpoints, then called `/claim` while testing parameters. Wataru Endo (DM, 75.5, age 32, Liverpool) was added to Leverkusen squad unintentionally.
+
+---
+
 ## Key Architecture Notes
 
 - **No build step** — Vue 3 runtime-only via CDN. Template in `index.html`, logic in `app.js`.
@@ -90,6 +132,7 @@ SVG coords: x 0–68 (left→right), y 0–105 (attacking→GK). API sends right
 - **Cache**: `SF_CACHE_BASE` points to `sf-cache.ofersi15.workers.dev` on prod, `/sf-cache` locally.
 - **My club**: `MY_CLUB = 'Leverkusen'`
 - **Cache keys**: `sf_players_v6`, `sf_stats_v1`, `sf_tactics_v4`, `sf_submissions_all_v1`
+- **Auth**: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`
 
 ---
 
@@ -101,8 +144,9 @@ SVG coords: x 0–68 (left→right), y 0–105 (attacking→GK). API sends right
 
 ---
 
-## Possible Next Tasks (not yet built)
+## Possible Next Tasks
 
-- Run arrow accuracy fine-tuning for other formations (currently only validated on 442)
+- Add agent/tamagotchi status widget to the app (streak tracker, days until gift)
+- Run arrow accuracy fine-tuning for formations other than 442
 - Player click → full profile view from the pitch
 - Any other features Ofer requests
