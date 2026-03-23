@@ -8,4 +8,4 @@ binding = "SF_CACHE"
 id = "81b54b4f78ab4cc28490e780d719bd2c"
 
 [triggers]
-crons = ["0 0,6,12,18 * * *"]
+crons = ["0 0,6,12,18 * * *", "* * * * *"]

@@ -55,9 +55,55 @@ async function refreshSquadsCache(env) {
   }
 }
 
+// Returns true if current time is within 9am–11pm US Eastern
+function isActiveHours() {
+  const now = new Date();
+  const utcMonth = now.getUTCMonth(); // 0=Jan
+  // DST: 2nd Sun Mar → 1st Sun Nov — approximate as month 2–9
+  const estOffset = (utcMonth >= 2 && utcMonth <= 9) ? -4 : -5;
+  const estHour = (now.getUTCHours() + estOffset + 24) % 24;
+  return estHour >= 9 && estHour < 23;
+}
+
+async function refreshNegosCache(env) {
+  if (!isActiveHours()) { console.log('[negos] outside active hours, skipping'); return; }
+
+  // Check last pull time — enforce 5-min minimum, randomise up to 15 min
+  const lastPullRaw = await env.SF_CACHE.get('sf_negos_last_pull');
+  const lastPull = lastPullRaw ? parseInt(lastPullRaw, 10) : 0;
+  const elapsedMin = (Date.now() - lastPull) / 60000;
+
+  if (elapsedMin < 5) { console.log(`[negos] too soon (${elapsedMin.toFixed(1)}m), skipping`); return; }
+  // Between 5–15 min: pull with linearly increasing probability
+  if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) {
+    console.log(`[negos] random skip at ${elapsedMin.toFixed(1)}m`); return;
+  }
+
+  console.log(`[negos] pulling at ${elapsedMin.toFixed(1)}m elapsed`);
+  const r = await fetch('https://slowfootball.club/api/negotiations');
+  if (!r.ok) { console.error('[negos] fetch failed:', r.status); return; }
+  const data = await r.json();
+  const fresh = Array.isArray(data) ? data : (data.negotiations || data.items || []);
+
+  // Merge with accumulated history
+  const histRaw = await env.SF_CACHE.get('sf_negos_history_v1');
+  const historical = histRaw ? JSON.parse(histRaw) : [];
+  const map = new Map(historical.map(n => [n.id, n]));
+  fresh.forEach(n => map.set(n.id, n));
+  const merged = [...map.values()].sort((a, b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+
+  await env.SF_CACHE.put('sf_negos_history_v1', JSON.stringify(merged));
+  await env.SF_CACHE.put('sf_negos_last_pull', String(Date.now()));
+  console.log(`[negos] saved ${merged.length} records (${fresh.length} fresh, ${historical.length} historical)`);
+}
+
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(refreshSquadsCache(env));
+    if (event.cron === '* * * * *') {
+      ctx.waitUntil(refreshNegosCache(env));
+    } else {
+      ctx.waitUntil(refreshSquadsCache(env));
+    }
   },
 
   async fetch(request, env) {
