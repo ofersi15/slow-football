@@ -333,7 +333,7 @@ createApp({
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
       espionageSubTab: 'negos', espionageSearch: '', espionageSort: 'club',
-      espionageNegoSearch: '', negoExpandedId: null,
+      espionageNegoSearch: '', negoExpandedId: null, negoShowAll: false, negoShowAllModal: false,
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -639,11 +639,14 @@ createApp({
     },
     espionageNegoFiltered() {
       const q = (this.espionageNegoSearch||'').trim().toLowerCase();
-      let list = q ? this.espionageNegos.filter(n =>
-        (n.playerName||'').toLowerCase().includes(q) ||
-        (n.buyer||'').toLowerCase().includes(q) ||
-        (n.seller||'').toLowerCase().includes(q)
-      ) : [...this.espionageNegos];
+      const cutoff = Date.now() - 14 * 24 * 3600 * 1000; // 2 weeks
+      let list = this.espionageNegos.filter(n => {
+        if (!this.negoShowAll && !q && new Date(n.updatedAt||0).getTime() < cutoff) return false;
+        if (!q) return true;
+        return (n.playerName||'').toLowerCase().includes(q) ||
+               (n.buyer||'').toLowerCase().includes(q) ||
+               (n.seller||'').toLowerCase().includes(q);
+      });
       const ns = this.negoSort;
       if (ns==='player_a') list.sort((a,b)=>(a.playerName||'').localeCompare(b.playerName||''));
       else if (ns==='player_d') list.sort((a,b)=>(b.playerName||'').localeCompare(a.playerName||''));
@@ -659,6 +662,13 @@ createApp({
       const name = (this.selectedPlayer.Player||this.selectedPlayer.name||'').toLowerCase();
       if (!name) return [];
       return this.espionageNegos.filter(n => (n.playerName||'').toLowerCase() === name);
+    },
+    selectedPlayerNegosVisible() {
+      const all = this.selectedPlayerNegos;
+      if (this.negoShowAllModal) return all;
+      const cutoff = Date.now() - 30 * 24 * 3600 * 1000; // 1 month
+      const recent = all.filter(n => new Date(n.updatedAt||0).getTime() >= cutoff);
+      return recent.length ? recent : all.slice(0, 5); // always show at least 5
     },
     mySquadByPosition() {
       const order = ['GK','FB','CB','DM','CM','AM','WF','CF'];
@@ -1013,7 +1023,7 @@ createApp({
       this.page=0;
     },
     async openModal(p, jobCtx=null) {
-      this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null;
+      this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null; this.negoShowAllModal=false;
       // Load negos history if not already populated
       if (this.espionageNegos.length === 0) {
         try {
@@ -1100,17 +1110,16 @@ createApp({
       serverCacheDelete(STATS_CACHE_KEY);
       try { localStorage.removeItem(PLAYERS_CACHE_KEY); } catch(e){}
       try { localStorage.removeItem(STATS_CACHE_KEY); } catch(e){}
-      // Also clear youth and club caches
       try { localStorage.removeItem('sf_youth_hist_v2'); } catch(e){}
       try { localStorage.removeItem('sf_youth_idx_v2'); } catch(e){}
       try { localStorage.removeItem('sf_club_v1'); } catch(e){}
-      this.allPlayers=[]; this.loaded=false; this.playersCacheDate=null;
+      // Keep UI visible — refresh in background without clearing allPlayers
       this.statsEnriched=false; this.statsProgress=0;
-      // Reset tab states so next visit re-fetches
       this.youthHistLoaded=false; this.youthHistCacheDate=null;
       this.youthLoaded=false;
       this.clubLoaded=false; this.clubLoading=false;
-      this.fetchFreshData(true);
+      this.playersRefreshing=true;
+      this.fetchFreshData(false);  // background — existing UI stays visible
     },
 
     // Background stats enrichment — fetch full season stats per player from /api/player-stats
@@ -2415,7 +2424,18 @@ createApp({
           const cached = rawCached ? await parseAsync(rawCached) : null;
           if (cached) {
             this.espionageClubs = cached.clubs || [];
-            this.espionageNegos = cached.negos || [];
+            // Always merge with sf_negos_history_v1 so CF-worker updates show up immediately
+            let negos = cached.negos || [];
+            try {
+              const hRaw = await serverCacheGet('sf_negos_history_v1');
+              if (hRaw) {
+                const hist = JSON.parse(hRaw);
+                const m = new Map(negos.map(n => [n.id, n]));
+                hist.forEach(n => m.set(n.id, n));
+                negos = [...m.values()].sort((a,b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+              }
+            } catch(e) {}
+            this.espionageNegos = negos;
             this.espionageCacheDate = new Date(cached.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
             this.espionageLoaded = true;
             this.espionageLoading = false;
@@ -2434,36 +2454,25 @@ createApp({
         const clubs = [...clubSet].sort();
         const total = clubs.length;
 
-        // Fetch negotiations
+        // Load negotiations — prefer CF worker's KV history (updated every 5–15 min), API as fallback
         let negos = [];
         try {
-          const r = await fetch(`${API}/negotiations`).then(r => r.json());
-          const all = Array.isArray(r) ? r : (r.negotiations || r.items || []);
-          const freshNegos = all.map(n => ({
-              id: n.id,
-              playerName: n.playerName,
-              buyer: n.buyer || n.toClub,
-              seller: n.seller || n.fromClub,
-              amount: n.amount,
-              status: n.status,
-              subStatus: n.subStatus,
-              via: n.via,
-              lastActionBy: n.lastActionBy,
-              history: n.history || [],
-              createdAt: n.createdAt,
-              updatedAt: n.updatedAt || n.ts,
-            }));
-          // Merge with historical negos — accumulate all records, prefer fresh data for same id
-          let historical = [];
-          try {
-            const hRaw = await serverCacheGet('sf_negos_history_v1');
-            if (hRaw) historical = JSON.parse(hRaw);
-          } catch(e) {}
-          const negoMap = new Map(historical.map(n => [n.id, n]));
-          freshNegos.forEach(n => negoMap.set(n.id, n)); // fresh overwrites same id
-          negos = [...negoMap.values()].sort((a,b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
-          // Persist accumulated history separately (permanent)
-          serverCacheSet('sf_negos_history_v1', JSON.stringify(negos));
+          const hRaw = await serverCacheGet('sf_negos_history_v1');
+          if (hRaw) {
+            negos = JSON.parse(hRaw);
+          } else {
+            // First-time fallback: hit the API directly
+            const r = await fetch(`${API}/negotiations`).then(r => r.json());
+            const all = Array.isArray(r) ? r : (r.negotiations || r.items || []);
+            negos = all.map(n => ({
+              id: n.id, playerName: n.playerName,
+              buyer: n.buyer || n.toClub, seller: n.seller || n.fromClub,
+              amount: n.amount, status: n.status, subStatus: n.subStatus,
+              via: n.via, lastActionBy: n.lastActionBy,
+              history: n.history || [], createdAt: n.createdAt, updatedAt: n.updatedAt || n.ts,
+            })).sort((a,b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+            serverCacheSet('sf_negos_history_v1', JSON.stringify(negos));
+          }
         } catch(e) {}
 
         // Batch fetch staff + facilities for all clubs

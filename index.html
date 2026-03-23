@@ -268,6 +268,12 @@
 
       <!-- ── MY SQUAD TAB ── -->
       <div v-if="activeTab==='squad'" class="content" style="padding:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-weight:700;font-size:14px">My Squad</span>
+          <span v-if="playersCacheDate" class="c-gray" style="font-size:11px">cached {{playersCacheDate}}</span>
+          <button v-if="!playersRefreshing" class="btn" style="font-size:11px;margin-left:auto" @click="clearPlayersCache()">⟳ Refresh</button>
+          <span v-if="playersRefreshing" style="margin-left:auto;font-size:11px;color:#ffa657">⟳ refreshing…</span>
+        </div>
 
         <!-- ── SAVED LINEUP ── -->
         <div v-if="lineupWithStats" class="card" style="margin-bottom:20px">
@@ -2021,14 +2027,17 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
         <input type="text" v-model="espionageNegoSearch" placeholder="Search player, club…" style="width:200px">
-        <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} negotiations · all-time history</span>
+        <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} shown · {{espionageNegos.length}} total</span>
+        <button v-if="!negoShowAll && espionageNegos.length > espionageNegoFiltered.length" class="btn" style="font-size:10px;padding:2px 8px" @click="negoShowAll=true">Show all {{espionageNegos.length}}</button>
+        <button v-if="negoShowAll" class="btn" style="font-size:10px;padding:2px 8px" @click="negoShowAll=false">Last 2 weeks only</button>
       </div>
       <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
         <table style="font-size:11px">
           <thead>
             <tr style="cursor:pointer">
               <th style="min-width:110px" @click="negoSortBy('player')">Player{{negoSortIcon('player')}}</th>
-              <th style="min-width:55px">Pos / Age</th>
+              <th style="min-width:35px">Pos</th>
+              <th style="min-width:30px">Age</th>
               <th style="min-width:45px">Rating</th>
               <th @click="negoSortBy('parties')">Seller → Buyer{{negoSortIcon('parties')}}</th>
               <th @click="negoSortBy('fee')">Amount{{negoSortIcon('fee')}}</th>
@@ -2045,14 +2054,12 @@
                 <td style="font-weight:600">
                   <span @click.stop="openPlayerByName(n.playerName)" style="cursor:pointer;color:#79c0ff;border-bottom:1px dotted #79c0ff40">{{n.playerName||'?'}}</span>
                 </td>
-                <td style="white-space:nowrap;color:#8b949e">
-                  <span style="font-size:10px">{{playerByName(n.playerName)?.Position||'—'}}</span>
-                  <span class="c-gray" style="font-size:10px"> · {{playerByName(n.playerName)?.Age||'?'}}</span>
-                </td>
+                <td style="font-size:10px;color:#8b949e">{{playerByName(n.playerName)?.Position||'—'}}</td>
+                <td style="font-size:10px;color:#8b949e">{{playerByName(n.playerName)?.Age||'—'}}</td>
                 <td>
-                  <span v-if="playerByName(n.playerName)?._posRating"
-                    :style="{fontWeight:700,color:playerByName(n.playerName)._posRating>=80?'#7ee787':playerByName(n.playerName)._posRating>=70?'#ffa657':'#e6edf3',fontSize:'11px'}">
-                    {{playerByName(n.playerName)._posRating.toFixed(1)}}
+                  <span v-if="playerByName(n.playerName)?._gameRating"
+                    :style="{fontWeight:700,color:playerByName(n.playerName)._gameRating>=80?'#7ee787':playerByName(n.playerName)._gameRating>=70?'#ffa657':'#e6edf3',fontSize:'11px'}">
+                    {{playerByName(n.playerName)._gameRating.toFixed(1)}}
                   </span>
                   <span v-else class="c-gray" style="font-size:10px">—</span>
                 </td>
@@ -2080,7 +2087,7 @@
                 </td>
               </tr>
               <tr v-if="negoExpandedId===n.id&&n.history&&n.history.length>1" :key="'h-'+n.id">
-                <td colspan="9" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
+                <td colspan="10" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
                   <div style="font-size:10px;font-weight:600;color:#8b949e;margin-bottom:6px">Bid history ({{n.history.length}} rounds)</div>
                   <div style="display:flex;flex-direction:column;gap:5px">
                     <div v-for="(h,hi) in n.history" :key="hi" style="display:flex;align-items:center;gap:10px">
@@ -2594,9 +2601,14 @@
 
       <!-- Negotiations history -->
       <template v-if="selectedPlayerNegos.length">
-        <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Negotiations</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="font-weight:700;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Negotiations</div>
+          <span class="c-gray" style="font-size:10px">{{selectedPlayerNegosVisible.length}} / {{selectedPlayerNegos.length}}</span>
+          <button v-if="selectedPlayerNegos.length > selectedPlayerNegosVisible.length && !negoShowAllModal" class="btn" style="font-size:10px;padding:1px 6px;margin-left:auto" @click="negoShowAllModal=true">Show all</button>
+          <button v-if="negoShowAllModal" class="btn" style="font-size:10px;padding:1px 6px;margin-left:auto" @click="negoShowAllModal=false">Recent only</button>
+        </div>
         <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:5px">
-          <div v-for="n in selectedPlayerNegos" :key="n.id" style="background:#0d1117;border-radius:6px;padding:7px 10px;border:1px solid #21262d">
+          <div v-for="n in selectedPlayerNegosVisible" :key="n.id" style="background:#0d1117;border-radius:6px;padding:7px 10px;border:1px solid #21262d">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
               <div style="display:flex;align-items:center;gap:6px">
                 <span v-if="n.status==='pending'" :style="{background:'#1f3a5a',color:'#79c0ff',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">📨 Offer out</span>
