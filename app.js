@@ -252,7 +252,7 @@ createApp({
       posFilter: new Set(ALL_POSITIONS),
       maxAge: 40, search: '',
       hideOwn: false, hideVacant: true, managedOnly: false, forSaleOnly: false,
-      transferListedOnly: false, injuredOnly: false,
+      transferListedOnly: false, injuredOnly: false, hideRetiring: true,
       sortCol: '_gameRating', sortDir: -1, page: 0,
       // Per-position rating filters — each pos has its own min threshold
       posRatingFilters: {GK:60,FB:60,CB:60,DM:60,CM:60,AM:60,WF:60,CF:60},
@@ -725,6 +725,7 @@ createApp({
         if (this.forSaleOnly && (!p._managed || p.notForSale)) return false;
         if (this.transferListedOnly && !p._transferListed) return false;
         if (this.injuredOnly && !p.injured && !p.suspended) return false;
+        if (this.hideRetiring && p.retiring) return false;
         // Attribute filters
         for (const [attr, minVal] of Object.entries(this.attrFilters)) {
           if (minVal > 0 && (p[attr]||0) < minVal) return false;
@@ -2418,13 +2419,7 @@ createApp({
         try {
           const r = await fetch(`${API}/negotiations`).then(r => r.json());
           const all = Array.isArray(r) ? r : (r.negotiations || r.items || []);
-          const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-          negos = all
-            .filter(n => {
-              const d = n.updatedAt ? new Date(n.updatedAt).getTime() : (n.ts || 0);
-              return d > twoWeeksAgo;
-            })
-            .map(n => ({
+          const freshNegos = all.map(n => ({
               id: n.id,
               playerName: n.playerName,
               buyer: n.buyer || n.toClub,
@@ -2437,8 +2432,18 @@ createApp({
               history: n.history || [],
               createdAt: n.createdAt,
               updatedAt: n.updatedAt || n.ts,
-            }))
-            .sort((a,b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+            }));
+          // Merge with historical negos — accumulate all records, prefer fresh data for same id
+          let historical = [];
+          try {
+            const hRaw = await serverCacheGet('sf_negos_history_v1');
+            if (hRaw) historical = JSON.parse(hRaw);
+          } catch(e) {}
+          const negoMap = new Map(historical.map(n => [n.id, n]));
+          freshNegos.forEach(n => negoMap.set(n.id, n)); // fresh overwrites same id
+          negos = [...negoMap.values()].sort((a,b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+          // Persist accumulated history separately (permanent)
+          serverCacheSet('sf_negos_history_v1', JSON.stringify(negos));
         } catch(e) {}
 
         // Batch fetch staff + facilities for all clubs
