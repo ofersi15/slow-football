@@ -43,14 +43,14 @@ async function refreshSquadsCache(env) {
   const squads = await squadsRes.json();
   const clubCount = Object.keys(squads).length;
 
-  await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }), { expirationTtl: 24 * 3600 });
+  await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }));
   console.log(`[cron] squads refreshed: ${clubCount} clubs`);
 
   // Also fetch tables (lightweight) and cache separately
   const tablesRes = await fetch(`${GAME_API}/tables/from-fixtures`, { headers });
   if (tablesRes.ok) {
     const tables = await tablesRes.json();
-    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }), { expirationTtl: 24 * 3600 });
+    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
     console.log('[cron] tables refreshed');
   }
 }

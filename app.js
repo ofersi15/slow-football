@@ -76,7 +76,7 @@ async function serverCacheGet(key, noStore = false) {
 async function serverCacheSet(key, str) {
   if (location.protocol === 'file:') return;
   try {
-    await fetch(`${SF_CACHE_BASE}/${key}`, {
+    await fetch(`${SF_CACHE_BASE}/${key}?permanent=1`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: str,
@@ -1098,8 +1098,9 @@ createApp({
     },
 
     // Background stats enrichment — fetch full season stats per player from /api/player-stats
-    async enrichStats() {
-      if (this.statsEnriching || this.statsEnriched) return;
+    async enrichStats(forceRefresh = false) {
+      if (this.statsEnriching || (this.statsEnriched && !forceRefresh)) return;
+      if (forceRefresh) { this.statsEnriched = false; }
       // Try loading from stats cache first (server → localStorage fallback)
       try {
         let cached = await serverCacheGet(STATS_CACHE_KEY);
@@ -1109,10 +1110,8 @@ createApp({
           const _spa0 = performance.now();
           const {statsMap, ts} = await parseAsync(cached);
           console.log('[SF] parseAsync stats:', Math.round(performance.now()-_spa0)+'ms');
-          const age = Date.now() - ts;
-          if (age < 7*24*60*60*1000 && statsMap) {  // 7-day TTL — stats only update on weekends
-            // Pre-compute the new array BEFORE touching Vue's reactive state,
-            // then yield one frame so the browser isn't blocked mid-paint.
+          if (statsMap) {
+            // Always apply cached stats immediately
             let applied = 0;
             const newPlayers = this.allPlayers.map(p => {
               const s = statsMap[(p.Player||'').toLowerCase()];
@@ -1121,11 +1120,12 @@ createApp({
               return Object.freeze({...p, ...s});
             });
             if (applied > 0) {
-              // Yield to the browser so the current frame finishes rendering
-              // before we trigger the reactive allPlayers update + re-render.
               await new Promise(r => requestAnimationFrame(r));
               this.allPlayers = newPlayers;
               this.statsEnriched = true;
+              // Background refresh if >24h old
+              const age = Date.now() - ts;
+              if (age > 24*60*60*1000) { setTimeout(() => this.enrichStats(true), 2000); }
               return;
             }
           }
@@ -1611,44 +1611,47 @@ createApp({
             const staticAge  = now - (cached.staticSavedAt || 0);
             const enc        = encodeURIComponent(MY_CLUB);
 
-            if (liveAge < LIVE_TTL && histAge < HIST_TTL && staticAge < STATIC_TTL) {
-              // Fully fresh → serve from cache immediately
-              applyCache(cached);
-              this.youthLoading = false;
-              return;
-            }
+            // Always show cached data immediately
+            applyCache(cached);
+            this.youthLoading = false;
+
+            const needsRefresh = liveAge >= LIVE_TTL || histAge >= HIST_TTL || staticAge >= STATIC_TTL;
+            if (!needsRefresh) return;
 
             if (histAge < HIST_TTL) {
-              // History fresh, but live/static may be stale → incremental refresh
-              this.youthMsg = 'Refreshing scouting data…';
+              // History fresh — background refresh of live/static only
+              setTimeout(async () => {
               const fetchLive = liveAge >= LIVE_TTL;
               const fetchStatic = staticAge >= STATIC_TTL;
 
-              const [sjRes, acRes, facRes, staffRes] = await Promise.all([
-                fetchLive   ? fetch(`${API}/scouting/jobs?club=${enc}`).then(r=>r.json())     : Promise.resolve(null),
-                fetchLive   ? fetch(`${API}/academy?club=${enc}`).then(r=>r.json())           : Promise.resolve(null),
-                fetchStatic ? fetch(`${API}/facilities?club=${enc}`).then(r=>r.json())        : Promise.resolve(null),
-                fetchStatic ? fetch(`${API}/staff/effects?club=${enc}`).then(r=>r.json())     : Promise.resolve(null),
-              ]);
-
-              const newCache = {
-                ...cached,
-                savedAt      : fetchLive   ? now : cached.savedAt,
-                staticSavedAt: fetchStatic ? now : cached.staticSavedAt,
-                ...(fetchLive   ? { cap: sjRes.cap||{}, scouts: sjRes.items||[], academy: buildAcademy(acRes.items) } : {}),
-                ...(fetchStatic ? { facilities: facRes||{}, staff: (staffRes&&staffRes.ok ? staffRes.effects : {})||{} } : {}),
-              };
-              try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
-              applyCache(newCache);
-              this.youthLoading = false;
+                try {
+                  const fetchLive = liveAge >= LIVE_TTL;
+                  const fetchStatic = staticAge >= STATIC_TTL;
+                  const [sjRes, acRes, facRes, staffRes] = await Promise.all([
+                    fetchLive   ? fetch(`${API}/scouting/jobs?club=${enc}`).then(r=>r.json())     : Promise.resolve(null),
+                    fetchLive   ? fetch(`${API}/academy?club=${enc}`).then(r=>r.json())           : Promise.resolve(null),
+                    fetchStatic ? fetch(`${API}/facilities?club=${enc}`).then(r=>r.json())        : Promise.resolve(null),
+                    fetchStatic ? fetch(`${API}/staff/effects?club=${enc}`).then(r=>r.json())     : Promise.resolve(null),
+                  ]);
+                  const newCache = {
+                    ...cached,
+                    savedAt      : fetchLive   ? now : cached.savedAt,
+                    staticSavedAt: fetchStatic ? now : cached.staticSavedAt,
+                    ...(fetchLive   ? { cap: sjRes.cap||{}, scouts: sjRes.items||[], academy: buildAcademy(acRes.items) } : {}),
+                    ...(fetchStatic ? { facilities: facRes||{}, staff: (staffRes&&staffRes.ok ? staffRes.effects : {})||{} } : {}),
+                  };
+                  try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
+                  applyCache(newCache);
+                } catch(e) {}
+              }, 100);
               return;
             }
           }
         } catch(e) { /* ignore cache errors, fall through to full fetch */ }
       }
 
-      // ── Full fetch ─────────────────────────────────────────────────────────
-      this.youthMsg = 'Fetching scouting data…';
+      // ── Full fetch (only reaches here if no cache at all, or forceRefresh) ──
+      this.youthMsg = this.youthLoaded ? '' : 'Fetching scouting data…';
       try {
         const enc = encodeURIComponent(MY_CLUB);
         const [sjRes, acRes, facRes, staffRes] = await Promise.all([
@@ -1995,12 +1998,14 @@ createApp({
         if (!forceRefresh) {
           try {
             const cached = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-            if (cached && (Date.now() - cached.savedAt) < TTL) {
+            if (cached) {
               this.clubFacData = cached.facilities;
               this.clubFacQuotes = cached.quotes||{};
               this.clubStaff = cached.staff||{};
               this.clubStaffEffects = cached.effects||{};
-              this.clubLoaded = true; this.clubLoading = false; this.clubMsg = ''; return;
+              this.clubLoaded = true; this.clubLoading = false; this.clubMsg = '';
+              if (Date.now() - cached.savedAt > TTL) { setTimeout(() => this.loadClub(true), 100); }
+              return;
             }
           } catch(e) {}
         }
@@ -2387,13 +2392,17 @@ createApp({
           let rawCached = await serverCacheGet(CACHE_KEY);
           if (!rawCached) rawCached = localStorage.getItem(CACHE_KEY);
           const cached = rawCached ? await parseAsync(rawCached) : null;
-          if (cached && (Date.now() - cached.savedAt) < TTL) {
+          if (cached) {
             this.espionageClubs = cached.clubs || [];
             this.espionageNegos = cached.negos || [];
             this.espionageCacheDate = new Date(cached.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
             this.espionageLoaded = true;
             this.espionageLoading = false;
             this.loadEspionageSubmissions();
+            // Background refresh if stale
+            if (Date.now() - cached.savedAt > TTL) {
+              setTimeout(() => this.loadEspionage(true), 100);
+            }
             return;
           }
         } catch(e) {}
@@ -2742,7 +2751,7 @@ createApp({
         const raw = await serverCacheGet(SUBMISSIONS_CACHE_KEY);
         if (!raw) return;
         const data = await parseAsync(raw);
-        if (data?.clubs && (Date.now() - data.builtAt) < SUBMISSIONS_CACHE_TTL) {
+        if (data?.clubs) {
           for (const [club, byGw] of Object.entries(data.clubs)) {
             if (!this.submissionsCache[club]) this.submissionsCache[club] = byGw;
           }
