@@ -11,6 +11,7 @@ Single-page Vue 3 app (CDN, no build) for fantasy football analytics at **https:
 Repo: **https://github.com/ofersi15/slow-football**
 Auto-deploys from `main` branch via Cloudflare Pages (~60s).
 Always commit + push after every change.
+CF cache worker (`sf-cache`) must be separately deployed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 Files: `index.html` (template), `app.js` (all logic), `style.css`, `cf-worker/index.js` (KV cache worker)
 
@@ -18,15 +19,81 @@ Files: `index.html` (template), `app.js` (all logic), `style.css`, `cf-worker/in
 
 ## Tabs Built
 
-- **Standings** — league table
-- **Player Stats** — filterable stats table, partial-badge for incomplete players
-- **Trade Analyzer** — compare rosters
-- **Espionage** — opponent scouting, auto-loads on start
+- **Scout** — filterable player table with sidebar filters (search, position, ratings, age, flags)
+- **My Squad** — Leverkusen squad management
+- **Moneyball** — value analysis
+- **Analysis** — tactical matchup stats across all historical GWs
 - **Youth** — scouting jobs, academy, history scan
-- **Auction Draft** — budget tracker
-- **Clubs tab** — includes "Latest XI" sub-tab with interactive pitch visualization
-- **Analysis tab** (top-level) — tactical matchup stats across all historical GWs
-- **Matches tab** — match archive with detail view, filters, rebuild/append tools
+- **My Club** — facilities, staff, training
+- **Clubs** — all clubs, includes "Latest XI" sub-tab with interactive pitch visualization
+- **Espionage** (labelled "Transfers") — opponent scouting, negotiations, submissions
+- **Matches** — match archive with detail view, filters, rebuild/append tools
+
+---
+
+## Scout Tab Layout
+
+Sidebar filters sit UNDER the tab bar (inside `.main`, wrapped in a flex row with `.content`). Tabs span full width.
+
+```
+.layout (flex-col, full height)
+  .main (flex-col, flex:1)
+    .header (tabs row — full width)
+    div (display:flex, flex:1, overflow:hidden)
+      .sidebar (v-show="activeTab==='scout'", 245px)
+      .content (flex:1)
+```
+
+**Sidebar filters**: search, position toggle, min rating per position, max age, checkboxes (hide own/vacant/managed/for-sale/transfer-listed/injured/retiring), attr filters, weighted rating config.
+
+---
+
+## Caching Architecture
+
+### Philosophy: Stale-While-Revalidate everywhere
+- If cache exists → show immediately, refresh in background if stale
+- Only block UI when absolutely no cache exists
+- All KV writes are **permanent** (no expiry) — data lives forever until replaced
+
+### `serverCacheSet(key, str)` always appends `?permanent=1`
+
+### CF Cron (sf-cache worker, `cf-worker/wrangler.toml`)
+- Runs 4x/day: `0 0,6,12,18 * * *` (midnight, 6am, 12pm, 6pm UTC)
+- Fetches all squads + league tables from game API
+- Stores as `sf_squads_raw_v1` and `sf_tables_raw_v1` in KV (permanent)
+- Requires secrets: `SF_USERNAME`, `SF_PASSWORD` (set via `wrangler secret put`)
+- App reads `sf_squads_raw_v1` first in `fetchFreshData()` — skips per-club API calls if <8h old
+
+### Cache keys
+| Key | Content | TTL/Strategy |
+|-----|---------|------|
+| `sf_players_v6` | Processed players + meta | 6h — bg refresh if stale |
+| `sf_stats_v1` | Player stats | show cached always, bg refresh if >24h |
+| `sf_squads_raw_v1` | Raw bulk squads (cron-populated) | permanent, replaced each cron |
+| `sf_tables_raw_v1` | League tables (cron-populated) | permanent |
+| `sf_espionage_v3` | Espionage clubs + negos | show cached always, bg refresh if >30min |
+| `sf_negos_history_v1` | **Accumulated all-time nego history** | permanent, merges forever |
+| `sf_youth_idx_v2` | Youth data (localStorage only) | show cached always, bg refresh if stale |
+| `sf_club_v1` | My Club data (localStorage only) | show cached always, bg refresh if >30min |
+| `sf_match_archive_v3` | Match archive index | permanent |
+| `sf_match_archive_v3_gw_{N}` | Per-GW match chunks | permanent |
+| `SUBMISSIONS_CACHE_KEY` | Submissions by club | no TTL — always use cached |
+
+### Negotiations / Transfer history
+- **Never delete old records** — accumulated in `sf_negos_history_v1` forever
+- On each espionage refresh: fetch fresh negos, merge with `sf_negos_history_v1` by ID (fresh data wins for same ID)
+- 14-day filter removed — all historical deals preserved
+
+---
+
+## Player Flags (game update 2026-03-23)
+New fields from game API — badges shown automatically when present:
+- `retiring` → 🚨 retiring badge (red), "hide retiring" filter in sidebar (default ON)
+- `homegrown` → 🏠 HG badge (green)
+- `slowIcon` / `isSlowIcon` / `icon` → ⭐ icon badge (gold)
+- `inAcademy` → 🎓 acad badge (blue)
+
+Badges shown in: scout table (player name cell) + player detail panel header.
 
 ---
 
@@ -47,81 +114,34 @@ Data loaded from GW chunks in match archive. Invalidates and reloads after Appen
 ## Match Archive
 
 - **Cache key**: `sf_match_archive_v3` (compact index), `sf_match_archive_v3_gw_{N}` (one chunk per GW)
-- **Build flow**: Pass 1 collect fixture IDs → Pass 2 fetch full match details (reuses cached chunks) → Pass 3 fetch submissions → save chunks + index
 - **🔄 Rebuild** button: full rebuild (reuses cached chunks for speed)
-- **➕ Append GW** button: lightweight incremental update — only fetches new fixtures, only fetches submissions for involved clubs, patches index in place. Use this after each new gameweek. Located in the Matches tab header.
-- `extractTactics(narrativeArr, club)` — the correct method name for parsing narrative tactics (NOT `parseInstructions` which doesn't exist)
+- **➕ Append GW** button: lightweight incremental update — only fetches new fixtures, only fetches submissions for involved clubs, patches index in place. Use after each new gameweek.
+- `extractTactics(narrativeArr, club)` — correct method for parsing narrative tactics (NOT `parseInstructions`)
 
 ---
 
-## Clubs Tab / Latest XI — Current State
-
-### What's built
-- Pitch SVG (`viewBox="-3 -3 74 111"`, max-width 480px, max-height 78vh)
-- Players shown as colored circles with position/name/rating labels
-- **Run arrows** (dashed lines with arrowheads) from each player toward their run target
-- Hover tooltip: all 12 attrs + fitness/form/morale
-- Subs panel (right sidebar)
-- Roles panel (captain/penalty/freekick/corner)
-- "↺ Reload" button to force-refresh submission
-- **Last club persistence**: saves `sf_last_club` to localStorage, restores on page load (800ms delay)
-- "View XI" button in clubs table
-- Full squad table below pitch (sortable)
+## Clubs Tab / Latest XI
 
 ### Run Arrow Coordinate System (HARD-WON — do not change without reason)
 
-The game API stores runs in `submission.runs` keyed by slot (WM1, WM2, CM1, CM2, FB2, etc.).
-
-**xi array order**: right-side players first → [GK, RFB, RCB, LCB, LFB, RWM, RCM, LCM, LWM, RCF, LCF]
-**Slot numbering**: slot1 = right-side (first of each type), slot2 = left-side (second of each type)
-
-**Coordinate formulas** (in `pitchLayout()` in app.js):
-
 ```javascript
-// x: game uses 0–90 unit width spanning 68m pitch
 runX = (run.x / 90) * 68
-
-// slot1 (right-side: WM1, CM1, FB1...):
-// Game uses 150-unit coord space; pitch = y[27.5, 122.5] (95 units = 105m SVG)
-runY = (run.y - 27.5) / 95 * 105
-
-// slot2 (left-side: WM2, CM2, FB2...):
-// Flipped: y=0→GK end, y=100→attacking end
-runY = 105 - (run.y / 100) * 105
+// slot1 (right-side): runY = (run.y - 27.5) / 95 * 105
+// slot2 (left-side):  runY = 105 - (run.y / 100) * 105
 ```
 
-**Verified against game screenshot** with Leverkusen 442 formation:
-| Player | Slot | Expected direction | Result |
-|--------|------|--------------------|--------|
-| Martinelli | WM1 | Straight up, past CF | ✓ x≈60, y≈12 |
-| Palacios | CM1 | Down-left toward DM | ✓ x≈38, y≈68 |
-| Maza | CM2 | Up-right toward CF | ✓ x≈37, y≈36 |
-| Tella | WM2 | Up-right toward center | ✓ x≈22, y≈36 |
-| Grimaldo | FB2 | Up left flank | ✓ x≈12, y≈32 |
-
-### FORMATION_SLOT_POS
-
-SVG coords: x 0–68 (left→right), y 0–105 (attacking→GK). API sends right-side first, so x-values in the positions array are manually placed correctly (right players at higher x).
-
-```javascript
-'442': [GK(34,97), RFB(60,78), RCB(45,78), LCB(23,78), LFB(8,78),
-        RWM(59,55), RCM(44,55), LCM(24,55), LWM(9,55), RCF(44,20), LCF(24,20)]
-```
+`'442': [GK(34,97), RFB(60,78), RCB(45,78), LCB(23,78), LFB(8,78), RWM(59,55), RCM(44,55), LCM(24,55), LWM(9,55), RCF(44,20), LCF(24,20)]`
 
 ---
 
 ## Agent / Tamagotchi Feature
 
-Game endpoint: `GET /api/agents/status?club=Leverkusen` — returns `{ lastFed, streak, giftsCount, fedToday, activeOffer, awardedToday, serverProgress }`
-Game endpoint: `GET /api/agents/gifts?club=Leverkusen` — returns `{ gifts: [...] }`
-Feed action: `POST /api/agents/feed?club=Leverkusen` — feeds the agent (one per day, resets at UTC midnight)
-Claim action: `POST /api/agents/claim?club=Leverkusen` body `{ id: giftId }` — claims a gift player to squad
-
-**How it works**: Feed daily for 7 days → on day 7 feed triggers a random player gift. Gift expires in 48h.
-**Reroll**: Not possible. No reject/decline/reroll endpoint exists (tested: all return 403/not_found).
-**WARNING**: Do NOT call POST endpoints speculatively. Feed and claim are irreversible real game actions.
-
-**Incident (2026-03-23)**: Claude accidentally called `/feed` while probing endpoints, then called `/claim` while testing parameters. Wataru Endo (DM, 75.5, age 32, Liverpool) was added to Leverkusen squad unintentionally.
+- `GET /api/agents/status?club=Leverkusen` — streak, fedToday, activeOffer, giftsCount
+- `GET /api/agents/gifts?club=Leverkusen` — pending gifts
+- `POST /api/agents/feed?club=Leverkusen` — feeds (one per day). **DO NOT call without user intent.**
+- `POST /api/agents/claim?club=Leverkusen` body `{id: giftId}` — claims gift. **Irreversible.**
+- Feed 7 days → gift player on day 7 (random). No reroll possible.
+- **Incident (2026-03-23)**: accidental feed + claim → Wataru Endo (DM 75.5) added to Leverkusen
 
 ---
 
@@ -129,9 +149,8 @@ Claim action: `POST /api/agents/claim?club=Leverkusen` body `{ id: giftId }` —
 
 - **No build step** — Vue 3 runtime-only via CDN. Template in `index.html`, logic in `app.js`.
 - **Never put `</script>` at end of app.js** — breaks HTML parser.
-- **Cache**: `SF_CACHE_BASE` points to `sf-cache.ofersi15.workers.dev` on prod, `/sf-cache` locally.
+- **Cache base**: `sf-cache.ofersi15.workers.dev` on prod, `/sf-cache` locally
 - **My club**: `MY_CLUB = 'Leverkusen'`
-- **Cache keys**: `sf_players_v6`, `sf_stats_v1`, `sf_tactics_v4`, `sf_submissions_all_v1`
 - **Auth**: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`
 
 ---
@@ -139,14 +158,12 @@ Claim action: `POST /api/agents/claim?club=Leverkusen` body `{ id: giftId }` —
 ## Known Quirks
 
 - 32 players have `_incompleteStats` (only 4 position-key attrs) — shown with orange "partial" badge
-- Submission fetch: `openClubDetail(clubName)` — force-fetches fresh data, caches it
 - `mounted()` restores last club with `setTimeout(() => this.openClubDetail(lastClub), 800)`
 
 ---
 
-## Possible Next Tasks
+## User
 
-- Add agent/tamagotchi status widget to the app (streak tracker, days until gift)
-- Run arrow accuracy fine-tuning for formations other than 442
-- Player click → full profile view from the pitch
-- Any other features Ofer requests
+- Ofer (ofersi15@gmail.com) — fantasy football enthusiast, non-developer
+- Always commit + push after every change
+- Prefers minimal terminal interaction
