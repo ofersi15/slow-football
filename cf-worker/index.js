@@ -22,7 +22,44 @@ function cacheMaxAge(key) {
   return CACHE_MAX_AGE.default;
 }
 
+const GAME_API = 'https://slowfootball.club/api';
+
+async function refreshSquadsCache(env) {
+  // Login to get fresh token
+  const loginRes = await fetch(`${GAME_API}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
+  });
+  if (!loginRes.ok) { console.error('[cron] login failed:', loginRes.status); return; }
+  const { token } = await loginRes.json();
+  if (!token) { console.error('[cron] no token in login response'); return; }
+
+  const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+
+  // Fetch all squads (bulk endpoint returns dict keyed by club name)
+  const squadsRes = await fetch(`${GAME_API}/squads`, { headers });
+  if (!squadsRes.ok) { console.error('[cron] squads failed:', squadsRes.status); return; }
+  const squads = await squadsRes.json();
+  const clubCount = Object.keys(squads).length;
+
+  await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }), { expirationTtl: 24 * 3600 });
+  console.log(`[cron] squads refreshed: ${clubCount} clubs`);
+
+  // Also fetch tables (lightweight) and cache separately
+  const tablesRes = await fetch(`${GAME_API}/tables/from-fixtures`, { headers });
+  if (tablesRes.ok) {
+    const tables = await tablesRes.json();
+    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }), { expirationTtl: 24 * 3600 });
+    console.log('[cron] tables refreshed');
+  }
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(refreshSquadsCache(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const key = url.pathname.replace(/^\/sf-cache\//, '').replace(/^\//, '');

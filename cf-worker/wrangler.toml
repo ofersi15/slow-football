@@ -6,3 +6,6 @@ account_id = "ec690ff1a976f8d1f3fcd76d3f5f303b"
 [[kv_namespaces]]
 binding = "SF_CACHE"
 id = "81b54b4f78ab4cc28490e780d719bd2c"
+
+[triggers]
+crons = ["0 0,6,12,18 * * *"]

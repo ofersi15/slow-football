@@ -31,8 +31,16 @@
   <!-- MAIN APP -->
   <div v-if="loaded" class="layout">
 
-    <!-- SIDEBAR FILTERS -->
-    <div class="sidebar" v-show="activeTab==='scout'">
+    <!-- MAIN AREA -->
+    <div class="main">
+      <!-- TABS -->
+      <div class="header">
+        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id">{{t.label}}</button>
+        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden">
+      <!-- SIDEBAR FILTERS -->
+      <div class="sidebar" v-show="activeTab==='scout'">
       <div>
         <span class="label">Search</span>
         <input type="text" v-model="search" placeholder="Name, club, nation…">
@@ -179,13 +187,6 @@
       </div>
     </div>
 
-    <!-- MAIN AREA -->
-    <div class="main">
-      <!-- TABS -->
-      <div class="header">
-        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id">{{t.label}}</button>
-        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
-      </div>
 
       <!-- ── SCOUT TAB ── -->
       <div v-if="activeTab==='scout'" class="content">
@@ -2639,8 +2640,9 @@
         <div class="attr-row"><span class="c-gray">Injured</span><span>{{selectedPlayer.injured?'🤕 Yes':'No'}}</span></div>
         <div class="attr-row"><span class="c-gray">Suspended</span><span>{{selectedPlayer.suspended?'🚫 Yes':'No'}}</span></div>
       </div>
-    </div>
-  </div>
+      </div><!-- end flex wrapper -->
+    </div><!-- end .main -->
+  </div><!-- end .layout -->
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

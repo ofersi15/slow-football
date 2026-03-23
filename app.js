@@ -51,7 +51,7 @@ const TACTICS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 // Player data cache — loaded instantly on revisit; refreshed in background weekly
 const PLAYERS_CACHE_KEY = 'sf_players_v6';
 const STATS_CACHE_KEY = 'sf_stats_v1';
-const PLAYERS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+const PLAYERS_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours — CF cron pre-fetches 4x/day
 const SUBMISSIONS_CACHE_KEY = 'sf_submissions_all_v1';
 const SUBMISSIONS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours (KV TTL check)
 const SUBMISSIONS_LS_KEY = 'sf_subs_ls'; // localStorage key — no TTL, persists forever
@@ -1217,30 +1217,51 @@ createApp({
         const seen = new Set();
         const players = [];
 
-        for (let i=0; i<clubs.length; i++) {
-          if (foreground) { this.loadMsg=`Fetching squads… (${i+1}/${clubs.length})`; this.progress=10+Math.round(85*(i+1)/clubs.length); }
-          try {
-            const d = await fetch(`${API}/squads?club=${encodeURIComponent(clubs[i])}`).then(r=>r.json());
-            (d.players||[]).forEach(p=>{
-              const key=`${p.Player}|${p.Club||clubs[i]}`;
-              if (seen.has(key)) return;
-              seen.add(key);
-              p.Club=p.Club||clubs[i];
-              p._league=leagueMap[p.Club]||'other';
-              p._managed=managedClubs.has(p.Club);
-              p._gameRating=calcGameRating(p, p.Position);
-              p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
-              p._estValue=calcEstValue(p);
-              p._incompleteStats = FULL_ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length < 5;
-              const mins=p.Minutes||0;
-              p._g90=mins>=30?Math.round((p.Goals||0)/mins*90*100)/100:null;
-              p._a90=mins>=30?Math.round((p.Assists||0)/mins*90*100)/100:null;
-              p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
-              p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
-              players.push(p);
-            });
-          } catch(e){ console.warn('Failed:',clubs[i]); }
-          await new Promise(r=>setTimeout(r,80));
+        // Try pre-fetched squads cache (populated by CF cron 4x/day)
+        let preSquads = null;
+        try {
+          const cached = await serverCacheGet('sf_squads_raw_v1');
+          if (cached) {
+            const { data, ts } = JSON.parse(cached);
+            if (Date.now() - ts < 8 * 60 * 60 * 1000) { preSquads = data; console.log('[SF] using pre-fetched squads cache'); }
+          }
+        } catch(e) {}
+
+        const processPlayers = (clubName, playerList) => {
+          (playerList||[]).forEach(p => {
+            const key=`${p.Player}|${p.Club||clubName}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            p.Club=p.Club||clubName;
+            p._league=leagueMap[p.Club]||'other';
+            p._managed=managedClubs.has(p.Club);
+            p._gameRating=calcGameRating(p, p.Position);
+            p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
+            p._estValue=calcEstValue(p);
+            p._incompleteStats = FULL_ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length < 5;
+            const mins=p.Minutes||0;
+            p._g90=mins>=30?Math.round((p.Goals||0)/mins*90*100)/100:null;
+            p._a90=mins>=30?Math.round((p.Assists||0)/mins*90*100)/100:null;
+            p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
+            p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
+            players.push(p);
+          });
+        };
+
+        if (preSquads) {
+          // Use pre-fetched bulk squads — no per-club API calls needed
+          if (foreground) { this.loadMsg='Loading squads from cache…'; this.progress=50; }
+          clubs.forEach(club => processPlayers(club, preSquads[club]?.players || preSquads[club] || []));
+        } else {
+          // Fall back to per-club fetch
+          for (let i=0; i<clubs.length; i++) {
+            if (foreground) { this.loadMsg=`Fetching squads… (${i+1}/${clubs.length})`; this.progress=10+Math.round(85*(i+1)/clubs.length); }
+            try {
+              const d = await fetch(`${API}/squads?club=${encodeURIComponent(clubs[i])}`).then(r=>r.json());
+              processPlayers(clubs[i], d.players);
+            } catch(e){ console.warn('Failed:',clubs[i]); }
+            await new Promise(r=>setTimeout(r,80));
+          }
         }
 
         // Fetch transfer history + active transfer list in parallel
