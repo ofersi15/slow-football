@@ -336,6 +336,7 @@ createApp({
       espionageNegoSearch: '', negoExpandedId: null, negoShowAll: false, negoShowAllModal: false,
       negoDisplayCount: 50,
       workerLog: null, workerLogOpen: false,
+      trueValueMap: {},
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -775,14 +776,14 @@ createApp({
         {title:'⚽ Top Scorers',data:[...withGames].sort((a,b)=>(b.Goals||0)-(a.Goals||0)).slice(0,15),key:'Goals',color:'#7ee787',dec:0},
         {title:'🎩 Most Clinical (Goals/xG)',data:[...withGames].filter(p=>(p.xG||0)>=1).sort((a,b)=>((b.Goals||0)/(b.xG||1))-((a.Goals||0)/(a.xG||1))).slice(0,15),key:'Goals',color:'#7ee787',dec:0},
         {title:'🅰 Top Assisters',data:[...withGames].sort((a,b)=>(b.Assists||0)-(a.Assists||0)).slice(0,15),key:'Assists',color:'#79c0ff',dec:0},
-        {title:'💰 True Market Value',data:[...this.filteredPlayers].filter(p=>p._estValue).sort((a,b)=>(b._estValue||0)-(a._estValue||0)).slice(0,15),key:'_estValue',color:'#ffa657',dec:0},
+        {title:'💰 True Market Value',data:[...this.filteredPlayers].filter(p=>this.trueVal(p)).sort((a,b)=>this.trueVal(b)-this.trueVal(a)).slice(0,15),key:'_estValue',color:'#ffa657',dec:0},
         {title:'🔥 Highest Form',data:[...withGames].sort((a,b)=>(b.Form||0)-(a.Form||0)).slice(0,15),key:'Form',color:'#ff7b72',dec:1},
         {title:'🏃 Top Workhorses',data:[...withGames].sort((a,b)=>(b.Steals||0)+(b['Tackle %']||0)-(a.Steals||0)-(a['Tackle %']||0)).slice(0,15),key:'Steals',color:'#79c0ff',dec:0},
       ];
     },
     activeChartList() {
       const fp = this.filteredPlayers.filter(p=>p.Games>0);
-      if (this.mbChart==='value-rating') return [...this.filteredPlayers].sort((a,b)=>(b._estValue||0)-(a._estValue||0)).slice(0,20);
+      if (this.mbChart==='value-rating') return [...this.filteredPlayers].sort((a,b)=>this.trueVal(b)-this.trueVal(a)).slice(0,20);
       if (this.mbChart==='goal-eff') return [...fp].filter(p=>p.xG>0).sort((a,b)=>((b.Goals||0)-(b.xG||0))-((a.Goals||0)-(a.xG||0))).slice(0,20);
       if (this.mbChart==='assist-eff') return [...fp].filter(p=>p.xA>0).sort((a,b)=>((b.Assists||0)-(b.xA||0))-((a.Assists||0)-(a.xA||0))).slice(0,20);
       if (this.mbChart==='age-gems') return [...this.filteredPlayers].filter(p=>p.Age<=26).sort((a,b)=>(b._weightedRating||0)-(a._weightedRating||0)).slice(0,20);
@@ -922,6 +923,8 @@ createApp({
   watch: {
     filteredPlayers() { this.page = 0; },
     espionageNegoFiltered() { this.negoDisplayCount = 50; },
+    espionageNegos(v) { if (v.length) this.computeTrueValues(); },
+    allPlayers(v) { if (v.length && this.espionageNegos.length) this.computeTrueValues(); },
     mentalCfgAttrs: { handler() {
       this.recomputeWeightedRatings();
       try { localStorage.setItem('sf_mental_cfg', JSON.stringify({attrs:this.mentalCfgAttrs,pct:this.mentalWeightPct})); } catch(e){}
@@ -2404,6 +2407,80 @@ createApp({
       if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
       if (diff < 7*86400000) return Math.floor(diff/86400000) + 'd ago';
       return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+    },
+    computeTrueValues() {
+      if (!this.allPlayers.length) return;
+      const now = Date.now();
+      const twoMo = 60 * 24 * 3600 * 1000;
+      const sixMo = 180 * 24 * 3600 * 1000;
+
+      // Index negos by lower-case player name
+      const negoIdx = {};
+      for (const n of this.espionageNegos) {
+        const k = (n.playerName||'').toLowerCase();
+        if (!k) continue;
+        if (!negoIdx[k]) negoIdx[k] = [];
+        negoIdx[k].push(n);
+      }
+
+      const map = {};
+      for (const p of this.allPlayers) {
+        const k = (p.Player||'').toLowerCase();
+        const negos = negoIdx[k] || [];
+
+        // Baseline: game value × rating multiplier
+        const gv = p.Value || 0;
+        const rtg = p._gameRating || 0;
+        const mult = rtg >= 85 ? 4.0 : rtg >= 82 ? 3.0 : rtg >= 79 ? 2.2 : rtg >= 76 ? 1.7 : rtg >= 72 ? 1.3 : 1.0;
+        let best = gv * mult;
+        let src = 'formula';
+        const pick = (v, s) => { if (v > best) { best = v; src = s; } };
+
+        // Last real transfer
+        if (p._transferHistory?.length) {
+          const real = p._transferHistory.filter(t => t.isReal).sort((a,b) => new Date(b.date)-new Date(a.date));
+          if (real[0]) {
+            const age = now - new Date(real[0].date).getTime();
+            pick(real[0].amount * (age < twoMo ? 1.0 : age < sixMo ? 0.9 : 0.8), 'transfer');
+          }
+        }
+        // Active listing ask
+        if (p._listingAsk) pick(p._listingAsk, 'listing');
+
+        // Nego signals
+        for (const n of negos) {
+          if (!n.amount || n.amount < 50000) continue;
+          const age = now - new Date(n.updatedAt||0).getTime();
+          const rec = age < twoMo ? 1.0 : age < sixMo ? 0.85 : 0.7;
+          if (n.status === 'accepted') pick(n.amount * rec, 'deal');
+          else if (n.status === 'rejected') pick(n.amount * 1.15 * rec, 'rejected+15%');
+          if (n.history) {
+            for (const h of n.history) {
+              if (h.amount >= 50000) pick(h.amount * 0.9 * rec, 'bid round');
+            }
+          }
+        }
+
+        if (best > 0) {
+          const v = Math.round(best/500000)*500000 || Math.round(best/100000)*100000 || Math.round(best);
+          map[k] = { v, src };
+        }
+      }
+      this.trueValueMap = map;
+    },
+    trueVal(p) {
+      return this.trueValueMap[(p.Player||'').toLowerCase()]?.v || p._estValue || 0;
+    },
+    trueValSrc(p) {
+      return this.trueValueMap[(p.Player||'').toLowerCase()]?.src || 'formula';
+    },
+    onNegoScroll(e) {
+      const el = e.target;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 250) {
+        if (this.negoDisplayCount < this.espionageNegoFiltered.length) {
+          this.negoDisplayCount = Math.min(this.negoDisplayCount + 50, this.espionageNegoFiltered.length);
+        }
+      }
     },
     async loadWorkerLog() {
       this.workerLogOpen = true;
