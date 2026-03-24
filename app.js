@@ -331,9 +331,11 @@ createApp({
       clubTransferMap: {},
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
-      espionageClubs: [], espionageNegos: [], espionageCacheDate: null,
+      espionageClubs: [], espionageNegos: [], espionageCacheDate: null, negosLastPull: null,
       espionageSubTab: 'negos', espionageSearch: '', espionageSort: 'club',
       espionageNegoSearch: '', negoExpandedId: null, negoShowAll: false, negoShowAllModal: false,
+      negoDisplayCount: 50,
+      workerLog: null, workerLogOpen: false,
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -663,6 +665,9 @@ createApp({
       if (!name) return [];
       return this.espionageNegos.filter(n => (n.playerName||'').toLowerCase() === name);
     },
+    espionageNegoPage() {
+      return this.espionageNegoFiltered.slice(0, this.negoDisplayCount);
+    },
     selectedPlayerNegosVisible() {
       const all = this.selectedPlayerNegos;
       if (this.negoShowAllModal) return all;
@@ -916,6 +921,7 @@ createApp({
 
   watch: {
     filteredPlayers() { this.page = 0; },
+    espionageNegoFiltered() { this.negoDisplayCount = 50; },
     mentalCfgAttrs: { handler() {
       this.recomputeWeightedRatings();
       try { localStorage.setItem('sf_mental_cfg', JSON.stringify({attrs:this.mentalCfgAttrs,pct:this.mentalWeightPct})); } catch(e){}
@@ -2399,6 +2405,13 @@ createApp({
       if (diff < 7*86400000) return Math.floor(diff/86400000) + 'd ago';
       return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
     },
+    async loadWorkerLog() {
+      this.workerLogOpen = true;
+      try {
+        const raw = await serverCacheGet('sf_worker_log');
+        this.workerLog = raw ? JSON.parse(raw) : [];
+      } catch(e) { this.workerLog = []; }
+    },
     playerByName(name) {
       if (!name) return null;
       const lc = name.toLowerCase();
@@ -2437,6 +2450,8 @@ createApp({
             } catch(e) {}
             this.espionageNegos = negos;
             this.espionageCacheDate = new Date(cached.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+            // Show when negos were last pulled by CF worker
+            serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
             this.espionageLoaded = true;
             this.espionageLoading = false;
             this.loadEspionageSubmissions();
@@ -2506,6 +2521,7 @@ createApp({
         this.espionageClubs = results;
         this.espionageNegos = negos;
         this.espionageCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
         const espionageCacheStr = JSON.stringify({ savedAt: Date.now(), clubs: results, negos });
         serverCacheSet(CACHE_KEY, espionageCacheStr);  // server-side persistence
         try { localStorage.setItem(CACHE_KEY, espionageCacheStr); } catch(e) {}

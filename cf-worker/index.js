@@ -24,6 +24,17 @@ function cacheMaxAge(key) {
 
 const GAME_API = 'https://slowfootball.club/api';
 
+// Append an entry to the KV-based worker log (last 50 entries, ring buffer)
+async function appendLog(env, type, msg) {
+  try {
+    const raw = await env.SF_CACHE.get('sf_worker_log');
+    const log = raw ? JSON.parse(raw) : [];
+    log.unshift({ ts: Date.now(), type, msg });
+    if (log.length > 50) log.length = 50;
+    await env.SF_CACHE.put('sf_worker_log', JSON.stringify(log));
+  } catch(e) { console.error('[log] failed to write log:', e); }
+}
+
 async function refreshSquadsCache(env) {
   // Login to get fresh token
   const loginRes = await fetch(`${GAME_API}/auth/login`, {
@@ -31,28 +42,42 @@ async function refreshSquadsCache(env) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
   });
-  if (!loginRes.ok) { console.error('[cron] login failed:', loginRes.status); return; }
+  if (!loginRes.ok) {
+    const msg = `login failed: ${loginRes.status}`;
+    console.error('[squads]', msg);
+    await appendLog(env, 'error', `squads: ${msg}`);
+    return;
+  }
   const { token } = await loginRes.json();
-  if (!token) { console.error('[cron] no token in login response'); return; }
+  if (!token) {
+    await appendLog(env, 'error', 'squads: no token in login response');
+    return;
+  }
 
   const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
   // Fetch all squads (bulk endpoint returns dict keyed by club name)
   const squadsRes = await fetch(`${GAME_API}/squads`, { headers });
-  if (!squadsRes.ok) { console.error('[cron] squads failed:', squadsRes.status); return; }
+  if (!squadsRes.ok) {
+    const msg = `squads fetch failed: ${squadsRes.status}`;
+    console.error('[squads]', msg);
+    await appendLog(env, 'error', msg);
+    return;
+  }
   const squads = await squadsRes.json();
   const clubCount = Object.keys(squads).length;
 
   await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }));
-  console.log(`[cron] squads refreshed: ${clubCount} clubs`);
+  console.log(`[squads] refreshed: ${clubCount} clubs`);
 
   // Also fetch tables (lightweight) and cache separately
   const tablesRes = await fetch(`${GAME_API}/tables/from-fixtures`, { headers });
   if (tablesRes.ok) {
     const tables = await tablesRes.json();
     await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
-    console.log('[cron] tables refreshed');
   }
+
+  await appendLog(env, 'squads', `${clubCount} clubs refreshed`);
 }
 
 // Returns true if current time is within 9am–11pm US Eastern
@@ -66,22 +91,24 @@ function isActiveHours() {
 }
 
 async function refreshNegosCache(env) {
-  if (!isActiveHours()) { console.log('[negos] outside active hours, skipping'); return; }
+  if (!isActiveHours()) { return; }  // silent skip outside hours
 
   // Check last pull time — enforce 5-min minimum, randomise up to 15 min
   const lastPullRaw = await env.SF_CACHE.get('sf_negos_last_pull');
   const lastPull = lastPullRaw ? parseInt(lastPullRaw, 10) : 0;
   const elapsedMin = (Date.now() - lastPull) / 60000;
 
-  if (elapsedMin < 5) { console.log(`[negos] too soon (${elapsedMin.toFixed(1)}m), skipping`); return; }
+  if (elapsedMin < 5) { return; }  // silent skip — too soon
   // Between 5–15 min: pull with linearly increasing probability
-  if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) {
-    console.log(`[negos] random skip at ${elapsedMin.toFixed(1)}m`); return;
-  }
+  if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) { return; }  // random skip
 
-  console.log(`[negos] pulling at ${elapsedMin.toFixed(1)}m elapsed`);
   const r = await fetch('https://slowfootball.club/api/negotiations');
-  if (!r.ok) { console.error('[negos] fetch failed:', r.status); return; }
+  if (!r.ok) {
+    const msg = `negos fetch failed: ${r.status}`;
+    console.error('[negos]', msg);
+    await appendLog(env, 'error', msg);
+    return;
+  }
   const data = await r.json();
   const fresh = Array.isArray(data) ? data : (data.negotiations || data.items || []);
 
@@ -94,7 +121,10 @@ async function refreshNegosCache(env) {
 
   await env.SF_CACHE.put('sf_negos_history_v1', JSON.stringify(merged));
   await env.SF_CACHE.put('sf_negos_last_pull', String(Date.now()));
-  console.log(`[negos] saved ${merged.length} records (${fresh.length} fresh, ${historical.length} historical)`);
+
+  const msg = `${fresh.length} fresh, ${merged.length} total (${elapsedMin.toFixed(1)}m since last)`;
+  console.log('[negos]', msg);
+  await appendLog(env, 'negos', msg);
 }
 
 export default {
