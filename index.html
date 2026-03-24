@@ -505,6 +505,165 @@
           <button v-for="c in mbCharts" :key="c.id" :class="['btn',{active:mbChart===c.id}]" @click="mbChart=c.id">{{c.label}}</button>
         </div>
 
+        <!-- Market Opportunities -->
+        <div v-if="mbChart==='market'" style="padding:14px;overflow-y:auto">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700">🛒 Market Opportunities</span>
+            <span class="c-gray" style="font-size:11px">Transfer-listed players · sorted by ask ÷ true value (lower = better deal)</span>
+            <span class="c-gray" style="font-size:11px;margin-left:auto">{{mbMarketList.length}} listed</span>
+          </div>
+          <div v-if="!mbMarketList.length" class="card" style="text-align:center;padding:40px;color:#8b949e">
+            No transfer-listed players found.<br><span style="font-size:11px">Player data needs to load with transfer listings enabled.</span>
+          </div>
+          <div v-else class="card" style="padding:0;overflow-x:auto">
+            <table style="font-size:11px;width:100%">
+              <thead style="position:sticky;top:0;background:#161b22;z-index:2">
+                <tr>
+                  <th style="min-width:130px">Player</th>
+                  <th>Pos</th><th>Age</th><th>Rtg</th>
+                  <th>Ask</th><th>True Val</th>
+                  <th title="Ask price ÷ True value — below 1.0 = good deal">Ratio</th>
+                  <th>Bids</th><th>Active Negos</th><th>Counter Offer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in mbMarketList" :key="row.p.Player"
+                    @click="openModal(row.p)" style="cursor:pointer"
+                    :style="{background:row.ratio<0.75?'#0f2a14':row.ratio<0.95?'#1c2008':'transparent'}">
+                  <td style="font-weight:600">
+                    <span :class="'pos pos-'+row.p.Position" style="font-size:9px;margin-right:5px">{{row.p.Position}}</span>
+                    {{row.p.Player}}
+                  </td>
+                  <td style="color:#8b949e;font-size:10px">{{row.p.Position}}</td>
+                  <td style="color:#8b949e">{{row.p.Age}}</td>
+                  <td :class="row.p._gameRating>=80?'c-green':row.p._gameRating>=72?'c-orange':''" style="font-weight:700">
+                    {{row.p._gameRating?row.p._gameRating.toFixed(1):'—'}}
+                  </td>
+                  <td style="color:#ffa657;font-weight:700">{{fmtVal(row.p._listingAsk)}}</td>
+                  <td style="color:#8b949e">{{row.tv?fmtVal(row.tv):'—'}}</td>
+                  <td style="font-weight:700;min-width:54px">
+                    <span v-if="row.tv>0" :style="{color:row.ratio<0.75?'#7ee787':row.ratio<0.95?'#e3b341':row.ratio<1.15?'#8b949e':'#ff7b72'}">
+                      {{(row.ratio*100).toFixed(0)}}%
+                      <span v-if="row.ratio<0.75" style="font-size:9px"> 🟢</span>
+                      <span v-else-if="row.ratio<0.95" style="font-size:9px"> 🟡</span>
+                    </span>
+                    <span v-else class="c-gray">—</span>
+                  </td>
+                  <td style="color:#8b949e">{{row.p._listingBids||0}}</td>
+                  <td>
+                    <span v-if="row.activeNegos.length" style="background:#1f3a5a;color:#79c0ff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:700">
+                      {{row.activeNegos.length}} active
+                    </span>
+                    <span v-else class="c-gray" style="font-size:10px">—</span>
+                  </td>
+                  <td style="color:#8b949e;font-size:10px">{{row.counterOffer?fmtVal(row.counterOffer):'—'}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Hidden Gems -->
+        <div v-if="mbChart==='gems'" style="padding:14px;overflow-y:auto">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700">💎 Hidden Gems</span>
+            <span class="c-gray" style="font-size:11px">Age ≤ 27 · Rated 68+ · Not at Leverkusen · sorted by rating² ÷ value (£M)</span>
+            <span class="c-gray" style="font-size:11px;margin-left:auto">{{mbGemsList.length}} players</span>
+          </div>
+          <div v-if="!mbGemsList.length" class="card" style="text-align:center;padding:40px;color:#8b949e">No gems found — load player data first.</div>
+          <div v-else class="card" style="padding:0;overflow-x:auto">
+            <table style="font-size:11px;width:100%">
+              <thead style="position:sticky;top:0;background:#161b22;z-index:2">
+                <tr>
+                  <th style="min-width:130px">Player</th>
+                  <th>Pos</th><th>Age</th><th>Rtg</th><th>WRtg</th>
+                  <th>True Val</th>
+                  <th title="Rating² ÷ Value (£M) — higher = more quality per £ spent. Under-23s get 30% bonus.">Gem Score</th>
+                  <th>Club</th><th>Negos</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row,i) in mbGemsList" :key="row.p.Player"
+                    @click="openModal(row.p)" style="cursor:pointer"
+                    :style="{background:i<5?'#0f1d2a':'transparent'}">
+                  <td style="font-weight:600">
+                    {{row.p.Player}}
+                    <span v-if="row.p.Age<=22" style="margin-left:4px;background:#1f2d3d;color:#79c0ff;font-size:9px;padding:1px 5px;border-radius:8px">u23</span>
+                    <span v-if="row.p.homegrown" style="margin-left:3px;background:#1a3a1a;color:#7ee787;font-size:9px;padding:1px 5px;border-radius:8px">HG</span>
+                  </td>
+                  <td><span :class="'pos pos-'+row.p.Position" style="font-size:9px">{{row.p.Position}}</span></td>
+                  <td :style="{color:row.p.Age<=22?'#79c0ff':row.p.Age<=24?'#7ee787':'#8b949e'}">{{row.p.Age}}</td>
+                  <td :class="row.p._gameRating>=80?'c-green':row.p._gameRating>=72?'c-orange':''" style="font-weight:700">
+                    {{row.p._gameRating?row.p._gameRating.toFixed(1):'—'}}
+                  </td>
+                  <td class="c-gray">{{row.p._weightedRating?row.p._weightedRating.toFixed(1):'—'}}</td>
+                  <td style="color:#ffa657">{{row.tv?fmtVal(row.tv):'—'}}</td>
+                  <td style="font-weight:700;color:#d2a8ff">{{row.gem.toFixed(1)}}</td>
+                  <td style="color:#8b949e;font-size:10px">{{row.p.Club}}</td>
+                  <td>
+                    <span v-if="row.activeNegos.length" style="background:#1f3a5a;color:#79c0ff;border-radius:8px;padding:1px 6px;font-size:9px;font-weight:700">
+                      {{row.activeNegos.length}} active
+                    </span>
+                    <span v-else class="c-gray" style="font-size:10px">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Gets It Done (Overperformers) -->
+        <div v-if="mbChart==='overperformers'" style="padding:14px;overflow-y:auto">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
+            <span style="font-size:13px;font-weight:700">⚡ Gets It Done</span>
+            <span class="c-gray" style="font-size:11px">High output (G+A per 90) relative to game rating · min 6 games</span>
+          </div>
+          <div v-if="!mbOverList.length" class="card" style="text-align:center;padding:40px;color:#8b949e">No stats yet — enrich stats from the Scout tab first.</div>
+          <div v-else>
+            <div class="card" style="padding:0;overflow-x:auto">
+              <table style="font-size:11px;width:100%">
+                <thead style="position:sticky;top:0;background:#161b22;z-index:2">
+                  <tr>
+                    <th style="min-width:130px">Player</th>
+                    <th>Pos</th><th>Age</th><th>Rtg</th>
+                    <th>G</th><th>A</th><th>G/90</th><th>A/90</th>
+                    <th title="(G×3 + A×2) per 90 — weighted contribution rate">Contrib/90</th>
+                    <th title="Contribution per 90 relative to rating — higher = overperforming">Over Index</th>
+                    <th>Games</th><th>Avg Rtg</th><th>Club</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in mbOverList" :key="row.p.Player"
+                      @click="openModal(row.p)" style="cursor:pointer">
+                    <td style="font-weight:600">
+                      {{row.p.Player}}
+                      <span v-if="row.isGem" style="margin-left:4px;background:#2d1a3a;color:#d2a8ff;font-size:9px;padding:1px 5px;border-radius:8px">💎 overperformer</span>
+                    </td>
+                    <td><span :class="'pos pos-'+row.p.Position" style="font-size:9px">{{row.p.Position}}</span></td>
+                    <td style="color:#8b949e">{{row.p.Age}}</td>
+                    <td :class="row.p._gameRating>=80?'c-green':row.p._gameRating>=72?'c-orange':'c-gray'" style="font-weight:700">
+                      {{row.p._gameRating?row.p._gameRating.toFixed(1):'—'}}
+                    </td>
+                    <td class="c-green" style="font-weight:700">{{row.p.Goals||0}}</td>
+                    <td class="c-blue" style="font-weight:700">{{row.p.Assists||0}}</td>
+                    <td class="c-green">{{row.p._g90!=null?row.p._g90.toFixed(2):'—'}}</td>
+                    <td class="c-blue">{{row.p._a90!=null?row.p._a90.toFixed(2):'—'}}</td>
+                    <td style="font-weight:700;color:#ffa657">{{row.contrib90.toFixed(2)}}</td>
+                    <td style="font-weight:700" :style="{color:row.overIndex>=2?'#7ee787':row.overIndex>=1.2?'#e3b341':'#8b949e'}">
+                      {{row.overIndex.toFixed(2)}}
+                    </td>
+                    <td style="color:#8b949e">{{row.p.Games||0}}</td>
+                    <td :class="(row.p['Average Rating']||0)>=7?'c-green':(row.p['Average Rating']||0)>=6.5?'c-orange':''">
+                      {{row.p['Average Rating']?row.p['Average Rating'].toFixed(2):'—'}}
+                    </td>
+                    <td style="color:#8b949e;font-size:10px">{{row.p.Club}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <!-- Top lists -->
         <div v-if="mbChart==='top-lists'" class="top-list-grid">
           <div v-for="list in topLists" :key="list.title" class="card">

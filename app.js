@@ -267,9 +267,12 @@ createApp({
       formationKeys: Object.keys(FORMATIONS),
       attrFiltersOpen: false,
       attrFilters: {},  // e.g. { Speed: 70, Dribbling: 75 } — 0/null = inactive
-      mbChart: 'top-lists',
+      mbChart: 'market',
       mbCharts: [
-        {id:'top-lists',label:'Top Lists'},
+        {id:'market',label:'🛒 Market'},
+        {id:'gems',label:'💎 Gems'},
+        {id:'overperformers',label:'⚡ Gets It Done'},
+        {id:'top-lists',label:'📋 Top Lists'},
         {id:'value-rating',label:'Value vs Rating'},
         {id:'goal-eff',label:'Goals vs xG'},
         {id:'assist-eff',label:'Assists vs xA'},
@@ -788,6 +791,62 @@ createApp({
       if (this.mbChart==='assist-eff') return [...fp].filter(p=>p.xA>0).sort((a,b)=>((b.Assists||0)-(b.xA||0))-((a.Assists||0)-(a.xA||0))).slice(0,20);
       if (this.mbChart==='age-gems') return [...this.filteredPlayers].filter(p=>p.Age<=26).sort((a,b)=>(b._weightedRating||0)-(a._weightedRating||0)).slice(0,20);
       return [];
+    },
+    mbMarketList() {
+      return this.allPlayers
+        .filter(p => p._transferListed && p._listingAsk)
+        .map(p => {
+          const tv = this.trueVal(p);
+          const ratio = tv > 0 ? p._listingAsk / tv : 9;
+          const activeNegos = this.espionageNegos.filter(n =>
+            (n.playerName||'').toLowerCase() === (p.Player||'').toLowerCase() &&
+            (n.status === 'pending' || n.status === 'counter' || n.status === 'countered')
+          );
+          const counterOffer = tv > 0
+            ? Math.round(Math.min(p._listingAsk * 0.85, tv * 0.88) / 500000) * 500000 || Math.round(Math.min(p._listingAsk * 0.85, tv * 0.88) / 100000) * 100000
+            : null;
+          return { p, tv, ratio, activeNegos, counterOffer };
+        })
+        .sort((a, b) => a.ratio - b.ratio);
+    },
+    mbGemsList() {
+      return this.allPlayers
+        .filter(p => p.Age <= 27 && (p._gameRating || 0) >= 68 && p.Club !== MY_CLUB)
+        .map(p => {
+          const tv = this.trueVal(p);
+          // gem score: rating² per £M of value — higher = more quality per £ spent
+          // age bonus: under-23s get a 30% boost
+          const ageMult = p.Age <= 22 ? 1.3 : p.Age <= 24 ? 1.15 : 1.0;
+          const gem = tv > 0 ? (p._gameRating * p._gameRating * ageMult) / (tv / 1e6) : 0;
+          const activeNegos = this.espionageNegos.filter(n =>
+            (n.playerName||'').toLowerCase() === (p.Player||'').toLowerCase() &&
+            (n.status === 'pending' || n.status === 'counter' || n.status === 'countered')
+          );
+          return { p, tv, gem, activeNegos };
+        })
+        .filter(x => x.gem > 0)
+        .sort((a, b) => b.gem - a.gem)
+        .slice(0, 60);
+    },
+    mbOverList() {
+      // Players whose on-pitch output exceeds what their attribute rating would suggest
+      const MIN_GAMES = 6;
+      return this.allPlayers
+        .filter(p => (p.Games || 0) >= MIN_GAMES && (p._g90 != null || p._a90 != null))
+        .map(p => {
+          const g90 = p._g90 || 0;
+          const a90 = p._a90 || 0;
+          const contrib90 = g90 * 3 + a90 * 2;
+          const rtg = p._gameRating || 70;
+          // overIndex: contribution per unit of rating above 60
+          // players with low rating but high output score very high here
+          const overIndex = contrib90 / Math.max(0.05, (rtg - 58) / 25);
+          const isGem = rtg < 79 && contrib90 >= 0.35;
+          return { p, contrib90, overIndex, isGem };
+        })
+        .filter(x => x.contrib90 > 0)
+        .sort((a, b) => b.overIndex - a.overIndex)
+        .slice(0, 60);
     },
 
     // ── Youth tab computed ──
