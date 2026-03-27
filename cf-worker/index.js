@@ -195,15 +195,31 @@ export default {
     }
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const key = url.pathname.replace(/^\/sf-cache\//, '').replace(/^\//, '');
     const cors = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+
+    // ── Admin routes (no auth needed — low risk, only triggers read/cache ops) ──
+    if (url.pathname === '/_pull') {
+      ctx.waitUntil(refreshSquadsCache(env));
+      return new Response('squads refresh queued', { headers: cors });
+    }
+    if (url.pathname === '/_debug/auction-sample') {
+      const raw = await env.SF_CACHE.get('sf_negos_history_v1');
+      if (!raw) return new Response('no negos data', { status: 404, headers: cors });
+      const negos = JSON.parse(raw);
+      const sample = negos.find(n => n.via === 'auction') || negos[0] || null;
+      return new Response(JSON.stringify(sample, null, 2), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const key = url.pathname.replace(/^\/sf-cache\//, '').replace(/^\//, '');
     if (!key) return new Response('', { status: 404, headers: cors });
 
     if (request.method === 'GET') {

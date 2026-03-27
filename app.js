@@ -878,6 +878,10 @@ createApp({
       return this.clubBudget ?? this.budgetOverride;
     },
     auctionsByPlayer() {
+      // Previous auction close = nextAuctionClose minus 7 days
+      // A 'pending' bid from before the previous close is stale — that auction is over
+      const prevCloseMs = this.nextAuctionClose.getTime() - 7 * 24 * 3600 * 1000;
+
       const byPlayer = new Map();
       for (const n of this.espionageNegos) {
         if (n.via !== 'auction') continue;
@@ -892,7 +896,11 @@ createApp({
       }
       const active = [], past = [];
       for (const entry of byPlayer.values()) {
-        if (entry.bids.some(b => b.status === 'pending')) active.push(entry);
+        // Active only if a bid is pending AND was updated after the previous auction close
+        const hasCurrentPending = entry.bids.some(b =>
+          b.status === 'pending' && new Date(b.updatedAt || b.createdAt || 0).getTime() > prevCloseMs
+        );
+        if (hasCurrentPending) active.push(entry);
         else past.push(entry);
       }
       active.sort((a, b) => (a.playerName || '').localeCompare(b.playerName || ''));
@@ -2683,6 +2691,17 @@ createApp({
     auctionHighestBid(n) {
       if (!n.history?.length) return n.amount;
       return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
+    },
+    async pullBudgetNow() {
+      // Trigger the CF worker's squads refresh immediately via the /_pull route
+      const base = SF_CACHE_BASE.replace('/sf-cache', '');
+      try {
+        await fetch(`${base}/_pull`, { method: 'POST', signal: AbortSignal.timeout(5000) });
+        // Wait a few seconds for the worker to complete the refresh
+        await new Promise(r => setTimeout(r, 4000));
+        const r = await serverCacheGet('sf_leverkusen_fin_v1', true); // no-store to bypass CF edge cache
+        if (r) { const f = JSON.parse(r); if (f.budget) { this.clubBudget = f.budget; this.budgetEditing = false; } }
+      } catch(e) {}
     },
     saveBudget() {
       const v = parseInt((this.budgetEditVal||'').replace(/[^0-9]/g, ''), 10);
