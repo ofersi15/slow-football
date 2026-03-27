@@ -344,7 +344,8 @@ createApp({
       clubBudget: null, clubWageBudget: null,
       budgetOverride: (() => { try { const v = localStorage.getItem('sf_budget_override'); return v ? parseInt(v, 10) : null; } catch(e) { return null; } })(),
       budgetEditing: false, budgetEditVal: '',
-      auctionProfiles: {},  // playerName.toLowerCase() → {Position,Age,_gameRating,...} from /api/auctions
+      auctionProfiles: {},  // playerName.toLowerCase() → full snapshot from /api/auctions
+      auctionItems: [],    // raw items from /api/auctions (has all bids + snapshots)
       pastAuctionsOpen: false,
       auctionExpandedPlayers: {},
       selectedJobCtx: null,
@@ -878,17 +879,44 @@ createApp({
       return this.clubBudget ?? this.budgetOverride;
     },
     auctionsByPlayer() {
-      // Previous auction close = nextAuctionClose minus 7 days
-      // A 'pending' bid from before the previous close is stale — that auction is over
-      const prevCloseMs = this.nextAuctionClose.getTime() - 7 * 24 * 3600 * 1000;
+      const now = this._nowMs;
 
+      // ── Primary: data from /api/auctions (has ALL bids + player snapshots) ──
+      if (this.auctionItems.length) {
+        const active = [], past = [];
+        for (const item of this.auctionItems) {
+          const closesMs = new Date(item.endsAt || 0).getTime();
+          const isActive = closesMs > now;
+          const highestBidder = item.highest?.bidder || null;
+          // Normalise bids to the shape the template expects; sort by amount desc
+          const bids = [...(item.bids || [])]
+            .sort((a, b) => (b.amount || 0) - (a.amount || 0))
+            .map(b => ({
+              id: `${item.id}-${b.bidder}`,
+              buyer: b.bidder,
+              amount: b.amount,
+              updatedAt: b.at,
+              via: 'auction',
+              status: isActive ? 'pending' : (b.bidder === highestBidder ? 'accepted' : 'rejected'),
+              subStatus: isActive ? null : (b.bidder === highestBidder ? null : 'outbid'),
+            }));
+          const entry = { playerName: item.player, seller: item.club, bids, endsAt: item.endsAt };
+          if (isActive) active.push(entry);
+          else past.push(entry);
+        }
+        active.sort((a, b) => (a.playerName || '').localeCompare(b.playerName || ''));
+        past.sort((a, b) => new Date(b.endsAt || 0) - new Date(a.endsAt || 0));
+        return { active, past };
+      }
+
+      // ── Fallback: derive from negotiations data ──
+      // A 'pending' bid from before the previous auction close is stale
+      const prevCloseMs = this.nextAuctionClose.getTime() - 7 * 24 * 3600 * 1000;
       const byPlayer = new Map();
       for (const n of this.espionageNegos) {
         if (n.via !== 'auction') continue;
         const key = (n.playerName || '?').toLowerCase();
-        if (!byPlayer.has(key)) {
-          byPlayer.set(key, { playerName: n.playerName, seller: n.seller, bids: [] });
-        }
+        if (!byPlayer.has(key)) byPlayer.set(key, { playerName: n.playerName, seller: n.seller, bids: [] });
         byPlayer.get(key).bids.push(n);
       }
       for (const entry of byPlayer.values()) {
@@ -896,7 +924,6 @@ createApp({
       }
       const active = [], past = [];
       for (const entry of byPlayer.values()) {
-        // Active only if a bid is pending AND was updated after the previous auction close
         const hasCurrentPending = entry.bids.some(b =>
           b.status === 'pending' && new Date(b.updatedAt || b.createdAt || 0).getTime() > prevCloseMs
         );
@@ -2693,14 +2720,21 @@ createApp({
       return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
     },
     async pullBudgetNow() {
-      // Trigger the CF worker's squads refresh immediately via the /_pull route
+      // Trigger CF worker squads refresh (fetches budget + auctions + squads)
       const base = SF_CACHE_BASE.replace('/sf-cache', '');
       try {
         await fetch(`${base}/_pull`, { method: 'POST', signal: AbortSignal.timeout(5000) });
-        // Wait a few seconds for the worker to complete the refresh
-        await new Promise(r => setTimeout(r, 4000));
-        const r = await serverCacheGet('sf_leverkusen_fin_v1', true); // no-store to bypass CF edge cache
-        if (r) { const f = JSON.parse(r); if (f.budget) { this.clubBudget = f.budget; this.budgetEditing = false; } }
+        // Background job — poll for results up to 20s
+        for (let i = 0; i < 5; i++) {
+          await new Promise(r => setTimeout(r, 4000));
+          const [budgetRaw, auctionsRaw] = await Promise.all([
+            serverCacheGet('sf_leverkusen_fin_v1', true),
+            serverCacheGet('sf_auctions_v1', true),
+          ]);
+          if (budgetRaw) { const f = JSON.parse(budgetRaw); if (f.budget) { this.clubBudget = f.budget; this.budgetEditing = false; } }
+          if (auctionsRaw) { this._applyAuctionData(JSON.parse(auctionsRaw)); }
+          if (budgetRaw || auctionsRaw) break;
+        }
       } catch(e) {}
     },
     saveBudget() {
@@ -2713,48 +2747,33 @@ createApp({
       }
       this.budgetEditing = false;
     },
-    async loadAuctionProfiles() {
-      // Try to fetch player profile data from the auction API endpoint
-      const CACHE_KEY = 'sf_auction_profiles_v1';
-      try {
-        const cached = await serverCacheGet(CACHE_KEY);
-        if (cached) {
-          this.auctionProfiles = JSON.parse(cached);
-          return;
-        }
-      } catch(e) {}
-      // Try known/candidate auction endpoints
-      const candidates = [
-        `${API}/auctions`,
-        `${API}/transfers/auctions`,
-        `${API}/transfers?type=auction`,
-        `${API}/negotiations/auctions`,
-      ];
-      for (const url of candidates) {
-        try {
-          const r = await fetch(url, {signal: AbortSignal.timeout(4000)});
-          if (!r.ok) continue;
-          const data = await r.json();
-          const items = Array.isArray(data) ? data : (data.auctions || data.items || data.listings || []);
-          if (!items.length) continue;
-          const map = {};
-          for (const item of items) {
-            const name = item.playerName || item.player?.name || item.name;
-            if (!name) continue;
-            const k = name.toLowerCase();
-            const pos = item.playerPosition || item.player?.position || item.position;
-            const age = item.playerAge ?? item.player?.age ?? item.age ?? null;
-            const rtg = item.playerRating ?? item.player?.rating ?? item.rating ?? null;
-            const club = item.playerClub || item.player?.club || item.seller || null;
-            map[k] = { Player: name, Position: pos||null, Age: age, _gameRating: rtg, Club: club };
-          }
-          if (Object.keys(map).length) {
-            this.auctionProfiles = map;
-            serverCacheSet(CACHE_KEY, JSON.stringify(map));
-          }
-          return;  // stop on first successful endpoint
-        } catch(e) {}
+    _applyAuctionData(data) {
+      // data = parsed sf_auctions_v1 value (may be {data:{items:[...]},ts:...} or {items:[...]} or [...])
+      const raw = data.data || data;
+      const items = Array.isArray(raw) ? raw : (raw.items || []);
+      this.auctionItems = items;
+      // Build profile map from snapshots — full player objects usable in the modal
+      const profiles = {};
+      for (const item of items) {
+        if (!item.player) continue;
+        const k = item.player.toLowerCase();
+        const snap = item.snapshot || {};
+        profiles[k] = {
+          ...snap,  // all attributes (Speed, Tackling, etc.) for the modal
+          Player: item.player,
+          Position: item.position || snap.Position || null,
+          Age: snap.Age ?? null,
+          _gameRating: item.rating ?? snap.Rating ?? null,
+          Club: item.club || snap.Club || null,
+        };
       }
+      this.auctionProfiles = profiles;
+    },
+    async loadAuctionData() {
+      try {
+        const raw = await serverCacheGet('sf_auctions_v1');
+        if (raw) this._applyAuctionData(JSON.parse(raw));
+      } catch(e) {}
     },
     async loadWorkerLog() {
       this.workerLogOpen = true;
@@ -2808,7 +2827,7 @@ createApp({
             serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
             // Load club budget if cached
             serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
-            this.loadAuctionProfiles();
+            this.loadAuctionData();
             this.espionageLoaded = true;
             this.espionageLoading = false;
             this.loadEspionageSubmissions();
@@ -2880,7 +2899,7 @@ createApp({
         this.espionageCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
         serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
-        this.loadAuctionProfiles();
+        this.loadAuctionData();
         const espionageCacheStr = JSON.stringify({ savedAt: Date.now(), clubs: results, negos });
         serverCacheSet(CACHE_KEY, espionageCacheStr);  // server-side persistence
         try { localStorage.setItem(CACHE_KEY, espionageCacheStr); } catch(e) {}

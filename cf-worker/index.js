@@ -136,6 +136,17 @@ async function refreshSquadsCache(env) {
     console.log(`[squads] budget cached: ${levBudget}`);
   }
 
+  // Fetch active auctions — has all bids + player snapshots
+  try {
+    const auctionsRes = await fetch(`${GAME_API}/auctions`, { headers });
+    if (auctionsRes.ok) {
+      const auctionsData = await auctionsRes.json();
+      await env.SF_CACHE.put('sf_auctions_v1', JSON.stringify({ data: auctionsData, ts: Date.now() }));
+      const count = Array.isArray(auctionsData) ? auctionsData.length : (auctionsData.items?.length || 0);
+      await appendLog(env, 'auctions', `${count} auctions cached`);
+    }
+  } catch(e) { console.error('[auctions]', e); }
+
   await appendLog(env, 'squads', `${clubCount} clubs refreshed`);
 }
 
