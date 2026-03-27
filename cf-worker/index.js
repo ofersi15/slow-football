@@ -77,30 +77,59 @@ async function refreshSquadsCache(env) {
     await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
   }
 
-  // Try to extract Leverkusen budget — first from the bulk squads response
+  // Try to extract Leverkusen budget from multiple sources
   let levBudget = null;
+
+  // 1. Check bulk squads response (Leverkusen entry)
   const levBulk = squads['Leverkusen'] || squads['leverkusen'];
   if (levBulk) {
     levBudget = levBulk.budget ?? levBulk.transferBudget ?? levBulk.finances?.budget
              ?? levBulk.club?.budget ?? levBulk.financials?.budget ?? null;
     if (levBudget == null) {
-      await appendLog(env, 'debug', `lev bulk keys: ${Object.keys(levBulk).join(',')}`);
+      await appendLog(env, 'debug', `lev-squad-keys: ${Object.keys(levBulk).join(',')}`);
     }
   }
-  // Fallback: single-club endpoint
+
+  // 2. Try /api/clubs endpoint (all clubs metadata)
   if (levBudget == null) {
     try {
-      const clubRes = await fetch(`${GAME_API}/squads?club=Leverkusen`, { headers });
-      if (clubRes.ok) {
-        const cd = await clubRes.json();
-        levBudget = cd.budget ?? cd.transferBudget ?? cd.finances?.budget
-                 ?? cd.club?.budget ?? cd.financials?.budget ?? null;
-        if (levBudget == null) {
-          await appendLog(env, 'debug', `single club keys: ${Object.keys(cd).join(',')}`);
+      const clubsRes = await fetch(`${GAME_API}/clubs`, { headers });
+      if (clubsRes.ok) {
+        const clubs = await clubsRes.json();
+        const lev = Array.isArray(clubs)
+          ? clubs.find(c => (c.name||c.club||c.id||'').toLowerCase().includes('leverkusen'))
+          : (clubs['Leverkusen'] || clubs['leverkusen']);
+        if (lev) {
+          levBudget = lev.budget ?? lev.transferBudget ?? lev.finances?.budget ?? null;
+          if (levBudget == null) {
+            await appendLog(env, 'debug', `clubs-lev-keys: ${Object.keys(lev).join(',')}`);
+          }
+        } else {
+          await appendLog(env, 'debug', `clubs-endpoint: no Leverkusen entry. Sample keys: ${Array.isArray(clubs)?Object.keys(clubs[0]||{}).join(','):Object.keys(clubs).slice(0,5).join(',')}`);
         }
       }
-    } catch(e) { console.error('[squads] budget fetch failed:', e); }
+    } catch(e) {}
   }
+
+  // 3. Try /api/managers (own manager info may include budget)
+  if (levBudget == null) {
+    try {
+      const mgrRes = await fetch(`${GAME_API}/managers`, { headers });
+      if (mgrRes.ok) {
+        const mgrs = await mgrRes.json();
+        const me = Array.isArray(mgrs)
+          ? mgrs.find(m => (m.club||m.team||'').toLowerCase().includes('leverkusen'))
+          : mgrs;
+        if (me) {
+          levBudget = me.budget ?? me.transferBudget ?? me.club?.budget ?? null;
+          if (levBudget == null) {
+            await appendLog(env, 'debug', `mgr-keys: ${Object.keys(me).join(',')}`);
+          }
+        }
+      }
+    } catch(e) {}
+  }
+
   if (levBudget != null) {
     await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
     await appendLog(env, 'budget', `Leverkusen budget: ${levBudget}`);

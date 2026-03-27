@@ -343,6 +343,7 @@ createApp({
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
       clubBudget: null, clubWageBudget: null,
       pastAuctionsOpen: false,
+      auctionExpandedPlayers: {},
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -2694,8 +2695,7 @@ createApp({
     },
     openPlayerByName(name) {
       if (!name) return;
-      const lc = name.toLowerCase();
-      const p = this.allPlayers.find(pl => (pl.Player||'').toLowerCase() === lc);
+      const p = this.playerByName(name);
       if (p) this.openModal(p);
     },
 
