@@ -28,16 +28,13 @@ const GAME_API = 'https://slowfootball.club/api';
 async function cacheBudget(env, data) {
   try {
     // Response may be keyed by club name or have a specific shape — try common structures
-    const lev = data['Leverkusen'] || data['leverkusen']
-              || (Array.isArray(data) ? data.find(b => (b.club||b.name||'').toLowerCase().includes('leverkusen')) : null)
-              || data;
-    const budget = lev?.budget ?? lev?.transferBudget ?? lev?.transfer_budget ?? null;
+    // Response shape: { budgets, committed, available, updatedAt, source }
+    const budget = data?.available ?? data?.budget ?? data?.transferBudget ?? null;
     if (budget != null) {
       await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget, ts: Date.now() }));
       await appendLog(env, 'budget', `Leverkusen budget: ${budget}`);
       console.log('[budget] cached:', budget);
     } else {
-      // Log keys to help debug the response shape
       const sample = Array.isArray(data) ? data[0] : data;
       await appendLog(env, 'debug', `budget-keys: ${Object.keys(sample||{}).join(',')}`);
     }
