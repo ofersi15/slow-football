@@ -346,6 +346,7 @@ createApp({
       budgetEditing: false, budgetEditVal: '', pullingBudget: false,
       auctionProfiles: {},  // playerName.toLowerCase() → full snapshot from /api/auctions
       auctionItems: [],    // raw items from /api/auctions (has all bids + snapshots)
+      allBudgets: {},      // club name → {transfer, ...} from /api/budgets?format=full
       pastAuctionsOpen: false,
       auctionExpandedPlayers: {},
       selectedJobCtx: null,
@@ -877,6 +878,16 @@ createApp({
     },
     effectiveBudget() {
       return this.clubBudget ?? this.budgetOverride;
+    },
+    clubBudgetFor() {
+      // Returns a function: clubBudgetFor(name) → transfer budget number or null
+      return (name) => {
+        if (!name) return null;
+        const entry = this.allBudgets[name] || this.allBudgets[name.toLowerCase()] || null;
+        if (!entry) return name === this.myClub ? this.effectiveBudget : null;
+        return typeof entry === 'number' ? entry
+             : (entry.transfer ?? entry.transferBudget ?? entry.available ?? entry.budget ?? null);
+      };
     },
     auctionsByPlayer() {
       const now = this._nowMs;
@@ -2735,7 +2746,9 @@ createApp({
           ]);
           if (budgetRaw) { const f = JSON.parse(budgetRaw); if (f.budget) this.clubBudget = f.budget; }
           if (auctionsRaw) this._applyAuctionData(JSON.parse(auctionsRaw));
-          if (budgetRaw) break;  // got budget — stop polling
+          const allBudRaw = await serverCacheGet('sf_all_budgets_v1', true);
+          if (allBudRaw) { const b = JSON.parse(allBudRaw); this.allBudgets = b.data || b; }
+          if (budgetRaw) break;
         }
       } catch(e) {}
       this.pullingBudget = false;
@@ -2774,8 +2787,12 @@ createApp({
     },
     async loadAuctionData() {
       try {
-        const raw = await serverCacheGet('sf_auctions_v1');
-        if (raw) this._applyAuctionData(JSON.parse(raw));
+        const [aRaw, bRaw] = await Promise.all([
+          serverCacheGet('sf_auctions_v1'),
+          serverCacheGet('sf_all_budgets_v1'),
+        ]);
+        if (aRaw) this._applyAuctionData(JSON.parse(aRaw));
+        if (bRaw) { const b = JSON.parse(bRaw); this.allBudgets = b.data || b; }
       } catch(e) {}
     },
     async loadWorkerLog() {
