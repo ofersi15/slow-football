@@ -341,6 +341,7 @@ createApp({
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
+      clubBudget: null, clubWageBudget: null,
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -850,6 +851,21 @@ createApp({
         .slice(0, 60);
     },
 
+    negoPlayerMap() {
+      const map = {};
+      for (const n of this.espionageNegos) {
+        const k = (n.playerName||'').toLowerCase();
+        if (!k || map[k]) continue;
+        const pos = n.playerPosition || n.player?.position || n.position;
+        const age = n.playerAge ?? n.player?.age ?? n.age;
+        const rtg = n.playerRating || n.player?.rating || n.rating;
+        const club = n.playerClub || n.player?.club || n.seller;
+        if (pos || age != null || rtg) {
+          map[k] = { Player: n.playerName, Position: pos||'?', Age: age, _gameRating: rtg, Club: club };
+        }
+      }
+      return map;
+    },
     // ── Auction computed ──
     nextAuctionClose() {
       const now = new Date(this._nowMs);
@@ -2611,13 +2627,18 @@ createApp({
         return { icon:'✓', label: isAuction ? 'Won auction' : 'Accepted', detail:'', color:'#7ee787', bg:'#1a4a2e' };
       }
       if (status === 'rejected') {
-        const reason = rejReasons[subStatus] || subStatus || '';
-        return { icon:'✗', label:'Rejected', detail:reason, color:'#ff7b72', bg:'#3a1212' };
+        const labels = {
+          declined:'↩ Withdrawn',counter_rejected:'✗ Counter rejected',
+          moved_elsewhere:'✗ Went elsewhere',outbid:'✗ Outbid',
+          insufficient_funds:'⚠ Funds issue',withdrawn:'↩ Withdrawn',closed:'✗ Closed',
+        };
+        const label = labels[subStatus] || '✗ Rejected';
+        const note = subStatus==='insufficient_funds' ? 'next bidder wins' : subStatus==='outbid' ? '' : '';
+        return { icon:'', label, detail:note, color:label.startsWith('↩')?'#8b949e':'#ff7b72', bg:label.startsWith('↩')?'#21262d':'#3a1212' };
       }
       if (status === 'withdrawn') return { icon:'↩', label:'Withdrawn', detail:'', color:'#8b949e', bg:'#21262d' };
-      // Check subStatus for terminal states not captured in status
-      if (subStatus === 'outbid') return { icon:'✗', label:'Outbid', detail:'', color:'#ff7b72', bg:'#3a1212' };
-      if (subStatus === 'insufficient_funds') return { icon:'⚠', label:'Funds issue', detail:'next bidder selected', color:'#ffa657', bg:'#3a2810' };
+      if (subStatus === 'outbid') return { icon:'', label:'✗ Outbid', detail:'', color:'#ff7b72', bg:'#3a1212' };
+      if (subStatus === 'insufficient_funds') return { icon:'', label:'⚠ Funds issue', detail:'next bidder wins', color:'#ffa657', bg:'#3a2810' };
       if (subStatus === 'won') return { icon:'✓', label:'Won', detail:'', color:'#7ee787', bg:'#1a4a2e' };
       return { icon:'', label:status||'—', detail:subStatus||'', color:'#8b949e', bg:'#21262d' };
     },
@@ -2636,7 +2657,10 @@ createApp({
     playerByName(name) {
       if (!name) return null;
       const lc = name.toLowerCase();
-      return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc) || null;
+      return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc)
+          || this.youthAcademy.find(p => (p.Player||p.name||'').toLowerCase() === lc)
+          || this.negoPlayerMap[lc]
+          || null;
     },
     openPlayerByName(name) {
       if (!name) return;
@@ -2673,6 +2697,8 @@ createApp({
             this.espionageCacheDate = new Date(cached.savedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
             // Show when negos were last pulled by CF worker
             serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
+            // Load club budget if cached
+            serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
             this.espionageLoaded = true;
             this.espionageLoading = false;
             this.loadEspionageSubmissions();
@@ -2743,6 +2769,7 @@ createApp({
         this.espionageNegos = negos;
         this.espionageCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
+        serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
         const espionageCacheStr = JSON.stringify({ savedAt: Date.now(), clubs: results, negos });
         serverCacheSet(CACHE_KEY, espionageCacheStr);  // server-side persistence
         try { localStorage.setItem(CACHE_KEY, espionageCacheStr); } catch(e) {}

@@ -77,6 +77,20 @@ async function refreshSquadsCache(env) {
     await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
   }
 
+  // Fetch Leverkusen budget from club squad data
+  try {
+    const clubRes = await fetch(`${GAME_API}/squads?club=Leverkusen`, { headers });
+    if (clubRes.ok) {
+      const clubData = await clubRes.json();
+      const budget = clubData.budget ?? clubData.transferBudget ?? clubData.finances?.budget ?? null;
+      const wage = clubData.wageBudget ?? clubData.wage ?? clubData.finances?.wage ?? null;
+      if (budget != null || wage != null) {
+        await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget, wage, ts: Date.now() }));
+        console.log(`[squads] budget cached: ${budget}`);
+      }
+    }
+  } catch(e) { console.error('[squads] budget fetch failed:', e); }
+
   await appendLog(env, 'squads', `${clubCount} clubs refreshed`);
 }
 
