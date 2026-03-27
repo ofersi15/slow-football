@@ -25,18 +25,27 @@ function cacheMaxAge(key) {
 const GAME_API = 'https://slowfootball.club/api';
 
 // Parse /api/budgets?format=full response and cache Leverkusen's budget
+// Response shape: { budgets:{club→{transfer,wage,...}}, committed, available:{obj}, updatedAt, source }
 async function cacheBudget(env, data) {
   try {
-    // Response may be keyed by club name or have a specific shape — try common structures
-    // Response shape: { budgets, committed, available, updatedAt, source }
-    const budget = data?.available ?? data?.budget ?? data?.transferBudget ?? null;
-    if (budget != null) {
-      await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget, ts: Date.now() }));
-      await appendLog(env, 'budget', `Leverkusen budget: ${budget}`);
-      console.log('[budget] cached:', budget);
+    const allBudgets = data?.budgets || null;
+
+    // Extract Leverkusen's transfer budget from the per-club dict (reliable)
+    const levEntry = allBudgets?.['Leverkusen'] || allBudgets?.['leverkusen'] || null;
+    const levBudget = levEntry == null ? null
+      : typeof levEntry === 'number' ? levEntry
+      : (levEntry.transfer ?? levEntry.transferBudget ?? levEntry.budget ?? levEntry.available ?? null);
+
+    if (typeof levBudget === 'number') {
+      await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
+      await appendLog(env, 'budget', `Leverkusen: ${levBudget}`);
     } else {
-      const sample = Array.isArray(data) ? data[0] : data;
-      await appendLog(env, 'debug', `budget-keys: ${Object.keys(sample||{}).join(',')}`);
+      // Log the raw entry to debug field names
+      await appendLog(env, 'debug', `lev-entry: ${JSON.stringify(levEntry).slice(0, 120)}`);
+    }
+    if (allBudgets) {
+      await env.SF_CACHE.put('sf_all_budgets_v1', JSON.stringify({ data: allBudgets, ts: Date.now() }));
+      await appendLog(env, 'budget', `all clubs: ${Object.keys(allBudgets).length} entries`);
     }
   } catch(e) { console.error('[budget] parse error:', e); }
 }

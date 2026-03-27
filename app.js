@@ -911,7 +911,14 @@ createApp({
               status: isActive ? 'pending' : (b.bidder === highestBidder ? 'accepted' : 'rejected'),
               subStatus: isActive ? null : (b.bidder === highestBidder ? null : 'outbid'),
             }));
-          const entry = { playerName: item.player, seller: item.club, bids, endsAt: item.endsAt };
+          // Find first bidder who can actually afford their bid (budget >= amount)
+          // null budget = unknown = assume they can pay
+          let effectiveWinner = bids[0]?.buyer || null;
+          for (const bid of bids) {
+            const bgt = this.clubBudgetFor(bid.buyer);
+            if (bgt == null || bgt >= bid.amount) { effectiveWinner = bid.buyer; break; }
+          }
+          const entry = { playerName: item.player, seller: item.club, bids, endsAt: item.endsAt, effectiveWinner };
           if (isActive) active.push(entry);
           else past.push(entry);
         }
@@ -2777,10 +2784,10 @@ createApp({
         profiles[k] = {
           ...snap,  // all attributes (Speed, Tackling, etc.) for the modal
           Player: item.player,
-          Position: item.position || snap.Position || null,
-          Age: snap.Age ?? null,
-          _gameRating: item.rating ?? snap.Rating ?? null,
-          Club: item.club || snap.Club || null,
+          Position: item.position || item.pos || snap.Position || snap.position || snap.pos || null,
+          Age: snap.Age ?? snap.age ?? item.age ?? null,
+          _gameRating: item.rating ?? item.Rating ?? snap.Rating ?? snap.rating ?? null,
+          Club: item.club || snap.Club || snap.club || null,
         };
       }
       this.auctionProfiles = profiles;
@@ -2846,7 +2853,7 @@ createApp({
             // Show when negos were last pulled by CF worker
             serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
             // Load club budget if cached
-            serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
+            serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); if (typeof f.budget==='number') this.clubBudget=f.budget; if (typeof f.wage==='number') this.clubWageBudget=f.wage; } }).catch(()=>{});
             this.loadAuctionData();
             this.espionageLoaded = true;
             this.espionageLoading = false;

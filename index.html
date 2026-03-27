@@ -2231,19 +2231,29 @@
             <!-- Budget indicator for top bidder -->
             <span v-if="entry.bids[0].buyer===myClub && effectiveBudget!=null"
                   :style="{fontSize:'10px',fontWeight:700,color:effectiveBudget>=entry.bids[0].amount?'#7ee787':'#ffa657'}">
-              💰 {{effectiveBudget>=entry.bids[0].amount?'budget ok':'might be short'}}
+              💰 {{effectiveBudget>=entry.bids[0].amount?'can pay':'short'}} ({{fmtVal(effectiveBudget)}})
             </span>
-            <template v-else-if="entry.bids[0].buyer!==myClub">
-              <span v-if="clubBudgetFor(entry.bids[0].buyer)!=null"
-                    :style="{fontSize:'10px',fontWeight:700,color:clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'#7ee787':'#ff7b72'}">
-                💰 {{clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'can pay':'short'}} ({{fmtVal(clubBudgetFor(entry.bids[0].buyer))}})
-              </span>
-              <span v-if="entry.bids.find(b=>b.buyer===myClub)" class="c-gray" style="font-size:10px">
-                our bid: {{fmtVal(entry.bids.find(b=>b.buyer===myClub).amount)}}
-              </span>
-            </template>
+            <span v-else-if="entry.bids[0].buyer!==myClub && clubBudgetFor(entry.bids[0].buyer)!=null"
+                  :style="{fontSize:'10px',fontWeight:700,color:clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'#7ee787':'#ff7b72'}">
+              💰 {{clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'can pay':'short'}} ({{fmtVal(clubBudgetFor(entry.bids[0].buyer))}})
+            </span>
+            <span v-if="entry.bids.find(b=>b.buyer===myClub) && entry.bids[0].buyer!==myClub" class="c-gray" style="font-size:10px">
+              our bid: {{fmtVal(entry.bids.find(b=>b.buyer===myClub).amount)}}
+            </span>
             <span :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 7px',fontSize:'9px',fontWeight:700,marginLeft:'auto'}">
               {{negoStatusInfo(entry.bids[0]).label}}
+            </span>
+          </div>
+          <!-- Effective winner: shown when top bidder is known to be short -->
+          <div v-if="entry.effectiveWinner && entry.effectiveWinner!==entry.bids[0].buyer"
+               style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(255,123,114,0.1);border-radius:6px;margin-top:4px;flex-wrap:wrap">
+            <span style="font-size:9px;color:#ff7b72;font-weight:700">⚠ TOP BIDDER SHORT — falls to</span>
+            <span @click.stop="openClubDetail(entry.effectiveWinner)" style="cursor:pointer;font-size:11px;font-weight:700;color:#ffa657">{{entry.effectiveWinner}}</span>
+            <span v-if="entry.bids.find(b=>b.buyer===entry.effectiveWinner)" style="font-size:11px;font-weight:700;color:#ffa657">
+              {{fmtVal(entry.bids.find(b=>b.buyer===entry.effectiveWinner).amount)}}
+            </span>
+            <span v-if="clubBudgetFor(entry.effectiveWinner)!=null" style="font-size:9px;color:#7ee787">
+              💰 {{fmtVal(clubBudgetFor(entry.effectiveWinner))}}
             </span>
           </div>
           <!-- Remaining bids (collapsible) -->
