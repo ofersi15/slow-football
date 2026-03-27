@@ -340,6 +340,7 @@ createApp({
       negoDisplayCount: 50,
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
+      negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -849,6 +850,29 @@ createApp({
         .slice(0, 60);
     },
 
+    // ── Auction computed ──
+    nextAuctionClose() {
+      const now = new Date(this._nowMs);
+      // BST = UTC+1 (approx March–October)
+      const mo = now.getUTCMonth();
+      const isBST = mo >= 2 && mo <= 9;
+      const closeUTC = isBST ? 20 : 21; // 9pm BST
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), closeUTC, 0, 0));
+      const dow = d.getUTCDay(); // 0=Sun 3=Wed
+      d.setUTCDate(d.getUTCDate() + ((3 - dow + 7) % 7));
+      if (d.getTime() <= this._nowMs) d.setUTCDate(d.getUTCDate() + 7);
+      return d;
+    },
+    auctionCountdown() {
+      const diff = this.nextAuctionClose.getTime() - this._nowMs;
+      if (diff <= 0) return 'closing…';
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (h >= 48) return `${Math.floor(h/24)}d ${h%24}h`;
+      if (h > 0) return `${h}h ${m}m`;
+      return `${m}m`;
+    },
+
     // ── Youth tab computed ──
     youthAcademySorted() {
       return [...this.youthAcademy].sort((a,b)=>(b.Rating||b.rating||0)-(a.Rating||a.rating||0));
@@ -1016,6 +1040,8 @@ createApp({
         if (v === 'espionage' || v === 'clubs') {
           if (!this.espionageLoaded && !this.espionageLoading) this.loadEspionage(false);
         }
+        if (v === 'espionage') { this.startNegosPolling(); }
+        else { this.stopNegosPolling(); }
         if (v === 'squad') {
           this.loadSavedLineup();
         }
@@ -2541,6 +2567,65 @@ createApp({
         }
       }
     },
+    startNegosPolling() {
+      if (this.negosPollingInterval) return;
+      this.negosPollingInterval = setInterval(() => this.pollNegosUpdate(), 30000);
+    },
+    stopNegosPolling() {
+      if (this.negosPollingInterval) { clearInterval(this.negosPollingInterval); this.negosPollingInterval = null; }
+    },
+    async pollNegosUpdate() {
+      try {
+        const tsRaw = await serverCacheGet('sf_negos_last_pull');
+        if (!tsRaw) return;
+        const newPull = parseInt(tsRaw, 10);
+        if (!this.negosLastPull || newPull > this.negosLastPull) {
+          const raw = await serverCacheGet('sf_negos_history_v1');
+          if (raw) {
+            this.espionageNegos = JSON.parse(raw);
+            this.negosLastPull = newPull;
+          }
+        }
+      } catch(e) {}
+    },
+    negoStatusInfo(n) {
+      const { status, subStatus, via, lastActionBy } = n;
+      const isAuction = via === 'auction';
+      const isListing = via === 'listing';
+      const rejReasons = {
+        declined:'not interested', counter_rejected:'counter rejected',
+        moved_elsewhere:'went elsewhere', outbid:'outbid',
+        insufficient_funds:'insufficient funds', withdrawn:'withdrawn',
+        closed:'closed',
+      };
+      if (status === 'pending') {
+        if (isAuction) return { icon:'🏛', label:'Auction bid', detail:`closes ${this.auctionCountdown}`, color:'#d2a8ff', bg:'#2d1a3a' };
+        if (isListing) return { icon:'📋', label:'Listing offer', detail:'', color:'#79c0ff', bg:'#1f3a5a' };
+        return { icon:'📨', label:'Direct offer', detail:'', color:'#79c0ff', bg:'#1f3a5a' };
+      }
+      if (status === 'counter' || status === 'countered') {
+        const who = lastActionBy === 'buyer' ? 'We' : 'Seller';
+        return { icon:'🔄', label:`${who} countered`, detail:'', color:'#ffa657', bg:'#4a3a10' };
+      }
+      if (status === 'accepted') {
+        return { icon:'✓', label: isAuction ? 'Won auction' : 'Accepted', detail:'', color:'#7ee787', bg:'#1a4a2e' };
+      }
+      if (status === 'rejected') {
+        const reason = rejReasons[subStatus] || subStatus || '';
+        return { icon:'✗', label:'Rejected', detail:reason, color:'#ff7b72', bg:'#3a1212' };
+      }
+      if (status === 'withdrawn') return { icon:'↩', label:'Withdrawn', detail:'', color:'#8b949e', bg:'#21262d' };
+      // Check subStatus for terminal states not captured in status
+      if (subStatus === 'outbid') return { icon:'✗', label:'Outbid', detail:'', color:'#ff7b72', bg:'#3a1212' };
+      if (subStatus === 'insufficient_funds') return { icon:'⚠', label:'Funds issue', detail:'next bidder selected', color:'#ffa657', bg:'#3a2810' };
+      if (subStatus === 'won') return { icon:'✓', label:'Won', detail:'', color:'#7ee787', bg:'#1a4a2e' };
+      return { icon:'', label:status||'—', detail:subStatus||'', color:'#8b949e', bg:'#21262d' };
+    },
+    // Highest bid amount visible for an auction nego
+    auctionHighestBid(n) {
+      if (!n.history?.length) return n.amount;
+      return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
+    },
     async loadWorkerLog() {
       this.workerLogOpen = true;
       try {
@@ -3670,6 +3755,8 @@ createApp({
 
   beforeUnmount() {
     if (this.youthBgInterval) clearInterval(this.youthBgInterval);
+    this.stopNegosPolling();
+    if (this._clockInterval) clearInterval(this._clockInterval);
   },
 
   mounted() {
@@ -3705,5 +3792,9 @@ createApp({
     this.fetchCurrentGameWeek();
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental
     this.youthBgInterval = setInterval(() => { this.bgAutoRefresh(); }, 8 * 60 * 1000);
+    // Clock tick for auction countdown
+    this._clockInterval = setInterval(() => { this._nowMs = Date.now(); }, 60000);
+    // Start polling if already on espionage tab
+    if (this.activeTab === 'espionage') this.startNegosPolling();
   }
 }).mount('#app');
