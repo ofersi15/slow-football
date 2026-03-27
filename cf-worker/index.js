@@ -191,10 +191,35 @@ export default {
     };
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
 
-    // ── Admin routes (no auth needed — low risk, only triggers read/cache ops) ──
+    // ── Admin routes ──
     if (url.pathname === '/_pull') {
       ctx.waitUntil(refreshSquadsCache(env));
       return new Response('squads refresh queued', { headers: cors });
+    }
+    if (url.pathname === '/_budget') {
+      ctx.waitUntil((async () => {
+        await appendLog(env, 'budget-pull', 'manual trigger');
+        // Try without auth first
+        try {
+          const r = await fetch(`${GAME_API}/budgets?format=full`);
+          if (r.ok) { await cacheBudget(env, await r.json()); return; }
+        } catch(e) {}
+        // Auth required — login and fetch
+        try {
+          const loginRes = await fetch(`${GAME_API}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
+          });
+          if (!loginRes.ok) { await appendLog(env, 'error', `budget login failed: ${loginRes.status}`); return; }
+          const { token } = await loginRes.json();
+          const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+          const br = await fetch(`${GAME_API}/budgets?format=full`, { headers: h });
+          if (br.ok) await cacheBudget(env, await br.json());
+          else await appendLog(env, 'error', `budget fetch failed: ${br.status}`);
+        } catch(e) { await appendLog(env, 'error', `budget pull error: ${e.message}`); }
+      })());
+      return new Response('budget pull queued', { headers: cors });
     }
     if (url.pathname === '/_debug/auction-sample') {
       const raw = await env.SF_CACHE.get('sf_negos_history_v1');

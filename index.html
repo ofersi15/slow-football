@@ -2190,7 +2190,7 @@
           <template v-if="!budgetEditing">
             <span v-if="effectiveBudget!=null" @click="budgetEditing=true;budgetEditVal=''" style="font-size:11px;font-weight:700;color:#7ee787;cursor:pointer" title="Click to edit">💰 {{fmtVal(effectiveBudget)}}</span>
             <button v-else class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=true;budgetEditVal=''">💰 Set budget</button>
-            <button class="btn" style="font-size:10px;padding:1px 7px" @click="pullBudgetNow()" title="Trigger squads refresh now to pull live budget from game API">⟳ Pull budget</button>
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="pullBudgetNow()" :disabled="pullingBudget">{{pullingBudget?'⟳ Pulling…':'⟳ Pull budget'}}</button>
           </template>
           <template v-else>
             <input v-model="budgetEditVal" type="number" placeholder="49280574" style="width:110px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">

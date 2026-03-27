@@ -343,7 +343,7 @@ createApp({
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
       clubBudget: null, clubWageBudget: null,
       budgetOverride: (() => { try { const v = localStorage.getItem('sf_budget_override'); return v ? parseInt(v, 10) : null; } catch(e) { return null; } })(),
-      budgetEditing: false, budgetEditVal: '',
+      budgetEditing: false, budgetEditVal: '', pullingBudget: false,
       auctionProfiles: {},  // playerName.toLowerCase() → full snapshot from /api/auctions
       auctionItems: [],    // raw items from /api/auctions (has all bids + snapshots)
       pastAuctionsOpen: false,
@@ -2720,22 +2720,25 @@ createApp({
       return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
     },
     async pullBudgetNow() {
-      // Trigger CF worker squads refresh (fetches budget + auctions + squads)
-      const base = SF_CACHE_BASE.replace('/sf-cache', '');
+      if (this.pullingBudget) return;
+      this.pullingBudget = true;
+      // Use dedicated /_budget route — logs immediately so we can confirm it's hit
+      const WORKER = 'https://sf-cache.ofersi15.workers.dev';
       try {
-        await fetch(`${base}/_pull`, { method: 'POST', signal: AbortSignal.timeout(5000) });
-        // Background job — poll for results up to 20s
-        for (let i = 0; i < 5; i++) {
-          await new Promise(r => setTimeout(r, 4000));
+        await fetch(`${WORKER}/_budget`, { method: 'POST', signal: AbortSignal.timeout(8000) });
+        // Poll KV every 3s for up to 18s waiting for the background job
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 3000));
           const [budgetRaw, auctionsRaw] = await Promise.all([
             serverCacheGet('sf_leverkusen_fin_v1', true),
             serverCacheGet('sf_auctions_v1', true),
           ]);
-          if (budgetRaw) { const f = JSON.parse(budgetRaw); if (f.budget) { this.clubBudget = f.budget; this.budgetEditing = false; } }
-          if (auctionsRaw) { this._applyAuctionData(JSON.parse(auctionsRaw)); }
-          if (budgetRaw || auctionsRaw) break;
+          if (budgetRaw) { const f = JSON.parse(budgetRaw); if (f.budget) this.clubBudget = f.budget; }
+          if (auctionsRaw) this._applyAuctionData(JSON.parse(auctionsRaw));
+          if (budgetRaw) break;  // got budget — stop polling
         }
       } catch(e) {}
+      this.pullingBudget = false;
     },
     saveBudget() {
       const v = parseInt((this.budgetEditVal||'').replace(/[^0-9]/g, ''), 10);
