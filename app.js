@@ -342,6 +342,7 @@ createApp({
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
       clubBudget: null, clubWageBudget: null,
+      pastAuctionsOpen: false,
       selectedJobCtx: null,
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
@@ -649,6 +650,7 @@ createApp({
       const q = (this.espionageNegoSearch||'').trim().toLowerCase();
       const cutoff = Date.now() - 14 * 24 * 3600 * 1000; // 2 weeks
       let list = this.espionageNegos.filter(n => {
+        if (n.via === 'auction') return false; // shown in auction board above
         if (!this.negoShowAll && !q && new Date(n.updatedAt||0).getTime() < cutoff) return false;
         if (!q) return true;
         return (n.playerName||'').toLowerCase().includes(q) ||
@@ -852,19 +854,47 @@ createApp({
     },
 
     negoPlayerMap() {
+      // Build a lookup of player info from raw nego objects (covers unknown players like Irwin, Davids)
+      // Try every plausible field name the API might use; always create an entry so playerByName works
       const map = {};
       for (const n of this.espionageNegos) {
         const k = (n.playerName||'').toLowerCase();
         if (!k || map[k]) continue;
-        const pos = n.playerPosition || n.player?.position || n.position;
-        const age = n.playerAge ?? n.player?.age ?? n.age;
-        const rtg = n.playerRating || n.player?.rating || n.rating;
-        const club = n.playerClub || n.player?.club || n.seller;
-        if (pos || age != null || rtg) {
-          map[k] = { Player: n.playerName, Position: pos||'?', Age: age, _gameRating: rtg, Club: club };
-        }
+        const pi = n.player || n.playerInfo || {};
+        const pos = n.playerPosition || n.playerPos || pi.position || pi.pos || n.position || null;
+        const age = n.playerAge ?? n.playerDOB ?? pi.age ?? pi.dob ?? n.age ?? null;
+        const rtg = n.playerRating ?? n.playerOverall ?? pi.rating ?? pi.overall ?? n.rating ?? null;
+        const club = n.playerClub || pi.club || pi.clubName || n.seller || null;
+        // Always create entry — at minimum the seller club is useful context
+        map[k] = { Player: n.playerName, Position: pos||null, Age: age, _gameRating: rtg, Club: club };
       }
       return map;
+    },
+    auctionsByPlayer() {
+      const byPlayer = new Map();
+      for (const n of this.espionageNegos) {
+        if (n.via !== 'auction') continue;
+        const key = (n.playerName || '?').toLowerCase();
+        if (!byPlayer.has(key)) {
+          byPlayer.set(key, { playerName: n.playerName, seller: n.seller, bids: [] });
+        }
+        byPlayer.get(key).bids.push(n);
+      }
+      for (const entry of byPlayer.values()) {
+        entry.bids.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      }
+      const active = [], past = [];
+      for (const entry of byPlayer.values()) {
+        if (entry.bids.some(b => b.status === 'pending')) active.push(entry);
+        else past.push(entry);
+      }
+      active.sort((a, b) => (a.playerName || '').localeCompare(b.playerName || ''));
+      past.sort((a, b) => {
+        const ad = Math.max(...a.bids.map(b => new Date(b.updatedAt || 0).getTime()));
+        const bd = Math.max(...b.bids.map(b => new Date(b.updatedAt || 0).getTime()));
+        return bd - ad;
+      });
+      return { active, past };
     },
     // ── Auction computed ──
     nextAuctionClose() {
@@ -2628,9 +2658,9 @@ createApp({
       }
       if (status === 'rejected') {
         const labels = {
-          declined:'↩ Withdrawn',counter_rejected:'✗ Counter rejected',
-          moved_elsewhere:'✗ Went elsewhere',outbid:'✗ Outbid',
-          insufficient_funds:'⚠ Funds issue',withdrawn:'↩ Withdrawn',closed:'✗ Closed',
+          declined:'✗ Rejected', counter_rejected:'✗ Counter rejected',
+          moved_elsewhere:'✗ Went elsewhere', outbid:'✗ Outbid',
+          insufficient_funds:'⚠ Funds issue', withdrawn:'↩ Withdrawn', closed:'✗ Closed',
         };
         const label = labels[subStatus] || '✗ Rejected';
         const note = subStatus==='insufficient_funds' ? 'next bidder wins' : subStatus==='outbid' ? '' : '';

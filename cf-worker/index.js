@@ -77,19 +77,35 @@ async function refreshSquadsCache(env) {
     await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
   }
 
-  // Fetch Leverkusen budget from club squad data
-  try {
-    const clubRes = await fetch(`${GAME_API}/squads?club=Leverkusen`, { headers });
-    if (clubRes.ok) {
-      const clubData = await clubRes.json();
-      const budget = clubData.budget ?? clubData.transferBudget ?? clubData.finances?.budget ?? null;
-      const wage = clubData.wageBudget ?? clubData.wage ?? clubData.finances?.wage ?? null;
-      if (budget != null || wage != null) {
-        await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget, wage, ts: Date.now() }));
-        console.log(`[squads] budget cached: ${budget}`);
-      }
+  // Try to extract Leverkusen budget — first from the bulk squads response
+  let levBudget = null;
+  const levBulk = squads['Leverkusen'] || squads['leverkusen'];
+  if (levBulk) {
+    levBudget = levBulk.budget ?? levBulk.transferBudget ?? levBulk.finances?.budget
+             ?? levBulk.club?.budget ?? levBulk.financials?.budget ?? null;
+    if (levBudget == null) {
+      await appendLog(env, 'debug', `lev bulk keys: ${Object.keys(levBulk).join(',')}`);
     }
-  } catch(e) { console.error('[squads] budget fetch failed:', e); }
+  }
+  // Fallback: single-club endpoint
+  if (levBudget == null) {
+    try {
+      const clubRes = await fetch(`${GAME_API}/squads?club=Leverkusen`, { headers });
+      if (clubRes.ok) {
+        const cd = await clubRes.json();
+        levBudget = cd.budget ?? cd.transferBudget ?? cd.finances?.budget
+                 ?? cd.club?.budget ?? cd.financials?.budget ?? null;
+        if (levBudget == null) {
+          await appendLog(env, 'debug', `single club keys: ${Object.keys(cd).join(',')}`);
+        }
+      }
+    } catch(e) { console.error('[squads] budget fetch failed:', e); }
+  }
+  if (levBudget != null) {
+    await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
+    await appendLog(env, 'budget', `Leverkusen budget: ${levBudget}`);
+    console.log(`[squads] budget cached: ${levBudget}`);
+  }
 
   await appendLog(env, 'squads', `${clubCount} clubs refreshed`);
 }
