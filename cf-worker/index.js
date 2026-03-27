@@ -24,6 +24,26 @@ function cacheMaxAge(key) {
 
 const GAME_API = 'https://slowfootball.club/api';
 
+// Parse /api/budgets?format=full response and cache Leverkusen's budget
+async function cacheBudget(env, data) {
+  try {
+    // Response may be keyed by club name or have a specific shape — try common structures
+    const lev = data['Leverkusen'] || data['leverkusen']
+              || (Array.isArray(data) ? data.find(b => (b.club||b.name||'').toLowerCase().includes('leverkusen')) : null)
+              || data;
+    const budget = lev?.budget ?? lev?.transferBudget ?? lev?.transfer_budget ?? null;
+    if (budget != null) {
+      await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget, ts: Date.now() }));
+      await appendLog(env, 'budget', `Leverkusen budget: ${budget}`);
+      console.log('[budget] cached:', budget);
+    } else {
+      // Log keys to help debug the response shape
+      const sample = Array.isArray(data) ? data[0] : data;
+      await appendLog(env, 'debug', `budget-keys: ${Object.keys(sample||{}).join(',')}`);
+    }
+  } catch(e) { console.error('[budget] parse error:', e); }
+}
+
 // Append an entry to the KV-based worker log (last 50 entries, ring buffer)
 async function appendLog(env, type, msg) {
   try {
@@ -77,64 +97,13 @@ async function refreshSquadsCache(env) {
     await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
   }
 
-  // Try to extract Leverkusen budget from multiple sources
-  let levBudget = null;
-
-  // 1. Check bulk squads response (Leverkusen entry)
-  const levBulk = squads['Leverkusen'] || squads['leverkusen'];
-  if (levBulk) {
-    levBudget = levBulk.budget ?? levBulk.transferBudget ?? levBulk.finances?.budget
-             ?? levBulk.club?.budget ?? levBulk.financials?.budget ?? null;
-    if (levBudget == null) {
-      await appendLog(env, 'debug', `lev-squad-keys: ${Object.keys(levBulk).join(',')}`);
+  // Fetch budget from the dedicated endpoint (auth required)
+  try {
+    const budgetRes = await fetch(`${GAME_API}/budgets?format=full`, { headers });
+    if (budgetRes.ok) {
+      await cacheBudget(env, await budgetRes.json());
     }
-  }
-
-  // 2. Try /api/clubs endpoint (all clubs metadata)
-  if (levBudget == null) {
-    try {
-      const clubsRes = await fetch(`${GAME_API}/clubs`, { headers });
-      if (clubsRes.ok) {
-        const clubs = await clubsRes.json();
-        const lev = Array.isArray(clubs)
-          ? clubs.find(c => (c.name||c.club||c.id||'').toLowerCase().includes('leverkusen'))
-          : (clubs['Leverkusen'] || clubs['leverkusen']);
-        if (lev) {
-          levBudget = lev.budget ?? lev.transferBudget ?? lev.finances?.budget ?? null;
-          if (levBudget == null) {
-            await appendLog(env, 'debug', `clubs-lev-keys: ${Object.keys(lev).join(',')}`);
-          }
-        } else {
-          await appendLog(env, 'debug', `clubs-endpoint: no Leverkusen entry. Sample keys: ${Array.isArray(clubs)?Object.keys(clubs[0]||{}).join(','):Object.keys(clubs).slice(0,5).join(',')}`);
-        }
-      }
-    } catch(e) {}
-  }
-
-  // 3. Try /api/managers (own manager info may include budget)
-  if (levBudget == null) {
-    try {
-      const mgrRes = await fetch(`${GAME_API}/managers`, { headers });
-      if (mgrRes.ok) {
-        const mgrs = await mgrRes.json();
-        const me = Array.isArray(mgrs)
-          ? mgrs.find(m => (m.club||m.team||'').toLowerCase().includes('leverkusen'))
-          : mgrs;
-        if (me) {
-          levBudget = me.budget ?? me.transferBudget ?? me.club?.budget ?? null;
-          if (levBudget == null) {
-            await appendLog(env, 'debug', `mgr-keys: ${Object.keys(me).join(',')}`);
-          }
-        }
-      }
-    } catch(e) {}
-  }
-
-  if (levBudget != null) {
-    await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
-    await appendLog(env, 'budget', `Leverkusen budget: ${levBudget}`);
-    console.log(`[squads] budget cached: ${levBudget}`);
-  }
+  } catch(e) { console.error('[budget]', e); }
 
   // Fetch active auctions — has all bids + player snapshots
   try {
@@ -171,6 +140,13 @@ async function refreshNegosCache(env) {
   if (elapsedMin < 5) { return; }  // silent skip — too soon
   // Between 5–15 min: pull with linearly increasing probability
   if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) { return; }  // random skip
+
+  // Try budget without auth — if the endpoint is public this keeps budget fresh alongside negos
+  try {
+    const budgetRes = await fetch(`${GAME_API}/budgets?format=full`);
+    if (budgetRes.ok) await cacheBudget(env, await budgetRes.json());
+    // If 401/403, silently skip — refreshSquadsCache handles the authed version
+  } catch(e) {}
 
   const r = await fetch('https://slowfootball.club/api/negotiations');
   if (!r.ok) {
