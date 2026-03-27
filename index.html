@@ -2186,17 +2186,26 @@
           <span v-if="negosLastPull" class="c-gray" style="font-size:10px">
             updated {{new Date(negosLastPull).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}}
           </span>
-          <span v-if="clubBudget!=null" style="font-size:11px;font-weight:700;color:#7ee787">💰 {{fmtVal(clubBudget)}}</span>
+          <!-- Budget display + manual override -->
+          <template v-if="!budgetEditing">
+            <span v-if="effectiveBudget!=null" style="font-size:11px;font-weight:700;color:#7ee787" @click="budgetEditing=true;budgetEditVal=''" title="Click to edit" style="cursor:pointer">💰 {{fmtVal(effectiveBudget)}}</span>
+            <button v-else class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=true;budgetEditVal=''">💰 Set budget</button>
+          </template>
+          <template v-else>
+            <input v-model="budgetEditVal" type="number" placeholder="49280574" style="width:110px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false" autofocus>
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="saveBudget()">Save</button>
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=false">✕</button>
+          </template>
           <button class="btn" style="font-size:11px" @click="loadWorkerLog()">📋 Log</button>
           <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
         </div>
       </div>
-      <!-- ── Auction Board ── -->
-      <div v-if="auctionsByPlayer.active.length || auctionsByPlayer.past.length" style="margin-bottom:16px">
+      <!-- ── Auction Board — only shown when there are active (pending) auctions ── -->
+      <div v-if="auctionsByPlayer.active.length" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:700;color:#d2a8ff">🏛 Auctions</span>
           <span class="c-gray" style="font-size:10px">closes {{nextAuctionClose.toLocaleString('en-GB',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'})}} BST · {{auctionCountdown}}</span>
-          <span v-if="clubBudget!=null" style="font-size:11px;font-weight:700;color:#7ee787">💰 {{fmtVal(clubBudget)}}</span>
+          <span v-if="effectiveBudget!=null" style="font-size:11px;font-weight:700;color:#7ee787">💰 {{fmtVal(effectiveBudget)}}</span>
           <span style="font-size:10px;color:#586069">silent sealed · falls to next if winner can't pay</span>
         </div>
         <!-- Active auctions — one card per player -->
@@ -2219,11 +2228,11 @@
             </span>
             <span style="font-weight:700;font-size:14px;color:#e6edf3">{{entry.bids[0].amount&&entry.bids[0].amount>1?fmtVal(entry.bids[0].amount):'—'}}</span>
             <!-- Budget indicator (only when we know the top bidder's budget) -->
-            <span v-if="entry.bids[0].buyer===myClub && clubBudget!=null"
-                  :style="{fontSize:'10px',fontWeight:700,color:clubBudget>=entry.bids[0].amount?'#7ee787':'#ffa657'}">
-              💰 {{clubBudget>=entry.bids[0].amount?'budget ok':'might be short'}}
+            <span v-if="entry.bids[0].buyer===myClub && effectiveBudget!=null"
+                  :style="{fontSize:'10px',fontWeight:700,color:effectiveBudget>=entry.bids[0].amount?'#7ee787':'#ffa657'}">
+              💰 {{effectiveBudget>=entry.bids[0].amount?'budget ok':'might be short'}}
             </span>
-            <span v-else-if="entry.bids[0].buyer!==myClub && clubBudget!=null" class="c-gray" style="font-size:10px">
+            <span v-else-if="entry.bids[0].buyer!==myClub && effectiveBudget!=null" class="c-gray" style="font-size:10px">
               our bid: {{entry.bids.find(b=>b.buyer===myClub)?fmtVal(entry.bids.find(b=>b.buyer===myClub).amount):'none'}}
             </span>
             <span :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 7px',fontSize:'9px',fontWeight:700,marginLeft:'auto'}">
@@ -2288,6 +2297,24 @@
             </div>
           </template>
         </div>
+      </div>
+      <!-- Past auctions accessible even when no active ones -->
+      <div v-if="!auctionsByPlayer.active.length && auctionsByPlayer.past.length" style="margin-bottom:12px">
+        <button class="btn" style="font-size:10px;padding:2px 10px" @click="pastAuctionsOpen=!pastAuctionsOpen">
+          {{pastAuctionsOpen?'▲':'▼'}} Past Auctions ({{auctionsByPlayer.past.length}})
+        </button>
+        <template v-if="pastAuctionsOpen">
+          <div v-for="entry in auctionsByPlayer.past" :key="'ap2-'+entry.playerName"
+               class="card" style="margin-top:6px;margin-bottom:6px;padding:8px 14px;opacity:0.8">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span @click="openPlayerByName(entry.playerName)" style="cursor:pointer;color:#79c0ff;font-weight:600;font-size:12px">{{entry.playerName}}</span>
+              <span v-if="playerByName(entry.playerName)?.Position" style="font-size:10px;color:#c9d1d9;background:#21262d;padding:1px 5px;border-radius:4px">{{playerByName(entry.playerName).Position}}</span>
+              <span class="c-gray" style="font-size:10px">from {{entry.seller}}</span>
+              <span class="c-gray" style="font-size:10px">· top bid: {{entry.bids[0]?.buyer}} {{entry.bids[0]?.amount?fmtVal(entry.bids[0].amount):''}}</span>
+              <span :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 6px',fontSize:'9px',fontWeight:700}">{{negoStatusInfo(entry.bids[0]).label}}</span>
+            </div>
+          </div>
+        </template>
       </div>
       <!-- ── Nego Table ── -->
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">

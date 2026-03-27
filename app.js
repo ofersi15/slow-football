@@ -342,6 +342,9 @@ createApp({
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
       clubBudget: null, clubWageBudget: null,
+      budgetOverride: (() => { try { const v = localStorage.getItem('sf_budget_override'); return v ? parseInt(v, 10) : null; } catch(e) { return null; } })(),
+      budgetEditing: false, budgetEditVal: '',
+      auctionProfiles: {},  // playerName.toLowerCase() → {Position,Age,_gameRating,...} from /api/auctions
       pastAuctionsOpen: false,
       auctionExpandedPlayers: {},
       selectedJobCtx: null,
@@ -870,6 +873,9 @@ createApp({
         map[k] = { Player: n.playerName, Position: pos||null, Age: age, _gameRating: rtg, Club: club };
       }
       return map;
+    },
+    effectiveBudget() {
+      return this.clubBudget ?? this.budgetOverride;
     },
     auctionsByPlayer() {
       const byPlayer = new Map();
@@ -2678,6 +2684,59 @@ createApp({
       if (!n.history?.length) return n.amount;
       return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
     },
+    saveBudget() {
+      const v = parseInt((this.budgetEditVal||'').replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(v) && v > 0) {
+        this.budgetOverride = v;
+        try { localStorage.setItem('sf_budget_override', String(v)); } catch(e) {}
+        // Also write to KV so it persists across devices
+        serverCacheSet('sf_leverkusen_fin_v1', JSON.stringify({ budget: v, ts: Date.now() }));
+      }
+      this.budgetEditing = false;
+    },
+    async loadAuctionProfiles() {
+      // Try to fetch player profile data from the auction API endpoint
+      const CACHE_KEY = 'sf_auction_profiles_v1';
+      try {
+        const cached = await serverCacheGet(CACHE_KEY);
+        if (cached) {
+          this.auctionProfiles = JSON.parse(cached);
+          return;
+        }
+      } catch(e) {}
+      // Try known/candidate auction endpoints
+      const candidates = [
+        `${API}/auctions`,
+        `${API}/transfers/auctions`,
+        `${API}/transfers?type=auction`,
+        `${API}/negotiations/auctions`,
+      ];
+      for (const url of candidates) {
+        try {
+          const r = await fetch(url, {signal: AbortSignal.timeout(4000)});
+          if (!r.ok) continue;
+          const data = await r.json();
+          const items = Array.isArray(data) ? data : (data.auctions || data.items || data.listings || []);
+          if (!items.length) continue;
+          const map = {};
+          for (const item of items) {
+            const name = item.playerName || item.player?.name || item.name;
+            if (!name) continue;
+            const k = name.toLowerCase();
+            const pos = item.playerPosition || item.player?.position || item.position;
+            const age = item.playerAge ?? item.player?.age ?? item.age ?? null;
+            const rtg = item.playerRating ?? item.player?.rating ?? item.rating ?? null;
+            const club = item.playerClub || item.player?.club || item.seller || null;
+            map[k] = { Player: name, Position: pos||null, Age: age, _gameRating: rtg, Club: club };
+          }
+          if (Object.keys(map).length) {
+            this.auctionProfiles = map;
+            serverCacheSet(CACHE_KEY, JSON.stringify(map));
+          }
+          return;  // stop on first successful endpoint
+        } catch(e) {}
+      }
+    },
     async loadWorkerLog() {
       this.workerLogOpen = true;
       try {
@@ -2690,6 +2749,7 @@ createApp({
       const lc = name.toLowerCase();
       return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc)
           || this.youthAcademy.find(p => (p.Player||p.name||'').toLowerCase() === lc)
+          || this.auctionProfiles[lc]
           || this.negoPlayerMap[lc]
           || null;
     },
@@ -2729,6 +2789,7 @@ createApp({
             serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
             // Load club budget if cached
             serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
+            this.loadAuctionProfiles();
             this.espionageLoaded = true;
             this.espionageLoading = false;
             this.loadEspionageSubmissions();
@@ -2800,6 +2861,7 @@ createApp({
         this.espionageCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
         serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
+        this.loadAuctionProfiles();
         const espionageCacheStr = JSON.stringify({ savedAt: Date.now(), clubs: results, negos });
         serverCacheSet(CACHE_KEY, espionageCacheStr);  // server-side persistence
         try { localStorage.setItem(CACHE_KEY, espionageCacheStr); } catch(e) {}
