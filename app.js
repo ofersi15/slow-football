@@ -347,6 +347,7 @@ createApp({
       auctionProfiles: {},  // playerName.toLowerCase() → full snapshot from /api/auctions
       auctionItems: [],    // raw items from /api/auctions (has all bids + snapshots)
       allBudgets: {},      // club name → {transfer, ...} from /api/budgets?format=full
+      clubInfoCache: {},   // club name → { facilities, staff, academy, scouts, loading }
       pastAuctionsOpen: false,
       auctionExpandedPlayers: {},
       selectedJobCtx: null,
@@ -1886,9 +1887,28 @@ createApp({
           fetch(`${API}/staff/effects?club=${enc}`).then(r=>r.json()),
         ]);
         this.youthMsg = 'Fetching scout history…';
-        const rejRes = await fetch(`${API}/scouting/jobs?club=${enc}&status=rejected`).then(r=>r.json());
+        const [rejRes, accRes] = await Promise.all([
+          fetch(`${API}/scouting/jobs?club=${enc}&status=rejected`).then(r=>r.json()),
+          fetch(`${API}/scouting/jobs?club=${enc}&status=accepted`).then(r=>r.json()).catch(()=>({})),
+        ]);
 
-        const academy = buildAcademy(acRes.items);
+        // Build academy list and enrich with accepted-job stats (which have full attrs)
+        const acItems = acRes.items || [];
+        const accMap = {};
+        for (const job of (accRes.items || [])) {
+          const pname = (job.player?.name || job.player?.Player || '').toLowerCase();
+          if (pname) accMap[pname] = job.player;
+        }
+        const ATTR_KEYS_ENR = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision','Mentality','Experience','Leadership','Work rate'];
+        for (const p of acItems) {
+          const pname = (p.name || p.Player || '').toLowerCase();
+          const jobPlayer = accMap[pname];
+          if (jobPlayer) {
+            ATTR_KEYS_ENR.forEach(a => { if (jobPlayer[a] != null && p[a] == null) p[a] = jobPlayer[a]; });
+            if (jobPlayer.stats) ATTR_KEYS_ENR.forEach(a => { if (jobPlayer.stats[a] != null && p[a] == null) p[a] = jobPlayer.stats[a]; });
+          }
+        }
+        const academy = buildAcademy(acItems);
         const staff   = (staffRes.ok ? staffRes.effects : {}) || {};
         const now     = Date.now();
 
@@ -2710,7 +2730,12 @@ createApp({
         return { icon:'📨', label:'Direct offer', detail:'', color:'#79c0ff', bg:'#1f3a5a' };
       }
       if (status === 'counter' || status === 'countered') {
-        const who = lastActionBy === 'buyer' ? 'We' : 'Seller';
+        // Determine perspective: are we the buyer or seller in this nego?
+        const iAmBuyer = n.buyer === this.myClub;
+        const buyerActed = lastActionBy === 'buyer';
+        const weActed = iAmBuyer ? buyerActed : !buyerActed;
+        const other = iAmBuyer ? 'Seller' : 'Buyer';
+        const who = weActed ? 'We' : other;
         return { icon:'🔄', label:`${who} countered`, detail:'', color:'#ffa657', bg:'#4a3a10' };
       }
       if (status === 'accepted') {
@@ -3240,18 +3265,55 @@ createApp({
       this.activeTab = 'clubs';
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
-      // Persist last visited club so page refresh restores it
       try { localStorage.setItem('sf_last_club', clubName); } catch(e) {}
-      // Always fetch fresh — bypasses bulk cache so we get the latest upcoming GW submission
       delete this.submissionsCache[clubName];
       await this._fetchClubSubmissions(clubName);
-      // Update localStorage with fresh data for this club
       try {
         const lsRaw = localStorage.getItem(SUBMISSIONS_LS_KEY);
         const lsData = lsRaw ? JSON.parse(lsRaw) : { clubs: {} };
         lsData.clubs[clubName] = this.submissionsCache[clubName] || {};
         localStorage.setItem(SUBMISSIONS_LS_KEY, JSON.stringify(lsData));
       } catch(e) {}
+      // Preload club info (facilities/staff/academy/scouts) in background
+      this._fetchClubInfo(clubName);
+    },
+
+    async _fetchClubInfo(clubName) {
+      if (this.clubInfoCache[clubName]?.loaded) return;
+      this.clubInfoCache = { ...this.clubInfoCache, [clubName]: { loading: true } };
+      try {
+        const enc = encodeURIComponent(clubName);
+        const [facRes, staffRes, acRes, sjRes, accRes] = await Promise.all([
+          fetch(`${API}/facilities?club=${enc}`).then(r=>r.json()).catch(()=>({})),
+          fetch(`${API}/staff/effects?club=${enc}`).then(r=>r.json()).catch(()=>({})),
+          fetch(`${API}/academy?club=${enc}`).then(r=>r.json()).catch(()=>({})),
+          fetch(`${API}/scouting/jobs?club=${enc}`).then(r=>r.json()).catch(()=>({})),
+          fetch(`${API}/scouting/jobs?club=${enc}&status=accepted`).then(r=>r.json()).catch(()=>({})),
+        ]);
+        // Enrich academy players with accepted-job attrs
+        const acItems = acRes.items || [];
+        const accMap = {};
+        for (const job of (accRes.items || [])) {
+          const k = (job.player?.name || job.player?.Player || '').toLowerCase();
+          if (k) accMap[k] = job.player;
+        }
+        const ENRICH = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision','Mentality','Experience'];
+        for (const p of acItems) {
+          const jp = accMap[(p.name||p.Player||'').toLowerCase()];
+          if (jp) ENRICH.forEach(a => { if (jp[a] != null && p[a] == null) p[a] = jp[a]; if (jp.stats?.[a] != null && p[a] == null) p[a] = jp.stats[a]; });
+        }
+        this.clubInfoCache = { ...this.clubInfoCache, [clubName]: {
+          loaded: true, loading: false,
+          facilities: facRes?.levels || facRes || {},
+          facilityProject: facRes?.project || null,
+          staff: (staffRes?.ok ? staffRes.effects : staffRes) || {},
+          academy: acItems,
+          scouts: sjRes?.items || [],
+          scoutCap: sjRes?.cap || {},
+        }};
+      } catch(e) {
+        this.clubInfoCache = { ...this.clubInfoCache, [clubName]: { loaded: true, loading: false, error: true }};
+      }
     },
 
     async fetchMySubmission() {
