@@ -134,12 +134,6 @@ async function refreshNegosCache(env) {
   // 5–15 min window: pull with linearly increasing probability
   if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) return;
 
-  // Budget (public endpoint — no auth needed for negos pull)
-  try {
-    const budgetRes = await fetch(`${GAME_API}/budgets?format=full`);
-    if (budgetRes.ok) await cacheBudget(env, await budgetRes.json());
-  } catch(e) {}
-
   // Negos fetch
   const r = await fetch('https://slowfootball.club/api/negotiations');
   if (!r.ok) { console.error('[negos] fetch failed:', r.status); return; }
