@@ -24,13 +24,13 @@ function cacheMaxAge(key) {
 
 const GAME_API = 'https://slowfootball.club/api';
 
-// Parse /api/budgets?format=full response and cache Leverkusen's budget
+// Parse /api/budgets?format=full response and cache budgets.
 // Response shape: { budgets:{club→{transfer,wage,...}}, committed, available:{obj}, updatedAt, source }
 async function cacheBudget(env, data) {
   try {
     const allBudgets = data?.budgets || null;
 
-    // Extract Leverkusen's transfer budget from the per-club dict (reliable)
+    // Extract Leverkusen's transfer budget from the per-club dict
     const levEntry = allBudgets?.['Leverkusen'] || allBudgets?.['leverkusen'] || null;
     const levBudget = levEntry == null ? null
       : typeof levEntry === 'number' ? levEntry
@@ -38,27 +38,27 @@ async function cacheBudget(env, data) {
 
     if (typeof levBudget === 'number') {
       await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
-      await appendLog(env, 'budget', `Leverkusen: ${levBudget}`);
+      console.log('[budget] Leverkusen:', levBudget);
     } else {
-      // Log the raw entry to debug field names
-      await appendLog(env, 'debug', `lev-entry: ${JSON.stringify(levEntry).slice(0, 120)}`);
+      console.log('[budget] could not parse lev budget; entry:', JSON.stringify(levEntry).slice(0, 200));
     }
     if (allBudgets) {
       await env.SF_CACHE.put('sf_all_budgets_v1', JSON.stringify({ data: allBudgets, ts: Date.now() }));
-      await appendLog(env, 'budget', `all clubs: ${Object.keys(allBudgets).length} entries`);
+      console.log('[budget] all clubs cached:', Object.keys(allBudgets).length);
     }
   } catch(e) { console.error('[budget] parse error:', e); }
 }
 
-// Append an entry to the KV-based worker log (last 50 entries, ring buffer)
+// Write a one-line summary to sf_worker_log (ring buffer, last 20 entries).
+// Call sparingly — each call costs 1 KV read + 1 KV write.
 async function appendLog(env, type, msg) {
   try {
     const raw = await env.SF_CACHE.get('sf_worker_log');
     const log = raw ? JSON.parse(raw) : [];
     log.unshift({ ts: Date.now(), type, msg });
-    if (log.length > 50) log.length = 50;
+    if (log.length > 20) log.length = 20;
     await env.SF_CACHE.put('sf_worker_log', JSON.stringify(log));
-  } catch(e) { console.error('[log] failed to write log:', e); }
+  } catch(e) { console.error('[log] failed:', e); }
 }
 
 async function refreshSquadsCache(env) {
@@ -69,60 +69,47 @@ async function refreshSquadsCache(env) {
     body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
   });
   if (!loginRes.ok) {
-    const msg = `login failed: ${loginRes.status}`;
-    console.error('[squads]', msg);
-    await appendLog(env, 'error', `squads: ${msg}`);
+    console.error('[squads] login failed:', loginRes.status);
     return;
   }
   const { token } = await loginRes.json();
-  if (!token) {
-    await appendLog(env, 'error', 'squads: no token in login response');
-    return;
-  }
+  if (!token) { console.error('[squads] no token'); return; }
 
   const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
-  // Fetch all squads (bulk endpoint returns dict keyed by club name)
+  // Fetch all squads
   const squadsRes = await fetch(`${GAME_API}/squads`, { headers });
-  if (!squadsRes.ok) {
-    const msg = `squads fetch failed: ${squadsRes.status}`;
-    console.error('[squads]', msg);
-    await appendLog(env, 'error', msg);
-    return;
-  }
+  if (!squadsRes.ok) { console.error('[squads] fetch failed:', squadsRes.status); return; }
   const squads = await squadsRes.json();
   const clubCount = Object.keys(squads).length;
-
   await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }));
-  console.log(`[squads] refreshed: ${clubCount} clubs`);
 
-  // Also fetch tables (lightweight) and cache separately
+  // Tables
   const tablesRes = await fetch(`${GAME_API}/tables/from-fixtures`, { headers });
   if (tablesRes.ok) {
-    const tables = await tablesRes.json();
-    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: tables, ts: Date.now() }));
+    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: await tablesRes.json(), ts: Date.now() }));
   }
 
-  // Fetch budget from the dedicated endpoint (auth required)
+  // Budget (auth required)
   try {
     const budgetRes = await fetch(`${GAME_API}/budgets?format=full`, { headers });
-    if (budgetRes.ok) {
-      await cacheBudget(env, await budgetRes.json());
-    }
+    if (budgetRes.ok) await cacheBudget(env, await budgetRes.json());
   } catch(e) { console.error('[budget]', e); }
 
-  // Fetch active auctions — has all bids + player snapshots
+  // Auctions
   try {
     const auctionsRes = await fetch(`${GAME_API}/auctions`, { headers });
     if (auctionsRes.ok) {
       const auctionsData = await auctionsRes.json();
       await env.SF_CACHE.put('sf_auctions_v1', JSON.stringify({ data: auctionsData, ts: Date.now() }));
       const count = Array.isArray(auctionsData) ? auctionsData.length : (auctionsData.items?.length || 0);
-      await appendLog(env, 'auctions', `${count} auctions cached`);
+      console.log('[auctions]', count, 'cached');
     }
   } catch(e) { console.error('[auctions]', e); }
 
-  await appendLog(env, 'squads', `${clubCount} clubs refreshed`);
+  // Single log entry for the whole squads run (1 KV read + 1 KV write)
+  await appendLog(env, 'squads', `${clubCount} clubs · ${new Date().toISOString()}`);
+  console.log('[squads] done:', clubCount, 'clubs');
 }
 
 // Returns true if current time is within 9am–11pm US Eastern
@@ -136,47 +123,41 @@ function isActiveHours() {
 }
 
 async function refreshNegosCache(env) {
-  if (!isActiveHours()) { return; }  // silent skip outside hours
+  if (!isActiveHours()) return;  // silent skip — no KV read needed
 
-  // Check last pull time — enforce 5-min minimum, randomise up to 15 min
+  // Rate-limit: one KV read to check last pull time
   const lastPullRaw = await env.SF_CACHE.get('sf_negos_last_pull');
   const lastPull = lastPullRaw ? parseInt(lastPullRaw, 10) : 0;
   const elapsedMin = (Date.now() - lastPull) / 60000;
 
-  if (elapsedMin < 5) { return; }  // silent skip — too soon
-  // Between 5–15 min: pull with linearly increasing probability
-  if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) { return; }  // random skip
+  if (elapsedMin < 5) return;  // too soon
+  // 5–15 min window: pull with linearly increasing probability
+  if (elapsedMin < 15 && Math.random() > (elapsedMin - 5) / 10) return;
 
-  // Try budget without auth — if the endpoint is public this keeps budget fresh alongside negos
+  // Budget (public endpoint — no auth needed for negos pull)
   try {
     const budgetRes = await fetch(`${GAME_API}/budgets?format=full`);
     if (budgetRes.ok) await cacheBudget(env, await budgetRes.json());
-    // If 401/403, silently skip — refreshSquadsCache handles the authed version
   } catch(e) {}
 
+  // Negos fetch
   const r = await fetch('https://slowfootball.club/api/negotiations');
-  if (!r.ok) {
-    const msg = `negos fetch failed: ${r.status}`;
-    console.error('[negos]', msg);
-    await appendLog(env, 'error', msg);
-    return;
-  }
+  if (!r.ok) { console.error('[negos] fetch failed:', r.status); return; }
   const data = await r.json();
   const fresh = Array.isArray(data) ? data : (data.negotiations || data.items || []);
 
-  // Merge with accumulated history
+  // Merge with history (1 KV read)
   const histRaw = await env.SF_CACHE.get('sf_negos_history_v1');
   const historical = histRaw ? JSON.parse(histRaw) : [];
   const map = new Map(historical.map(n => [n.id, n]));
   fresh.forEach(n => map.set(n.id, n));
   const merged = [...map.values()].sort((a, b) => new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
 
+  // 2 KV writes for negos data
   await env.SF_CACHE.put('sf_negos_history_v1', JSON.stringify(merged));
   await env.SF_CACHE.put('sf_negos_last_pull', String(Date.now()));
 
-  const msg = `${fresh.length} fresh, ${merged.length} total (${elapsedMin.toFixed(1)}m since last)`;
-  console.log('[negos]', msg);
-  await appendLog(env, 'negos', msg);
+  console.log('[negos]', fresh.length, 'fresh,', merged.length, 'total,', elapsedMin.toFixed(1), 'min since last');
 }
 
 export default {
@@ -204,7 +185,7 @@ export default {
     }
     if (url.pathname === '/_budget') {
       ctx.waitUntil((async () => {
-        await appendLog(env, 'budget-pull', 'manual trigger');
+        console.log('[budget] manual pull triggered');
         // Try without auth first
         try {
           const r = await fetch(`${GAME_API}/budgets?format=full`);
@@ -217,21 +198,22 @@ export default {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
           });
-          if (!loginRes.ok) { await appendLog(env, 'error', `budget login failed: ${loginRes.status}`); return; }
+          if (!loginRes.ok) { console.error('[budget] login failed:', loginRes.status); return; }
           const { token } = await loginRes.json();
           const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
           const br = await fetch(`${GAME_API}/budgets?format=full`, { headers: h });
           if (br.ok) await cacheBudget(env, await br.json());
-          else await appendLog(env, 'error', `budget fetch failed: ${br.status}`);
-        } catch(e) { await appendLog(env, 'error', `budget pull error: ${e.message}`); }
+          else console.error('[budget] fetch failed:', br.status);
+        } catch(e) { console.error('[budget] pull error:', e.message); }
       })());
       return new Response('budget pull queued', { headers: cors });
     }
     if (url.pathname === '/_debug/auction-sample') {
-      const raw = await env.SF_CACHE.get('sf_negos_history_v1');
-      if (!raw) return new Response('no negos data', { status: 404, headers: cors });
-      const negos = JSON.parse(raw);
-      const sample = negos.find(n => n.via === 'auction') || negos[0] || null;
+      const raw = await env.SF_CACHE.get('sf_auctions_v1');
+      if (!raw) return new Response('no auctions data', { status: 404, headers: cors });
+      const auctions = JSON.parse(raw);
+      const items = (auctions.data || auctions).items || auctions.data || auctions;
+      const sample = Array.isArray(items) ? items[0] : null;
       return new Response(JSON.stringify(sample, null, 2), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       });
@@ -265,7 +247,6 @@ export default {
       const permanent = url.searchParams.get('permanent') === '1';
       const opts = permanent ? {} : { expirationTtl: 7 * 24 * 3600 };
       await env.SF_CACHE.put(key, body, opts);
-      // Purge CF edge cache so the next GET reads fresh KV data
       try {
         const getUrl = `${url.origin}/sf-cache/${key}`;
         await caches.default.delete(new Request(getUrl));

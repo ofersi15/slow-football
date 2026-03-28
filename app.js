@@ -2675,7 +2675,7 @@ createApp({
     },
     startNegosPolling() {
       if (this.negosPollingInterval) return;
-      this.negosPollingInterval = setInterval(() => this.pollNegosUpdate(), 30000);
+      this.negosPollingInterval = setInterval(() => this.pollNegosUpdate(), 300000); // 5 min
     },
     stopNegosPolling() {
       if (this.negosPollingInterval) { clearInterval(this.negosPollingInterval); this.negosPollingInterval = null; }
