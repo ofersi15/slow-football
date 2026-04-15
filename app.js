@@ -1469,7 +1469,6 @@ createApp({
 
         const clubs = clubsRes.clubs;
         this.totalClubs = clubs.length;
-        const activeClubSet = new Set(clubs); // all clubs in current game
         const seen = new Set();
         const players = [];
 
@@ -1489,9 +1488,9 @@ createApp({
             if (seen.has(key)) return;
             seen.add(key);
             p.Club=p.Club||clubName;
-            // Clubs not in north/south/europa tables but in the active game → tag 'world'
-            // so they appear under the World league filter button
-            p._league=leagueMap[p.Club]||(activeClubSet.has(p.Club)?'world':'other');
+            // Clubs in one of the 6 active leagues: tagged by division (N/S/E from tables)
+            // or 'world' (W/C/H) if managed or a real vacancy — AI clubs fall through to 'other'
+            p._league=leagueMap[p.Club]||((managedClubs.has(p.Club)||this.vacantClubs.has(p.Club))?'world':'other');
             p._managed=managedClubs.has(p.Club);
             p._gameRating=calcGameRating(p, p.Position);
             p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
