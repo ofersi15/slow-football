@@ -1,3 +1,8 @@
+# credentials & browser session — never commit
+.game-creds.json
+tools/.session.json
+tools/node_modules/
+
 # wrangler files
 .wrangler
 .dev.vars*
