@@ -166,6 +166,18 @@
           </div>
         </div>
       </div>
+      <!-- Column Groups -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <span class="label">📋 Columns</span>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">
+          <label class="check-row"><input type="checkbox" v-model="colGroups.stats" style="accent-color:#1f6feb"> Season Stats</label>
+          <label class="check-row"><input type="checkbox" v-model="colGroups.per90" style="accent-color:#1f6feb"> Per 90</label>
+          <label class="check-row"><input type="checkbox" v-model="colGroups.fitness" style="accent-color:#1f6feb"> Fitness</label>
+          <label class="check-row"><input type="checkbox" v-model="colGroups.attrs" style="accent-color:#1f6feb"> Attributes</label>
+          <label class="check-row"><input type="checkbox" v-model="colGroups.mental" style="accent-color:#1f6feb"> Mental</label>
+          <label class="check-row"><input type="checkbox" v-model="colGroups.bio" style="accent-color:#1f6feb"> Bio</label>
+        </div>
+      </div>
       <div style="border-top:1px solid #21262d;padding-top:8px;font-size:11px;color:#8b949e">
         <div>{{filteredPlayers.length}} players · {{filteredClubs}} clubs</div>
         <div style="margin-top:3px">Wk {{asOfWeek}} · <span :class="playersRefreshing?'c-orange':''">{{playersRefreshing?'⟳ refreshing…':playersCacheDate?'cached '+playersCacheDate:'live'}}</span></div>
@@ -194,7 +206,7 @@
         <table>
           <thead>
             <tr>
-              <th v-for="c in tableCols" :key="c.key" @click="sortBy(c.key)" :style="{minWidth:c.w+'px'}" :title="c.full||c.label">
+              <th v-for="c in visibleTableCols" :key="c.key" @click="sortBy(c.key)" :style="{minWidth:c.w+'px'}" :title="c.full||c.label">
                 {{c.label}}<span v-if="sortCol===c.key" class="sort-arrow"> {{sortDir>0?'▲':'▼'}}</span>
               </th>
             </tr>
@@ -219,6 +231,7 @@
               <td :class="ratingClass(p._weightedRating)" :title="p._weightedRating&&p._gameRating?'Δ '+(p._weightedRating-p._gameRating).toFixed(1)+' vs game rating':''">{{p._weightedRating?p._weightedRating.toFixed(1):'—'}}</td>
               <td>{{fmtVal(p.Value)}}</td>
               <td class="c-gray" :title="'Source: '+trueValSrc(p)">{{fmtVal(trueVal(p))}}</td>
+              <template v-if="colGroups.stats">
               <td>{{p.Games||0}}</td>
               <td>{{p.Minutes||0}}</td>
               <td :class="ratingClass(p['Average Rating'])">{{p['Average Rating']?p['Average Rating'].toFixed(1):'—'}}</td>
@@ -226,10 +239,14 @@
               <td class="c-orange">{{p.xG!=null?p.xG.toFixed(2):'—'}}</td>
               <td class="c-blue">{{p.Assists||0}}</td>
               <td>{{p.xA!=null?p.xA.toFixed(2):'—'}}</td>
+              </template>
+              <template v-if="colGroups.per90">
               <td class="c-green">{{p._g90!=null?p._g90.toFixed(2):'—'}}</td>
               <td class="c-blue">{{p._a90!=null?p._a90.toFixed(2):'—'}}</td>
               <td class="c-orange">{{p._xG90!=null?p._xG90.toFixed(2):'—'}}</td>
               <td>{{p._xA90!=null?p._xA90.toFixed(2):'—'}}</td>
+              </template>
+              <template v-if="colGroups.stats">
               <td :class="(p.Yellow||0)>=3?'c-red':(p.Yellow||0)>=2?'c-orange':''">{{p.Yellow||''}}</td>
               <td :class="(p.Red||0)>=1?'c-red':''">{{p.Red||''}}</td>
               <td>{{p['Tackle %']!=null?p['Tackle %'].toFixed(0)+'%':'—'}}</td>
@@ -237,9 +254,13 @@
               <td>{{p.Steals||0}}</td>
               <td :class="p.Mistakes>2?'c-red':''">{{p.Mistakes||0}}</td>
               <td>{{p.Form?p.Form.toFixed(1):'—'}}</td>
+              </template>
+              <template v-if="colGroups.fitness">
               <td :class="p.fitnessPct<70?'c-red':p.fitnessPct<85?'c-orange':'c-green'">{{p.fitnessPct!=null?p.fitnessPct+'%':'—'}}</td>
               <td :class="p.injuryRiskLabel==='High'?'c-red':p.injuryRiskLabel==='Moderate'?'c-orange':'c-gray'">{{p.injuryRiskLabel||'—'}}</td>
               <td>{{p.injured?'🤕':''}}</td><td>{{p.suspended?'🚫':''}}</td>
+              </template>
+              <template v-if="colGroups.attrs">
               <td>{{p.Speed||'—'}}</td><td>{{p.Stamina||'—'}}</td><td>{{p.Vision||'—'}}</td>
               <td>{{p.Dribbling||'—'}}</td><td>{{p.Passing||'—'}}</td><td>{{p.Shooting||'—'}}</td>
               <td>{{p.Tackling||'—'}}</td><td>{{p.Marking||'—'}}</td><td>{{p.Heading||'—'}}</td>
@@ -247,14 +268,19 @@
               <td>{{p['Free kicks']!=null?p['Free kicks'].toFixed(0):'—'}}</td>
               <td>{{p.Penalties!=null?p.Penalties.toFixed(0):'—'}}</td>
               <td>{{p.Corners!=null?p.Corners.toFixed(0):'—'}}</td>
+              </template>
+              <template v-if="colGroups.mental">
               <td>{{p.Mentality!=null?p.Mentality.toFixed(0):'—'}}</td>
               <td>{{p.Leadership!=null?p.Leadership.toFixed(0):'—'}}</td>
               <td>{{p.Experience!=null?p.Experience.toFixed(0):'—'}}</td>
               <td>{{p.Confidence!=null?p.Confidence.toFixed(0):'—'}}</td>
               <td>{{p['Work rate']!=null?p['Work rate'].toFixed(0):'—'}}</td>
               <td>{{p.Morale!=null?p.Morale.toFixed(0):'—'}}</td>
+              </template>
+              <template v-if="colGroups.bio">
               <td class="c-gray" style="font-size:10px">{{p.Nationality}}</td>
               <td class="c-gray" style="font-size:10px">{{p.PreferredFoot||'—'}}</td>
+              </template>
             </tr>
           </tbody>
         </table>
