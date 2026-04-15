@@ -2640,15 +2640,16 @@ createApp({
         const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json());
         const week = weekRes.currentWeek - 1;
         if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
-        // Toggle all ads OFF then ON — this signals the game to generate new candidates
-        this.staffGenMsg = `Week ${week} — resetting ads…`;
+        // Toggle Technical Director ad off then on — triggers new candidate generation
+        this.staffGenMsg = `Week ${week} — toggling ads…`;
+        const ALL_ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
         await fetch(`${API}/staff/ads`, {
           method: 'POST', headers: h,
-          body: JSON.stringify({ club: MY_CLUB, roles: [] }),
+          body: JSON.stringify({ club: MY_CLUB, roles: ALL_ROLES.filter(r => r !== 'Technical Director') }),
         });
         await fetch(`${API}/staff/ads`, {
           method: 'POST', headers: h,
-          body: JSON.stringify({ club: MY_CLUB, roles: ['CEO', 'Technical Director', 'Assistant', 'Physio'] }),
+          body: JSON.stringify({ club: MY_CLUB, roles: ALL_ROLES }),
         });
         // Generate candidates
         this.staffGenMsg = 'Generating candidates…';
