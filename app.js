@@ -2595,7 +2595,7 @@ createApp({
           this.staffWeek = firstWeek;
         } else {
           const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json()).catch(() => ({}));
-          if (weekRes.currentWeek > 0) this.staffWeek = weekRes.currentWeek;
+          if (weekRes.currentWeek > 0) this.staffWeek = weekRes.currentWeek - 1;
         }
         // Sync openAds + current staff into clubStaff
         if (staffRes.openAds) this.clubStaff = { ...this.clubStaff, openAds: staffRes.openAds };
@@ -2657,20 +2657,10 @@ createApp({
           getAuthToken(),
           fetch(`${API}/fixtures/week`).then(r => r.json()),
         ]);
-        const week = weekRes.currentWeek;
+        const week = weekRes.currentWeek - 1;
         if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
         const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' };
-        // Toggle Technical Director off then on, then generate
-        this.staffGenMsg = `Week ${week} — toggling ads…`;
-        await fetch(`${API}/staff/ads`, {
-          method: 'POST', headers: h,
-          body: JSON.stringify({ club: MY_CLUB, roles: ['CEO', 'Assistant', 'Physio'] }),
-        });
-        await fetch(`${API}/staff/ads`, {
-          method: 'POST', headers: h,
-          body: JSON.stringify({ club: MY_CLUB, roles: ['CEO', 'Assistant', 'Physio', 'Technical Director'] }),
-        });
-        this.staffGenMsg = 'Generating candidates…';
+        this.staffGenMsg = `Week ${week} — generating…`;
         const genRes = await fetch(`${API}/staff/generate`, {
           method: 'POST', headers: h,
           body: JSON.stringify({ club: MY_CLUB, week }),
