@@ -245,7 +245,7 @@ createApp({
   data() {
     return {
       loaded: false, corsError: false, progress: 0, loadMsg: 'Starting…',
-      allPlayers: [], leagueTables: {}, managedSet: new Set(), managerMap: {}, asOfWeek: '?', totalClubs: 0,
+      allPlayers: [], leagueTables: {}, managedSet: new Set(), managerMap: {}, vacantClubs: new Set(), asOfWeek: '?', totalClubs: 0,
       transferMap: {},
       myClub: MY_CLUB,
       leagueFilter: new Set(ALL_LEAGUES),
@@ -764,7 +764,7 @@ createApp({
         if (this.posRatingMax < 99 && rtg > this.posRatingMax) return false;
         if (this.maxAge < 40 && (p.Age||99) > this.maxAge) return false;
         if (this.hideOwn && p.Club === MY_CLUB) return false;
-        if (this.hideVacant && !p._managed) return false;
+        if (this.hideVacant && (this.vacantClubs.size > 0 ? this.vacantClubs.has(p.Club) : !p._managed)) return false;
         if (this.managedOnly && !p._managed) return false;
         if (this.forSaleOnly && (!p._managed || p.notForSale)) return false;
         if (this.transferListedOnly && !p._transferListed) return false;
@@ -1261,6 +1261,10 @@ createApp({
             this.asOfWeek = meta.asOfWeek||'?';
             this.totalClubs = meta.totalClubs||0;
             this.managedSet = new Set(meta.managedClubs||[]);
+            // Load vacancy list from KV (updated by cron 4x/day)
+            serverCacheGet('sf_vacancies_v1').then(raw => {
+              if (raw) { try { const {clubs}=JSON.parse(raw); this.vacantClubs=new Set(clubs||[]); } catch(e){} }
+            }).catch(()=>{});
             // Recompute derived fields with current config (config can differ from cache-time)
             players.forEach(p => {
               // Always recompute _gameRating — CF formula was corrected (Shooting not Stamina)
@@ -1451,8 +1455,21 @@ createApp({
         this.managedSet = managedClubs;
         this.managerMap = managerMap;
 
+        // Load vacancies from KV (populated by cron every 6h) — fall back to managed diff
+        try {
+          const vacRaw = await serverCacheGet('sf_vacancies_v1');
+          if (vacRaw) {
+            const { clubs } = JSON.parse(vacRaw);
+            this.vacantClubs = new Set(clubs || []);
+          } else {
+            // Fallback: clubs in public list that have no manager (excluding AI-only clubs)
+            this.vacantClubs = new Set([...clubsRes.clubs].filter(c => !managedClubs.has(c) && !['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami'].includes(c)));
+          }
+        } catch(e) { this.vacantClubs = new Set(); }
+
         const clubs = clubsRes.clubs;
         this.totalClubs = clubs.length;
+        const activeClubSet = new Set(clubs); // all clubs in current game
         const seen = new Set();
         const players = [];
 
@@ -1472,7 +1489,9 @@ createApp({
             if (seen.has(key)) return;
             seen.add(key);
             p.Club=p.Club||clubName;
-            p._league=leagueMap[p.Club]||'other';
+            // Clubs not in north/south/europa tables but in the active game → tag 'world'
+            // so they appear under the World league filter button
+            p._league=leagueMap[p.Club]||(activeClubSet.has(p.Club)?'world':'other');
             p._managed=managedClubs.has(p.Club);
             p._gameRating=calcGameRating(p, p.Position);
             p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);

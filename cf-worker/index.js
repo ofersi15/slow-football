@@ -107,6 +107,17 @@ async function refreshSquadsCache(env) {
     }
   } catch(e) { console.error('[auctions]', e); }
 
+  // Vacancies — /api/admin/profile/vacancies (auth required)
+  try {
+    const vacRes = await fetch(`${GAME_API}/admin/profile/vacancies`, { headers });
+    if (vacRes.ok) {
+      const vacData = await vacRes.json();
+      const clubs = vacData.clubs || [];
+      await env.SF_CACHE.put('sf_vacancies_v1', JSON.stringify({ clubs, ts: Date.now() }));
+      console.log('[vacancies]', clubs.length, 'vacancies:', clubs.join(', '));
+    }
+  } catch(e) { console.error('[vacancies]', e); }
+
   // Single log entry for the whole squads run (1 KV read + 1 KV write)
   await appendLog(env, 'squads', `${clubCount} clubs · ${new Date().toISOString()}`);
   console.log('[squads] done:', clubCount, 'clubs');
