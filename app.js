@@ -43,6 +43,8 @@ function stringifyAsync(data) {
 const API = 'https://slowfootball.club/api';
 const MY_CLUB = 'Leverkusen';
 const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];
+// AI-controlled clubs — excluded from scout/tables; never count as vacancies
+const AI_CLUBS = new Set(['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami']);
 const ALL_POSITIONS = ['GK','FB','CB','DM','CM','AM','WF','CF'];
 const OUTFIELD_POSITIONS = ['FB','CB','DM','CM','AM','WF','CF'];
 const PAGE_SIZE = 100;
@@ -775,7 +777,7 @@ createApp({
         if (this.posRatingMax < 99 && rtg > this.posRatingMax) return false;
         if (this.maxAge < 40 && (p.Age||99) > this.maxAge) return false;
         if (this.hideOwn && p.Club === MY_CLUB) return false;
-        if (this.hideVacant && (this.vacantClubs.size > 0 ? this.vacantClubs.has(p.Club) : !p._managed)) return false;
+        if (this.hideVacant && !p._managed) return false;
         if (this.managedOnly && !p._managed) return false;
         if (this.forSaleOnly && (!p._managed || p.notForSale)) return false;
         if (this.transferListedOnly && !p._transferListed) return false;
@@ -1296,7 +1298,11 @@ createApp({
               if (raw) { try { const {clubs}=JSON.parse(raw); this.vacantClubs=new Set(clubs||[]); } catch(e){} }
             }).catch(()=>{});
             // Recompute derived fields with current config (config can differ from cache-time)
+            const cachedLeagueMap = {};
+            ALL_LEAGUES.forEach(l=>(this.leagueTables[l]||[]).forEach(t=>{cachedLeagueMap[t.Team]=l;}));
             players.forEach(p => {
+              // Recompute _league — AI_CLUBS set and fallback logic may have changed
+              p._league = AI_CLUBS.has(p.Club) ? 'other' : (cachedLeagueMap[p.Club] || p._league || 'world');
               // Always recompute _gameRating — CF formula was corrected (Shooting not Stamina)
               p._gameRating = calcGameRating(p, p.Position);
               p._weightedRating = calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
@@ -1492,7 +1498,7 @@ createApp({
             this.vacantClubs = new Set(clubs || []);
           } else {
             // Fallback: clubs in public list that have no manager (excluding AI-only clubs)
-            this.vacantClubs = new Set([...clubsRes.clubs].filter(c => !managedClubs.has(c) && !['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami'].includes(c)));
+            this.vacantClubs = new Set([...clubsRes.clubs].filter(c => !managedClubs.has(c) && !AI_CLUBS.has(c)));
           }
         } catch(e) { this.vacantClubs = new Set(); }
 
@@ -1519,9 +1525,9 @@ createApp({
             if (seen.has(key)) return;
             seen.add(key);
             p.Club=p.Club||clubName;
-            // Clubs in one of the 6 active leagues: tagged by division (N/S/E from tables)
-            // or 'world' (W/C/H) if managed or a real vacancy — AI clubs fall through to 'other'
-            p._league=leagueMap[p.Club]||((managedClubs.has(p.Club)||this.vacantClubs.has(p.Club))?'world':'other');
+            // AI clubs are always hidden; all other clubs get their division from the tables
+            // or fall back to 'world' (catches unmanaged real clubs not yet in the tables).
+            p._league=AI_CLUBS.has(p.Club)?'other':(leagueMap[p.Club]||'world');
             p._managed=managedClubs.has(p.Club);
             p._gameRating=calcGameRating(p, p.Position);
             p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
