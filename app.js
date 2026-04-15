@@ -255,6 +255,7 @@ createApp({
       maxAge: 40, search: '',
       hideOwn: false, hideVacant: true, managedOnly: false, forSaleOnly: false,
       transferListedOnly: false, injuredOnly: false, hideRetiring: true,
+      ageGroupFilter: 'all', // 'all' | 'u21' | 'u20'
       sortCol: '_gameRating', sortDir: -1, page: 0,
       // Per-position rating filters — each pos has its own min threshold
       posRatingFilters: {GK:60,FB:60,CB:60,DM:60,CM:60,AM:60,WF:60,CF:60},
@@ -433,7 +434,7 @@ createApp({
         {key:'Nationality',label:'Nat',w:60,full:'Nationality',group:'bio'},
         {key:'PreferredFoot',label:'Foot',w:36,full:'Preferred Foot',group:'bio'},
       ],
-      colGroups: { stats: true, per90: true, fitness: true, attrs: true, mental: false, bio: false },
+      colGroups: { stats: true, per90: true, fitness: true, attrs: false, mental: true, bio: false },
     };
   },
 
@@ -768,16 +769,25 @@ createApp({
       return this.allPlayers.filter(p => {
         if (!this.leagueFilter.has(p._league)) return false;
         if (!this.posFilter.has(p.Position)) return false;
-        // Per-position rating filter: use native position rating vs that position's threshold
-        const posThresh = this.posRatingFilters[p.Position] || 60;
+        // Per-position rating filter — if any position has a threshold > 60,
+        // only show those specific positions (at their thresholds); otherwise all pass.
         const rtg = this.posRatingUseWeighted
           ? ((p._weightedRating || p._gameRating || p.Rating) || 0)
           : ((p._gameRating || p.Rating) || 0);
-        if (rtg < posThresh) return false;
+        const hasActivePosFilter = Object.values(this.posRatingFilters).some(v => v > 60);
+        if (hasActivePosFilter) {
+          const thresh = this.posRatingFilters[p.Position] || 60;
+          if (thresh <= 60) return false;           // position not in active set
+          if (rtg < thresh) return false;           // below that position's threshold
+        }
         if (this.posRatingMax < 99 && rtg > this.posRatingMax) return false;
         if (this.maxAge < 40 && (p.Age||99) > this.maxAge) return false;
+        if (this.ageGroupFilter === 'u21' && !p._u21) return false;
+        if (this.ageGroupFilter === 'u20' && !p._u20) return false;
         if (this.hideOwn && p.Club === MY_CLUB) return false;
-        if (this.hideVacant && !p._managed) return false;
+        // hideVacant hides clubs with open job applications (vacantClubs from /api/admin/profile/vacancies)
+        if (this.hideVacant && this.vacantClubs.has(p.Club)) return false;
+        // managedOnly hides ALL clubs without a manager
         if (this.managedOnly && !p._managed) return false;
         if (this.forSaleOnly && (!p._managed || p.notForSale)) return false;
         if (this.transferListedOnly && !p._transferListed) return false;
@@ -1315,6 +1325,21 @@ createApp({
                 p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
                 p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
               }
+              // Recompute age group flags (DOB may now be in cache)
+              if (p.DOB) {
+                const dob = new Date(p.DOB);
+                const now = new Date();
+                const exactAge = (now - dob) / (365.25 * 24 * 3600 * 1000);
+                p._u21 = exactAge < 21;
+                p._u20 = exactAge < 20;
+                if (exactAge >= 20 && exactAge < 21) {
+                  const bday21 = new Date(dob.getFullYear() + 21, dob.getMonth(), dob.getDate());
+                  p._weeksTo21 = Math.ceil((bday21 - now) / (7 * 24 * 3600 * 1000));
+                } else { p._weeksTo21 = null; }
+              } else {
+                p._u21 = (p.Age||99) < 21;
+                p._u20 = (p.Age||99) < 20;
+              }
             });
             const _fr0 = performance.now();
             players.forEach(p => Object.freeze(p));  // skip Vue deep-proxy on 1400+ objects
@@ -1542,6 +1567,21 @@ createApp({
             p._a90=mins>=30?Math.round((p.Assists||0)/mins*90*100)/100:null;
             p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
             p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
+            // Age group & academy eligibility from DOB
+            if (p.DOB) {
+              const dob = new Date(p.DOB);
+              const now = new Date();
+              const exactAge = (now - dob) / (365.25 * 24 * 3600 * 1000);
+              p._u21 = exactAge < 21;
+              p._u20 = exactAge < 20;
+              if (exactAge >= 20 && exactAge < 21) {
+                const bday21 = new Date(dob.getFullYear() + 21, dob.getMonth(), dob.getDate());
+                p._weeksTo21 = Math.ceil((bday21 - now) / (7 * 24 * 3600 * 1000));
+              }
+            } else {
+              p._u21 = (p.Age||99) < 21;
+              p._u20 = (p.Age||99) < 20;
+            }
             players.push(p);
           });
         };
