@@ -42,6 +42,19 @@ function stringifyAsync(data) {
 
 const API = 'https://slowfootball.club/api';
 const MY_CLUB = 'Leverkusen';
+const PROXY_TOKEN_URL = 'https://sf-game-proxy.ofersi15.workers.dev/token';
+let _cachedToken = null;
+async function getAuthToken() {
+  if (_cachedToken) return _cachedToken;
+  const data = await fetch(PROXY_TOKEN_URL).then(r => r.json());
+  _cachedToken = data.token || null;
+  return _cachedToken;
+}
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (_cachedToken) { h['Authorization'] = `Bearer ${_cachedToken}`; h['X-Club'] = MY_CLUB; h['X-Role'] = 'manager'; }
+  return h;
+}
 const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];
 // AI-controlled clubs — excluded from scout/tables; never count as vacancies
 const AI_CLUBS = new Set(['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami']);
@@ -2604,9 +2617,12 @@ createApp({
     async rejectApplicant(applicant) {
       // Optimistically remove from list
       this.staffApplicants = (this.staffApplicants || []).filter(a => a.id !== applicant.id);
+      const token = await getAuthToken().catch(() => null);
       await fetch(`${API}/staff/applicants/reject`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: token
+          ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' }
+          : { 'Content-Type': 'application/json' },
         body: JSON.stringify({ club: MY_CLUB, id: applicant.id }),
       }).catch(() => {});
     },
@@ -2616,9 +2632,10 @@ createApp({
       const newRoles = isLive ? current.filter(r => r !== role) : [...current, role];
       this.staffAdsUpdating = true;
       try {
+        const token = await getAuthToken();
+        const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' };
         const res = await fetch(`${API}/staff/ads`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: h,
           body: JSON.stringify({ club: MY_CLUB, roles: newRoles }),
         });
         const data = await res.json();
@@ -2634,12 +2651,15 @@ createApp({
       this.staffApplicants = null;
       this.staffGenMsg = '';
       try {
-        const h = { 'Content-Type': 'application/json' };
-        // Always fetch from the authoritative source (currentWeek - 1 = staff week)
-        this.staffGenMsg = 'Getting current week…';
-        const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json());
+        // Get auth token and current week in parallel
+        this.staffGenMsg = 'Authenticating…';
+        const [token, weekRes] = await Promise.all([
+          getAuthToken(),
+          fetch(`${API}/fixtures/week`).then(r => r.json()),
+        ]);
         const week = weekRes.currentWeek - 1;
         if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
+        const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' };
         // Toggle Technical Director off then on, then generate
         this.staffGenMsg = `Week ${week} — toggling ads…`;
         await fetch(`${API}/staff/ads`, {
