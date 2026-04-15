@@ -1374,39 +1374,42 @@ createApp({
     // Background stats enrichment — fetch full season stats per player from /api/player-stats
     async enrichStats(forceRefresh = false) {
       if (this.statsEnriching || (this.statsEnriched && !forceRefresh)) return;
-      if (forceRefresh) { this.statsEnriched = false; }
-      // Try loading from stats cache first (server → localStorage fallback)
-      try {
-        let cached = await serverCacheGet(STATS_CACHE_KEY);
-        if (!cached) cached = localStorage.getItem(STATS_CACHE_KEY);
-        if (cached) {
-          console.log('[SF] stats cache:', Math.round(cached.length/1024)+'KB');
-          const _spa0 = performance.now();
-          const {statsMap, ts} = await parseAsync(cached);
-          console.log('[SF] parseAsync stats:', Math.round(performance.now()-_spa0)+'ms');
-          if (statsMap) {
-            // Always apply cached stats immediately
-            let applied = 0;
-            const newPlayers = this.allPlayers.map(p => {
-              const s = statsMap[(p.Player||'').toLowerCase()];
-              if (!s) return p;
-              applied++;
-              return Object.freeze({...p, ...s});
-            });
-            if (applied > 0) {
-              await new Promise(r => requestAnimationFrame(r));
-              this.allPlayers = newPlayers;
-              this.statsEnriched = true;
-              // Background refresh if >24h old
-              const age = Date.now() - ts;
-              if (age > 24*60*60*1000) { setTimeout(() => this.enrichStats(true), 2000); }
-              return;
+      this.statsEnriched = false;
+      // Try loading from stats cache first — but SKIP cache when force-refreshing
+      // (forceRefresh=true is triggered by the background stale-refresh; reading cache again
+      // would create an infinite loop instead of ever hitting the API)
+      if (!forceRefresh) {
+        try {
+          let cached = await serverCacheGet(STATS_CACHE_KEY);
+          if (!cached) cached = localStorage.getItem(STATS_CACHE_KEY);
+          if (cached) {
+            console.log('[SF] stats cache:', Math.round(cached.length/1024)+'KB');
+            const _spa0 = performance.now();
+            const {statsMap, ts} = await parseAsync(cached);
+            console.log('[SF] parseAsync stats:', Math.round(performance.now()-_spa0)+'ms');
+            if (statsMap) {
+              let applied = 0;
+              const newPlayers = this.allPlayers.map(p => {
+                const s = statsMap[(p.Player||'').toLowerCase()];
+                if (!s) return p;
+                applied++;
+                return Object.freeze({...p, ...s});
+              });
+              if (applied > 0) {
+                await new Promise(r => requestAnimationFrame(r));
+                this.allPlayers = newPlayers;
+                this.statsEnriched = true;
+                // Background refresh if >6h old — but use forceRefresh=true to skip cache
+                const age = Date.now() - ts;
+                if (age > 6*60*60*1000) { setTimeout(() => this.enrichStats(true), 3000); }
+                return;
+              }
             }
           }
-        }
-      } catch(e) {}
+        } catch(e) {}
+      }
 
-      // Fetch fresh stats in background
+      // Fetch fresh stats from API
       this.statsEnriching = true;
       this.statsProgress = 0;
       const statsMap = {};
@@ -1424,8 +1427,9 @@ createApp({
             const physAttrs = {};
             const PHYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
             if (d.player) PHYS.forEach(a => { if (d.player[a] != null) physAttrs[a] = d.player[a]; });
-            if (!d.seasonStats && Object.keys(physAttrs).length === 0) return;
-            const s = d.seasonStats || {};
+            const stats = d.career || d.seasonStats;
+            if (!stats && Object.keys(physAttrs).length === 0) return;
+            const s = stats || {};
             const mins = s.minutes || 0;
             const enriched = {
               ...physAttrs,
