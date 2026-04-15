@@ -2635,23 +2635,11 @@ createApp({
       this.staffGenMsg = '';
       try {
         const h = { 'Content-Type': 'application/json' };
-        // Determine the correct staff week:
-        // 1. From previously loaded applicants (most reliable)
-        // 2. From asOfWeek if it's a positive integer
-        // Otherwise fetch applicants first to get it
-        let week = this.staffWeek;
-        if (!week) {
-          const aw = Number(this.asOfWeek);
-          if (aw > 0) week = aw;
-        }
-        if (!week) {
-          // Fetch the authoritative current week and subtract 1
-          this.staffGenMsg = 'Getting current week…';
-          const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json()).catch(() => ({}));
-          const cw = weekRes.currentWeek;
-          if (cw > 0) week = cw - 1;
-        }
-        if (!week) throw new Error('Could not determine staff week.');
+        // Always fetch from the authoritative source (currentWeek - 1 = staff week)
+        this.staffGenMsg = 'Getting current week…';
+        const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json());
+        const week = weekRes.currentWeek - 1;
+        if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
         // Toggle all ads OFF then ON — this signals the game to generate new candidates
         this.staffGenMsg = `Week ${week} — resetting ads…`;
         await fetch(`${API}/staff/ads`, {
