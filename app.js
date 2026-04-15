@@ -2595,7 +2595,7 @@ createApp({
           this.staffWeek = firstWeek;
         } else {
           const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json()).catch(() => ({}));
-          if (weekRes.currentWeek > 0) this.staffWeek = weekRes.currentWeek - 1;
+          if (weekRes.currentWeek > 0) this.staffWeek = weekRes.currentWeek;
         }
         // Sync openAds + current staff into clubStaff
         if (staffRes.openAds) this.clubStaff = { ...this.clubStaff, openAds: staffRes.openAds };
@@ -2657,7 +2657,7 @@ createApp({
           getAuthToken(),
           fetch(`${API}/fixtures/week`).then(r => r.json()),
         ]);
-        const week = weekRes.currentWeek - 1;
+        const week = weekRes.currentWeek;
         if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
         const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' };
         // Toggle Technical Director off then on, then generate
