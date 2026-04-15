@@ -2715,6 +2715,7 @@ createApp({
       } catch(e) {}
     },
     negoStatusInfo(n) {
+      if (!n) return { icon:'', label:'—', detail:'', color:'#8b949e', bg:'#21262d' };
       const { status, subStatus, via, lastActionBy } = n;
       const isAuction = via === 'auction';
       const isListing = via === 'listing';
