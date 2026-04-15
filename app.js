@@ -245,7 +245,7 @@ createApp({
   data() {
     return {
       loaded: false, corsError: false, progress: 0, loadMsg: 'Starting…',
-      allPlayers: [], leagueTables: {}, managedSet: new Set(), asOfWeek: '?', totalClubs: 0,
+      allPlayers: [], leagueTables: {}, managedSet: new Set(), managerMap: {}, asOfWeek: '?', totalClubs: 0,
       transferMap: {},
       myClub: MY_CLUB,
       leagueFilter: new Set(ALL_LEAGUES),
@@ -340,7 +340,7 @@ createApp({
       // Espionage tab
       espionageLoading: false, espionageLoaded: false, espionageMsg: '', espionageProgress: 0,
       espionageClubs: [], espionageNegos: [], espionageCacheDate: null, negosLastPull: null,
-      espionageSubTab: 'negos', espionageSearch: '', espionageSort: 'club',
+      espionageSubTab: 'negos', espionageSearch: '', espionageSort: 'club', espShowVacantOnly: false,
       espionageNegoSearch: '', negoExpandedId: null, negoShowAll: false, negoShowAllModal: false,
       negoDisplayCount: 50,
       workerLog: null, workerLogOpen: false,
@@ -626,8 +626,9 @@ createApp({
       let list = [...this.espionageClubs];
       if (this.espionageSearch.trim()) {
         const q = this.espionageSearch.trim().toLowerCase();
-        list = list.filter(c => c.club.toLowerCase().includes(q));
+        list = list.filter(c => c.club.toLowerCase().includes(q) || (this.managerMap[c.club]||'').toLowerCase().includes(q));
       }
+      if (this.espShowVacantOnly) list = list.filter(c => !this.managedSet.has(c.club));
       const r = (c, role) => c.current?.[role]?.rating || 0;
       const lv = (c, key) => c.levels?.[key] || 0;
       const SORTS = {
@@ -654,6 +655,8 @@ createApp({
         ads_d:      (a,b) => (b.openAds?.length||0)-(a.openAds?.length||0),
         ads_a:      (a,b) => (a.openAds?.length||0)-(b.openAds?.length||0),
         club_d:     (a,b) => b.club.localeCompare(a.club),
+        mgr_d:      (a,b) => (this.managerMap[b.club]||'').localeCompare(this.managerMap[a.club]||''),
+        mgr_a:      (a,b) => { const av=this.managedSet.has(a.club)?1:0, bv=this.managedSet.has(b.club)?1:0; if(av!==bv) return av-bv; return (this.managerMap[a.club]||'').localeCompare(this.managerMap[b.club]||''); },
       };
       list.sort(SORTS[this.espionageSort] || ((a,b) => a.club.localeCompare(b.club)));
       return list;
@@ -1441,8 +1444,12 @@ createApp({
 
         const leagueMap = {};
         ALL_LEAGUES.forEach(l=>(tablesRes[l]||[]).forEach(t=>{leagueMap[t.Team]=l;}));
-        const managedClubs = new Set((managersRes.managers||[]).filter(m=>m.club&&!m.username?.includes('~deleted~')).map(m=>m.club));
+        const activeMgrs = (managersRes.managers||[]).filter(m=>m.club&&!m.username?.includes('~deleted~'));
+        const managedClubs = new Set(activeMgrs.map(m=>m.club));
+        const managerMap = {};
+        activeMgrs.forEach(m => { managerMap[m.club] = m.username || m.name || '?'; });
         this.managedSet = managedClubs;
+        this.managerMap = managerMap;
 
         const clubs = clubsRes.clubs;
         this.totalClubs = clubs.length;
@@ -2408,15 +2415,15 @@ createApp({
     },
     // ── Espionage table sort helpers ──────────────────────────────────────────
     espSortBy(col) {
-      const keyMap = { club:'club', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
-      const togMap = { club:'club_d', club_d:'club', ceo_d:'ceo_a', ceo_a:'ceo_d', td_d:'td_a', td_a:'td_d', asst_d:'asst_a', asst_a:'asst_d', physio_d:'physio_a', physio_a:'physio_d', training_d:'training_a', training_a:'training_d', scouting_d:'scouting_a', scouting_a:'scouting_d', academy_d:'academy_a', academy_a:'academy_d', medical_d:'medical_a', medical_a:'medical_d', analytics_d:'analytics_a', analytics_a:'analytics_d', stadium_d:'stadium_a', stadium_a:'stadium_d', ads_d:'ads_a', ads_a:'ads_d' };
+      const keyMap = { club:'club', mgr:'mgr_a', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
+      const togMap = { club:'club_d', club_d:'club', mgr_a:'mgr_d', mgr_d:'mgr_a', ceo_d:'ceo_a', ceo_a:'ceo_d', td_d:'td_a', td_a:'td_d', asst_d:'asst_a', asst_a:'asst_d', physio_d:'physio_a', physio_a:'physio_d', training_d:'training_a', training_a:'training_d', scouting_d:'scouting_a', scouting_a:'scouting_d', academy_d:'academy_a', academy_a:'academy_d', medical_d:'medical_a', medical_a:'medical_d', analytics_d:'analytics_a', analytics_a:'analytics_d', stadium_d:'stadium_a', stadium_a:'stadium_d', ads_d:'ads_a', ads_a:'ads_d' };
       const target = keyMap[col]; if (!target) return;
       this.espionageSort = this.espionageSort === target ? (togMap[target] || target) : target;
     },
     espSortIcon(col) {
       const s = this.espionageSort;
-      const aKeys = { club:'club', ceo:'ceo_a', td:'td_a', asst:'asst_a', physio:'physio_a', training:'training_a', scouting:'scouting_a', academy:'academy_a', medical:'medical_a', analytics:'analytics_a', stadium:'stadium_a', ads:'ads_a' };
-      const dKeys = { club:'club_d', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
+      const aKeys = { club:'club', mgr:'mgr_a', ceo:'ceo_a', td:'td_a', asst:'asst_a', physio:'physio_a', training:'training_a', scouting:'scouting_a', academy:'academy_a', medical:'medical_a', analytics:'analytics_a', stadium:'stadium_a', ads:'ads_a' };
+      const dKeys = { club:'club_d', mgr:'mgr_d', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
       if (s === aKeys[col]) return ' ▲';
       if (s === dKeys[col]) return ' ▼';
       return '';
