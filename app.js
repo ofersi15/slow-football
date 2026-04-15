@@ -78,6 +78,7 @@ const SUBMISSIONS_LS_KEY = 'sf_subs_ls'; // localStorage key — no TTL, persist
 const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
   ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
   : '/sf-cache';
+const SF_WORKER_BASE = 'https://sf-cache.ofersi15.workers.dev';
 async function serverCacheGet(key, noStore = false) {
   if (location.protocol === 'file:') return null;  // no server when opened from disk
   try {
@@ -2659,11 +2660,21 @@ createApp({
         ]);
         const week = weekRes.currentWeek - 1;
         if (!(week > 0)) throw new Error(`Bad week from /fixtures/week: ${JSON.stringify(weekRes)}`);
-        const h = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Club': MY_CLUB, 'X-Role': 'manager' };
+        const ch = { 'Content-Type': 'application/json' };
+        // Toggle TD off then on via CF worker (server-to-server — no browser Origin header)
+        this.staffGenMsg = `Week ${week} — toggling ads…`;
+        await fetch(`${SF_WORKER_BASE}/_staff/toggle`, {
+          method: 'POST', headers: ch,
+          body: JSON.stringify({ roles: ['CEO', 'Assistant', 'Physio'] }),
+        });
+        await fetch(`${SF_WORKER_BASE}/_staff/toggle`, {
+          method: 'POST', headers: ch,
+          body: JSON.stringify({ roles: ['CEO', 'Assistant', 'Physio', 'Technical Director'] }),
+        });
         this.staffGenMsg = `Week ${week} — generating…`;
-        const genRes = await fetch(`${API}/staff/generate`, {
-          method: 'POST', headers: h,
-          body: JSON.stringify({ club: MY_CLUB, week }),
+        const genRes = await fetch(`${SF_WORKER_BASE}/_staff/generate`, {
+          method: 'POST', headers: ch,
+          body: JSON.stringify({ week }),
         });
         if (!genRes.ok) {
           const txt = await genRes.text();

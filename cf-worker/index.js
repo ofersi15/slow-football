@@ -61,23 +61,25 @@ async function appendLog(env, type, msg) {
   } catch(e) { console.error('[log] failed:', e); }
 }
 
-async function refreshSquadsCache(env) {
-  // Login to get fresh token
-  const loginRes = await fetch(`${GAME_API}/auth/login`, {
+async function gameLogin(env) {
+  const r = await fetch(`${GAME_API}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
   });
-  if (!loginRes.ok) {
-    console.error('[squads] login failed:', loginRes.status);
-    return;
-  }
-  const { token } = await loginRes.json();
-  if (!token) { console.error('[squads] no token'); return; }
+  if (!r.ok) return null;
+  const { token } = await r.json();
+  return token || null;
+}
+
+async function refreshSquadsCache(env) {
+  const token = await gameLogin(env);
+  if (!token) { console.error('[squads] login failed'); return; }
 
   const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
   // Fetch all squads
+
   const squadsRes = await fetch(`${GAME_API}/squads`, { headers });
   if (!squadsRes.ok) { console.error('[squads] fetch failed:', squadsRes.status); return; }
   const squads = await squadsRes.json();
@@ -182,6 +184,40 @@ export default {
       'Access-Control-Allow-Headers': 'Content-Type',
     };
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
+
+    // ── Staff proxy routes (server-to-server, no browser Origin) ──
+    if (url.pathname === '/_staff/toggle' && request.method === 'POST') {
+      try {
+        const { roles } = await request.json();
+        const token = await gameLogin(env);
+        if (!token) return new Response(JSON.stringify({ error: 'login failed' }), { status: 401, headers: cors });
+        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+        const r = await fetch(`${GAME_API}/staff/ads`, {
+          method: 'POST', headers: h,
+          body: JSON.stringify({ club: 'Leverkusen', roles }),
+        });
+        const data = await r.json();
+        return new Response(JSON.stringify(data), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: cors });
+      }
+    }
+    if (url.pathname === '/_staff/generate' && request.method === 'POST') {
+      try {
+        const { week } = await request.json();
+        const token = await gameLogin(env);
+        if (!token) return new Response(JSON.stringify({ error: 'login failed' }), { status: 401, headers: cors });
+        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+        const r = await fetch(`${GAME_API}/staff/generate`, {
+          method: 'POST', headers: h,
+          body: JSON.stringify({ club: 'Leverkusen', week }),
+        });
+        const data = await r.json();
+        return new Response(JSON.stringify(data), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      } catch(e) {
+        return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: cors });
+      }
+    }
 
     // ── Admin routes ──
     if (url.pathname === '/_pull') {
