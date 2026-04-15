@@ -776,9 +776,16 @@ createApp({
           : ((p._gameRating || p.Rating) || 0);
         const hasActivePosFilter = Object.values(this.posRatingFilters).some(v => v > 60);
         if (hasActivePosFilter) {
-          const thresh = this.posRatingFilters[p.Position] || 60;
-          if (thresh <= 60) return false;           // position not in active set
-          if (rtg < thresh) return false;           // below that position's threshold
+          // Include any player who meets the threshold when rated AT any of the active positions.
+          // e.g. FB=80 shows primary FBs AND other positions whose FB rating is 80+
+          const qualifies = Object.entries(this.posRatingFilters).some(([pos, thresh]) => {
+            if (thresh <= 60) return false;
+            const posRtg = this.posRatingUseWeighted
+              ? calcWeightedRating(p, pos, this.mentalCfgAttrs, this.mentalWeightPct)
+              : calcGameRating(p, pos);
+            return posRtg != null && posRtg >= thresh;
+          });
+          if (!qualifies) return false;
         }
         if (this.posRatingMax < 99 && rtg > this.posRatingMax) return false;
         if (this.maxAge < 40 && (p.Age||99) > this.maxAge) return false;
