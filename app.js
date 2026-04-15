@@ -2576,9 +2576,14 @@ createApp({
           fetch(`${API}/staff?club=${enc}`).then(r => r.json()).catch(() => ({})),
         ]);
         this.staffApplicants = appRes.applicants || [];
-        // Store week from applicants (most reliable source — asOfWeek from tables may be 0)
+        // Store week from applicants, or fall back to fixtures/week API (currentWeek - 1)
         const firstWeek = this.staffApplicants[0]?.introducedWeek;
-        if (firstWeek > 0) this.staffWeek = firstWeek;
+        if (firstWeek > 0) {
+          this.staffWeek = firstWeek;
+        } else {
+          const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json()).catch(() => ({}));
+          if (weekRes.currentWeek > 0) this.staffWeek = weekRes.currentWeek - 1;
+        }
         // Sync openAds + current staff into clubStaff
         if (staffRes.openAds) this.clubStaff = { ...this.clubStaff, openAds: staffRes.openAds };
         if (staffRes.current) this.clubStaff = { ...this.clubStaff, current: staffRes.current };
@@ -2640,12 +2645,13 @@ createApp({
           if (aw > 0) week = aw;
         }
         if (!week) {
-          // Fetch applicants just to get the week
+          // Fetch the authoritative current week and subtract 1
           this.staffGenMsg = 'Getting current week…';
-          const appRes = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
-          week = appRes.applicants?.[0]?.introducedWeek || null;
+          const weekRes = await fetch(`${API}/fixtures/week`).then(r => r.json()).catch(() => ({}));
+          const cw = weekRes.currentWeek;
+          if (cw > 0) week = cw - 1;
         }
-        if (!week) throw new Error('Could not determine staff week. Load applicants first.');
+        if (!week) throw new Error('Could not determine staff week.');
         // Toggle all ads OFF then ON — this signals the game to generate new candidates
         this.staffGenMsg = `Week ${week} — resetting ads…`;
         await fetch(`${API}/staff/ads`, {
