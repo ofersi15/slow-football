@@ -359,7 +359,7 @@ createApp({
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
       allLeagues: ALL_LEAGUES, allPositions: ALL_POSITIONS,
-      selectedPlayer: null,
+      selectedPlayer: null, selectedPlayerStats: null, selectedPlayerStatsTab: 'career', selectedPlayerStatsLoading: false,
       highlightedPos: null,
       // Mental attr configuration for weighted position rating
       mentalCfgOpen: false,
@@ -681,6 +681,13 @@ createApp({
       else if (ns==='date_a') list.sort((a,b)=>new Date(a.updatedAt||0)-new Date(b.updatedAt||0));
       else list.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0)); // date_d default
       return list;
+    },
+    activeModalStats() {
+      const d = this.selectedPlayerStats;
+      if (!d) return null;
+      if (this.selectedPlayerStatsTab === 'season') return d.seasonStats || null;
+      if (this.selectedPlayerStatsTab === 'career') return d.career || d.seasonStats || null;
+      return null;
     },
     selectedPlayerNegos() {
       if (!this.selectedPlayer) return [];
@@ -1234,6 +1241,7 @@ createApp({
     },
     async openModal(p, jobCtx=null) {
       this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null; this.negoShowAllModal=false;
+      this.selectedPlayerStats=null; this.selectedPlayerStatsTab='career'; this.selectedPlayerStatsLoading=true;
       // Load negos history if not already populated
       if (this.espionageNegos.length === 0) {
         try {
@@ -1241,8 +1249,26 @@ createApp({
           if (raw) this.espionageNegos = JSON.parse(raw);
         } catch(e) {}
       }
+      // Lazy-fetch career + season stats
+      try {
+        const name = encodeURIComponent(p.Player||'');
+        if (name) {
+          const d = await fetch(`${API}/player-stats?player=${name}&history=true`).then(r=>r.json());
+          if (d.ok) this.selectedPlayerStats = d;
+        }
+      } catch(e) {}
+      this.selectedPlayerStatsLoading = false;
     },
-    closeModal() { this.selectedPlayer=null; this.selectedJobCtx=null; },
+    closeModal() { this.selectedPlayer=null; this.selectedJobCtx=null; this.selectedPlayerStats=null; },
+
+    // Return stats object for the selected tab in the player modal
+    playerStatsForTab(tab) {
+      const d = this.selectedPlayerStats;
+      if (!d) return null;
+      if (tab === 'season') return d.seasonStats || null;
+      if (tab === 'career') return d.career || d.seasonStats || null;
+      return null; // 'form' handled separately
+    },
 
     async loadData() {
       // Cache-first: show app instantly from server cache (falls back to localStorage)
