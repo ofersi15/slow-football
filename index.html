@@ -1646,7 +1646,10 @@
 
         <!-- Roster + Responsibilities -->
         <div class="card" style="flex:1;min-width:260px">
-          <div style="font-weight:700;margin-bottom:10px">👥 Roster</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-weight:700">👥 Roster</span>
+            <button class="btn" style="font-size:10px;padding:2px 8px" @click="loadClub(true)" title="Reload staff from game">⟳</button>
+          </div>
           <div v-if="clubStaff && clubStaff.current && Object.keys(clubStaff.current).length">
             <div style="overflow-x:auto"><table>
               <thead><tr style="cursor:pointer"><th @click="tblSortBy('ros','role')">Role{{tblSortIcon('ros','role')}}</th><th @click="tblSortBy('ros','name')">Name{{tblSortIcon('ros','name')}}</th><th @click="tblSortBy('ros','rating')">Rtg{{tblSortIcon('ros','rating')}}</th><th @click="tblSortBy('ros','weeklyWage')">Wage{{tblSortIcon('ros','weeklyWage')}}</th><th @click="tblSortBy('ros','contractWeeks')">Wks{{tblSortIcon('ros','contractWeeks')}}</th></tr></thead>
@@ -1770,41 +1773,45 @@
 
       </div>
 
-      <!-- ── GENERATE APPLICANTS ── -->
+      <!-- ── STAFF RECRUITMENT ── -->
       <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:4px">Staff Recruitment</div>
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <span style="font-weight:700;font-size:13px">📣 Staff Recruitment</span>
-          <label style="font-size:11px;color:#8b949e;display:flex;align-items:center;gap:4px">Week <input type="number" v-model.number="staffGenWeek" :placeholder="currentGameWeek || asOfWeek" min="1" max="99" style="width:48px;background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e6edf3;padding:2px 5px;font-size:11px"></label>
-          <span v-if="currentGameWeek" style="font-size:10px;color:#6e7681">auto: wk{{currentGameWeek}}</span>
-          <button class="btn" style="font-size:11px" :disabled="staffAdsLoading || staffGenLoading" @click="postAdsOnly()">
-            {{staffAdsLoading ? '⟳ Posting…' : '📋 Post Ads'}}
+          <span style="font-size:10px;color:#6e7681">wk{{asOfWeek}}</span>
+          <button class="btn" style="font-size:11px" :disabled="staffApplicantsLoading || staffGenLoading" @click="loadApplicants()">
+            {{staffApplicantsLoading ? '⟳ Loading…' : '⟳ Load Applicants'}}
           </button>
-          <button class="btn green" style="font-size:11px;margin-left:auto" :disabled="staffGenLoading || staffAdsLoading" @click="generateApplicants()">
-            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate'}}
+          <button class="btn green" style="font-size:11px;margin-left:auto" :disabled="staffGenLoading || staffApplicantsLoading" @click="generateApplicants()">
+            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate New'}}
           </button>
         </div>
-        <div v-if="staffAdsMsg" :style="{color:staffAdsMsg.startsWith('⚠')?'#ff7b72':'#7ee787',fontSize:'12px',marginBottom:'6px'}">{{staffAdsMsg}}</div>
+        <div v-if="staffApplicantsMsg" :style="{color:'#ff7b72',fontSize:'12px',marginBottom:'6px'}">{{staffApplicantsMsg}}</div>
         <div v-if="staffGenMsg" :style="{color:staffGenMsg.startsWith('⚠')?'#ff7b72':'#ffa657',fontSize:'12px',marginBottom:'8px'}">{{staffGenMsg}}</div>
-        <div v-if="staffGenResults">
-          <div style="font-size:10px;color:#8b949e;margin-bottom:8px">Week {{staffGenResults.week}} · candidates will appear in-game after the week transition</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">
-            <div v-for="(cands, role) in staffGenResults.byRole" :key="role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
+        <div v-if="staffApplicants !== null">
+          <div v-if="staffApplicants.length === 0" class="c-gray" style="font-size:11px;font-style:italic;padding:4px 0">No applicants found for this week.</div>
+          <div v-else style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div v-for="group in staffApplicantsByRole" :key="group.role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{role}}</span>
-                <button v-if="cands.length" @click="rejectAllCandidates(role)" style="background:none;border:1px solid #30363d;border-radius:4px;color:#6e7681;cursor:pointer;font-size:10px;padding:1px 6px" title="Reject all candidates for this role">✕ all</button>
+                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{group.role}}</span>
+                <button @click="toggleAd(group.role)" :disabled="staffAdsUpdating"
+                  :style="{background:'none',border:'1px solid',borderColor:group.isLive?'#238636':'#30363d',borderRadius:'4px',color:group.isLive?'#7ee787':'#6e7681',cursor:'pointer',fontSize:'10px',padding:'1px 6px'}"
+                  :title="group.isLive ? 'Ad is live — click to unpost' : 'Ad is off — click to post'">
+                  {{group.isLive ? '● Live' : '○ Off'}}
+                </button>
               </div>
-              <div v-for="(c, i) in cands" :key="i" style="display:flex;align-items:center;gap:6px;padding:2px 0;border-bottom:1px solid #21262d">
+              <div v-for="(c, i) in group.applicants" :key="c.id" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #21262d">
                 <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
-                <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || c.Name || '?'}}</span>
-                <span :class="ratingClass(c.rating||c.r)" style="font-size:11px;font-weight:700">r{{c.rating||c.r||'?'}}</span>
-                <button @click="rejectCandidate(role, i)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Dismiss">×</button>
+                <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || '?'}}</span>
+                <span :class="ratingClass(c.rating)" style="font-size:11px;font-weight:700">r{{c.rating||'?'}}</span>
+                <span style="font-size:10px;color:#8b949e">£{{Math.round((c.weeklyWage||0)/1000)}}k</span>
+                <button @click="rejectApplicant(c)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Reject">×</button>
               </div>
-              <div v-if="!cands.length" class="c-gray" style="font-size:11px;font-style:italic">No candidates</div>
+              <div v-if="!group.applicants.length" class="c-gray" style="font-size:11px;font-style:italic">No applicants</div>
             </div>
           </div>
         </div>
-        <div v-else-if="!staffGenLoading" class="c-gray" style="font-size:11px">Post ads first (optional), then hit Generate to preview upcoming staff candidates.</div>
+        <div v-else-if="!staffGenLoading && !staffApplicantsLoading" class="c-gray" style="font-size:11px">Click "Load Applicants" to see current applicants, or "Generate New" to create fresh candidates.</div>
       </div>
 
       <!-- ── FACILITY LEVEL REFERENCE ── -->

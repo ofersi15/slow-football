@@ -303,10 +303,10 @@ createApp({
       // Club tab state (Facilities + Staff)
       clubLoading: false, clubLoaded: false, clubMsg: '', clubSubTab: 'facilities',
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
-      // Generate applicants
-      staffGenLoading: false, staffGenMsg: '', staffGenResults: null, staffGenWeek: '',
-      currentGameWeek: null,
-      staffAdsLoading: false, staffAdsPosted: false, staffAdsMsg: '',
+      // Staff recruitment
+      staffApplicants: null, staffApplicantsLoading: false, staffApplicantsMsg: '',
+      staffGenLoading: false, staffGenMsg: '',
+      staffAdsUpdating: false,
       tblSort: {}, negoSort: 'date_d',
       // Saved lineup
       savedLineup: null,
@@ -441,6 +441,20 @@ createApp({
   computed: {
     visibleTableCols() {
       return this.tableCols.filter(c => !c.group || this.colGroups[c.group]);
+    },
+    staffApplicantsByRole() {
+      const ROLE_ORDER = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
+      const grouped = {};
+      for (const a of (this.staffApplicants || [])) {
+        if (!grouped[a.role]) grouped[a.role] = [];
+        grouped[a.role].push(a);
+      }
+      const liveAds = this.clubStaff?.openAds || [];
+      return ROLE_ORDER.map(role => ({
+        role,
+        applicants: (grouped[role] || []).sort((a, b) => (b.rating || 0) - (a.rating || 0)),
+        isLive: liveAds.includes(role),
+      }));
     },
     matchArchiveFiltered() {
       if (!this.matchArchive) return [];
@@ -1687,8 +1701,6 @@ createApp({
         this.playersCacheDate=new Date().toLocaleDateString();
         this.playersRefreshing=false;
         if (foreground) { this.progress=100; this.loadMsg='Done!'; this.loaded=true; this.buildBookmarklet(); this.checkTacticsCache(); }
-        // Refresh current game week now that asOfWeek is up to date
-        this.fetchCurrentGameWeek();
         // Kick off stats enrichment after squads loaded
         setTimeout(() => this.enrichStats(), 800);
 
@@ -2550,146 +2562,86 @@ createApp({
       return '';
     },
 
-    // ── Detect current game week ──────────────────────────────────────────────
-    async fetchCurrentGameWeek() {
-      // Try /game first
+    // ── Staff recruitment ─────────────────────────────────────────────────────
+    async loadApplicants() {
+      this.staffApplicantsLoading = true;
+      this.staffApplicantsMsg = '';
       try {
-        const gameRes = await fetch(`${API}/game`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
-        const w = Number(gameRes?.week ?? gameRes?.currentWeek ?? gameRes?.gameWeek ?? gameRes?.currentGameWeek ?? gameRes?.weekNumber);
-        if (w > 0 && !isNaN(w)) {
-          // If /game returns same week as tables (asOfWeek), it's also reporting last completed week — use +1
-          const asOf = Number(this.asOfWeek);
-          this.currentGameWeek = (asOf > 0 && w <= asOf) ? w + 1 : w;
-          return;
-        }
-        console.log('[SF] /game response (no week field found):', JSON.stringify(gameRes).slice(0,300));
-      } catch(e) { console.log('[SF] /game failed:', e.message); }
-      // Try /matches — infer from latest match week
-      try {
-        const mRes = await fetch(`${API}/matches?club=${encodeURIComponent(MY_CLUB)}&limit=3`, {signal: AbortSignal.timeout(4000)}).then(r=>r.json());
-        const weeks = (mRes.matches||[]).map(m => Number(m.gameweek ?? m.week ?? m.gameWeek ?? m.round ?? m.weekNumber)).filter(w => w > 0 && !isNaN(w));
-        if (weeks.length) { this.currentGameWeek = Math.max(...weeks) + 1; return; }
-        console.log('[SF] /matches response sample:', JSON.stringify((mRes.matches||[])[0]).slice(0,300));
-      } catch(e) {}
-      // Final fallback: asOfWeek + 1 (tables = last completed week)
-      const w = Number(this.asOfWeek);
-      if (w > 0 && !isNaN(w)) this.currentGameWeek = w + 1;
+        const enc = encodeURIComponent(MY_CLUB);
+        const [appRes, staffRes] = await Promise.all([
+          fetch(`${API}/staff/applicants?club=${enc}`).then(r => r.json()),
+          fetch(`${API}/staff?club=${enc}`).then(r => r.json()).catch(() => ({})),
+        ]);
+        this.staffApplicants = appRes.applicants || [];
+        // Sync openAds into clubStaff so the computed picks it up
+        if (staffRes.openAds) this.clubStaff = { ...this.clubStaff, openAds: staffRes.openAds };
+      } catch(e) {
+        this.staffApplicantsMsg = '⚠ ' + e.message;
+      } finally {
+        this.staffApplicantsLoading = false;
+      }
     },
-
-    // ── Generate applicants ───────────────────────────────────────────────────
+    async rejectApplicant(applicant) {
+      // Optimistically remove from list
+      this.staffApplicants = (this.staffApplicants || []).filter(a => a.id !== applicant.id);
+      await fetch(`${API}/staff/applicants/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ club: MY_CLUB, id: applicant.id }),
+      }).catch(() => {});
+    },
+    async toggleAd(role) {
+      const current = this.clubStaff?.openAds || [];
+      const isLive = current.includes(role);
+      const newRoles = isLive ? current.filter(r => r !== role) : [...current, role];
+      this.staffAdsUpdating = true;
+      try {
+        const res = await fetch(`${API}/staff/ads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ club: MY_CLUB, roles: newRoles }),
+        });
+        const data = await res.json();
+        this.clubStaff = { ...this.clubStaff, openAds: data.openAds || newRoles };
+      } catch(e) {
+        // no-op on error — UI will revert on next load
+      } finally {
+        this.staffAdsUpdating = false;
+      }
+    },
     async generateApplicants() {
       this.staffGenLoading = true;
-      this.staffGenResults = null;
+      this.staffApplicants = null;
+      this.staffGenMsg = '';
       try {
-        let week = this.staffGenWeek || this.currentGameWeek;
-        if (!week) {
-          // currentGameWeek not yet loaded — fetch it now
-          await this.fetchCurrentGameWeek();
-          week = this.currentGameWeek || this.asOfWeek;
-        }
-        const authHeaders = { 'Content-Type': 'application/json' };
-        const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
+        // Staff generate uses the last completed week (asOfWeek = n-1 relative to current game week)
+        const week = Number(this.asOfWeek) || 1;
+        const h = { 'Content-Type': 'application/json' };
+        // Post all ads first
         this.staffGenMsg = `Week ${week} — posting ads…`;
-        for (const role of ROLES) {
-          await fetch(`${API}/staff/ads`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({ club: MY_CLUB, role }),
-          }).catch(() => {});
-        }
+        await fetch(`${API}/staff/ads`, {
+          method: 'POST', headers: h,
+          body: JSON.stringify({ club: MY_CLUB, roles: ['CEO', 'Technical Director', 'Assistant', 'Physio'] }),
+        });
+        // Generate candidates
         this.staffGenMsg = 'Generating candidates…';
         const genRes = await fetch(`${API}/staff/generate`, {
-          method: 'POST',
-          headers: authHeaders,
+          method: 'POST', headers: h,
           body: JSON.stringify({ club: MY_CLUB, week }),
         });
         if (!genRes.ok) {
           const txt = await genRes.text();
-          throw new Error(`${genRes.status} ${genRes.statusText} — ${txt.slice(0,120)}`);
+          throw new Error(`${genRes.status} — ${txt.slice(0, 120)}`);
         }
-        const gen = await genRes.json();
-        const rejectedNames = new Set(JSON.parse(localStorage.getItem('sf_staff_rejected_v1')||'[]'));
-        const candidates = (Array.isArray(gen) ? gen : (gen.applicants || []))
-          .filter(c => !rejectedNames.has((c.name||c.Name||'').toLowerCase()));
-        const byRole = {};
-        for (const c of candidates) {
-          const role = c.role || c.Role || 'Unknown';
-          if (!byRole[role]) byRole[role] = [];
-          byRole[role].push(c);
-        }
-        for (const role of Object.keys(byRole)) {
-          byRole[role].sort((a, b) => (b.rating || b.r || 0) - (a.rating || a.r || 0));
-        }
-        this.staffGenResults = { week, byRole };
+        // Load the live applicants from API
+        this.staffGenMsg = 'Loading applicants…';
+        await this.loadApplicants();
         this.staffGenMsg = '';
       } catch(e) {
         this.staffGenMsg = '⚠ Error: ' + e.message;
       } finally {
         this.staffGenLoading = false;
       }
-    },
-
-    async postAdsOnly() {
-      this.staffAdsLoading = true;
-      this.staffAdsMsg = '';
-      this.staffAdsPosted = false;
-      try {
-        const authHeaders = { 'Content-Type': 'application/json' };
-        const ROLES = ['CEO', 'Technical Director', 'Assistant', 'Physio'];
-        for (const role of ROLES) {
-          await fetch(`${API}/staff/ads`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({ club: MY_CLUB, role }),
-          }).catch(() => {});
-        }
-        this.staffAdsPosted = true;
-        this.staffAdsMsg = '✓ Ads posted for all 4 roles';
-      } catch(e) {
-        this.staffAdsMsg = '⚠ ' + e.message;
-      } finally {
-        this.staffAdsLoading = false;
-      }
-    },
-    persistRejectedStaff(candidates) {
-      try {
-        const key = 'sf_staff_rejected_v1';
-        const existing = JSON.parse(localStorage.getItem(key)||'[]');
-        const names = candidates.map(c => (c.name||c.Name||'').toLowerCase()).filter(Boolean);
-        const merged = [...new Set([...existing, ...names])];
-        localStorage.setItem(key, JSON.stringify(merged.slice(-200)));
-      } catch(e) {}
-    },
-    async apiRejectCandidate(c) {
-      const headers = { 'Content-Type': 'application/json' };
-      try {
-        await fetch(`${API}/staff/applicants/reject`, {
-          method: 'POST', headers,
-          body: JSON.stringify({ club: MY_CLUB, name: c.name||c.Name, role: c.role||c.Role, week: this.staffGenResults?.week }),
-        });
-      } catch(e) {}
-    },
-    rejectCandidate(role, idx) {
-      if (!this.staffGenResults) return;
-      const candidate = this.staffGenResults.byRole[role][idx];
-      if (candidate) {
-        this.persistRejectedStaff([candidate]);
-        this.apiRejectCandidate(candidate);
-      }
-      const byRole = { ...this.staffGenResults.byRole };
-      byRole[role] = byRole[role].filter((_, i) => i !== idx);
-      this.staffGenResults = { ...this.staffGenResults, byRole };
-    },
-    rejectAllCandidates(role) {
-      if (!this.staffGenResults) return;
-      const all = this.staffGenResults.byRole[role] || [];
-      if (all.length) {
-        this.persistRejectedStaff(all);
-        all.forEach(c => this.apiRejectCandidate(c));
-      }
-      const byRole = { ...this.staffGenResults.byRole };
-      byRole[role] = [];
-      this.staffGenResults = { ...this.staffGenResults, byRole };
     },
 
     // ── Espionage ─────────────────────────────────────────────────────────────
@@ -4155,8 +4107,6 @@ createApp({
       const lastClub = localStorage.getItem('sf_last_club');
       if (lastClub && this.activeTab === 'clubs') setTimeout(() => this.openClubDetail(lastClub), 800);
     } catch(e) {}
-    // Fetch current game week proactively so the staff recruitment input shows the right week
-    this.fetchCurrentGameWeek();
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental
     this.youthBgInterval = setInterval(() => { this.bgAutoRefresh(); }, 8 * 60 * 1000);
     // Clock tick for auction countdown
