@@ -1320,15 +1320,14 @@ createApp({
     },
 
     clearPlayersCache() {
+      // Only clear squads cache — stats are independent season data, keep them
+      // so stats re-apply instantly from cache once fresh squads land
       serverCacheDelete(PLAYERS_CACHE_KEY);
-      serverCacheDelete(STATS_CACHE_KEY);
       try { localStorage.removeItem(PLAYERS_CACHE_KEY); } catch(e){}
-      try { localStorage.removeItem(STATS_CACHE_KEY); } catch(e){}
       try { localStorage.removeItem('sf_youth_hist_v2'); } catch(e){}
       try { localStorage.removeItem('sf_youth_idx_v2'); } catch(e){}
       try { localStorage.removeItem('sf_club_v1'); } catch(e){}
-      // Keep UI visible — refresh in background without clearing allPlayers
-      this.statsEnriched=false; this.statsProgress=0;
+      // Keep UI visible — refresh in background without clearing allPlayers or stats
       this.youthHistLoaded=false; this.youthHistCacheDate=null;
       this.youthLoaded=false;
       this.clubLoaded=false; this.clubLoading=false;
@@ -1478,7 +1477,9 @@ createApp({
           const cached = await serverCacheGet('sf_squads_raw_v1');
           if (cached) {
             const { data, ts } = JSON.parse(cached);
-            if (Date.now() - ts < 8 * 60 * 60 * 1000) { preSquads = data; console.log('[SF] using pre-fetched squads cache'); }
+            const ageH = (Date.now() - ts) / 3600000;
+            // Accept cache up to 24h — cron refreshes every 6h so this is always fresh enough
+            if (ageH < 24) { preSquads = data; console.log(`[SF] using pre-fetched squads cache (${ageH.toFixed(1)}h old)`); }
           }
         } catch(e) {}
 
@@ -1517,7 +1518,7 @@ createApp({
               const d = await fetch(`${API}/squads?club=${encodeURIComponent(clubs[i])}`).then(r=>r.json());
               processPlayers(clubs[i], d.players);
             } catch(e){ console.warn('Failed:',clubs[i]); }
-            await new Promise(r=>setTimeout(r,80));
+            await new Promise(r=>setTimeout(r,20));
           }
         }
 
