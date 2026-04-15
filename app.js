@@ -261,7 +261,12 @@ createApp({
       posRatingsOpen: false,
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
-      activeTab: localStorage.getItem('sf_activeTab') || 'squad',
+      activeTab: (() => {
+        const hash = location.hash.slice(1);
+        const validIds = ['scout','squad','moneyball','analysis','youth','club','clubs','espionage','matches'];
+        if (hash && validIds.includes(hash)) return hash;
+        return localStorage.getItem('sf_activeTab') || 'squad';
+      })(),
       tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'analysis',label:'🔬 Analysis'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
@@ -1137,6 +1142,7 @@ createApp({
       immediate: true,
       handler(v) {
         localStorage.setItem('sf_activeTab', v);
+        history.replaceState(null, '', '#' + v);
         if (v === 'youth') {
           if (!this.youthLoaded && !this.youthLoading) this.loadYouth();
           if (!this.youthHistLoaded && !this.youthHistLoading) this.loadYouthHistory(false);
@@ -4004,6 +4010,7 @@ createApp({
     if (this.youthBgInterval) clearInterval(this.youthBgInterval);
     this.stopNegosPolling();
     if (this._clockInterval) clearInterval(this._clockInterval);
+    if (this._hashHandler) window.removeEventListener('hashchange', this._hashHandler);
   },
 
   mounted() {
@@ -4043,5 +4050,11 @@ createApp({
     this._clockInterval = setInterval(() => { this._nowMs = Date.now(); }, 60000);
     // Start polling if already on espionage tab
     if (this.activeTab === 'espionage') this.startNegosPolling();
+    // Sync activeTab when user pastes a hash URL or navigates via browser
+    this._hashHandler = () => {
+      const h = location.hash.slice(1);
+      if (h && this.tabs.some(t => t.id === h)) this.activeTab = h;
+    };
+    window.addEventListener('hashchange', this._hashHandler);
   }
 }).mount('#app');
