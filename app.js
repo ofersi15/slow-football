@@ -305,6 +305,7 @@ createApp({
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
       // Staff recruitment
       staffApplicants: null, staffApplicantsLoading: false, staffApplicantsMsg: '',
+      staffWeek: null,
       staffGenLoading: false, staffGenMsg: '',
       staffAdsUpdating: false,
       tblSort: {}, negoSort: 'date_d',
@@ -450,10 +451,12 @@ createApp({
         grouped[a.role].push(a);
       }
       const liveAds = this.clubStaff?.openAds || [];
+      const current = this.clubStaff?.current || {};
       return ROLE_ORDER.map(role => ({
         role,
         applicants: (grouped[role] || []).sort((a, b) => (b.rating || 0) - (a.rating || 0)),
         isLive: liveAds.includes(role),
+        currentRating: current[role]?.rating ?? null,
       }));
     },
     matchArchiveFiltered() {
@@ -2573,13 +2576,25 @@ createApp({
           fetch(`${API}/staff?club=${enc}`).then(r => r.json()).catch(() => ({})),
         ]);
         this.staffApplicants = appRes.applicants || [];
-        // Sync openAds into clubStaff so the computed picks it up
+        // Store week from applicants (most reliable source — asOfWeek from tables may be 0)
+        const firstWeek = this.staffApplicants[0]?.introducedWeek;
+        if (firstWeek > 0) this.staffWeek = firstWeek;
+        // Sync openAds + current staff into clubStaff
         if (staffRes.openAds) this.clubStaff = { ...this.clubStaff, openAds: staffRes.openAds };
+        if (staffRes.current) this.clubStaff = { ...this.clubStaff, current: staffRes.current };
       } catch(e) {
         this.staffApplicantsMsg = '⚠ ' + e.message;
       } finally {
         this.staffApplicantsLoading = false;
       }
+    },
+    staffApplicantRatingClass(applicant) {
+      const current = this.clubStaff?.current?.[applicant.role];
+      const curRtg = current?.rating;
+      if (!curRtg) return this.ratingClass(applicant.rating);
+      if (applicant.rating > curRtg) return 'c-green';
+      if (applicant.rating === curRtg) return 'c-orange';
+      return 'c-red';
     },
     async rejectApplicant(applicant) {
       // Optimistically remove from list
@@ -2604,7 +2619,7 @@ createApp({
         const data = await res.json();
         this.clubStaff = { ...this.clubStaff, openAds: data.openAds || newRoles };
       } catch(e) {
-        // no-op on error — UI will revert on next load
+        // no-op — UI reverts on next load
       } finally {
         this.staffAdsUpdating = false;
       }
@@ -2614,11 +2629,29 @@ createApp({
       this.staffApplicants = null;
       this.staffGenMsg = '';
       try {
-        // Staff generate uses the last completed week (asOfWeek = n-1 relative to current game week)
-        const week = Number(this.asOfWeek) || 1;
         const h = { 'Content-Type': 'application/json' };
-        // Post all ads first
-        this.staffGenMsg = `Week ${week} — posting ads…`;
+        // Determine the correct staff week:
+        // 1. From previously loaded applicants (most reliable)
+        // 2. From asOfWeek if it's a positive integer
+        // Otherwise fetch applicants first to get it
+        let week = this.staffWeek;
+        if (!week) {
+          const aw = Number(this.asOfWeek);
+          if (aw > 0) week = aw;
+        }
+        if (!week) {
+          // Fetch applicants just to get the week
+          this.staffGenMsg = 'Getting current week…';
+          const appRes = await fetch(`${API}/staff/applicants?club=${encodeURIComponent(MY_CLUB)}`).then(r => r.json());
+          week = appRes.applicants?.[0]?.introducedWeek || null;
+        }
+        if (!week) throw new Error('Could not determine staff week. Load applicants first.');
+        // Toggle all ads OFF then ON — this signals the game to generate new candidates
+        this.staffGenMsg = `Week ${week} — resetting ads…`;
+        await fetch(`${API}/staff/ads`, {
+          method: 'POST', headers: h,
+          body: JSON.stringify({ club: MY_CLUB, roles: [] }),
+        });
         await fetch(`${API}/staff/ads`, {
           method: 'POST', headers: h,
           body: JSON.stringify({ club: MY_CLUB, roles: ['CEO', 'Technical Director', 'Assistant', 'Physio'] }),
@@ -2633,7 +2666,7 @@ createApp({
           const txt = await genRes.text();
           throw new Error(`${genRes.status} — ${txt.slice(0, 120)}`);
         }
-        // Load the live applicants from API
+        // Load the resulting live applicants
         this.staffGenMsg = 'Loading applicants…';
         await this.loadApplicants();
         this.staffGenMsg = '';

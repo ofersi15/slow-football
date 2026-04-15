@@ -1778,7 +1778,7 @@
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <span style="font-weight:700;font-size:13px">📣 Staff Recruitment</span>
-          <span style="font-size:10px;color:#6e7681">wk{{asOfWeek}}</span>
+          <span v-if="staffWeek" style="font-size:10px;color:#6e7681">wk{{staffWeek}}</span>
           <button class="btn" style="font-size:11px" :disabled="staffApplicantsLoading || staffGenLoading" @click="loadApplicants()">
             {{staffApplicantsLoading ? '⟳ Loading…' : '⟳ Load Applicants'}}
           </button>
@@ -1793,7 +1793,7 @@
           <div v-else style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div v-for="group in staffApplicantsByRole" :key="group.role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{group.role}}</span>
+                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{group.role}}<span v-if="group.currentRating != null" style="color:#6e7681;font-weight:400"> (now r{{group.currentRating}})</span></span>
                 <button @click="toggleAd(group.role)" :disabled="staffAdsUpdating"
                   :style="{background:'none',border:'1px solid',borderColor:group.isLive?'#238636':'#30363d',borderRadius:'4px',color:group.isLive?'#7ee787':'#6e7681',cursor:'pointer',fontSize:'10px',padding:'1px 6px'}"
                   :title="group.isLive ? 'Ad is live — click to unpost' : 'Ad is off — click to post'">
@@ -1803,7 +1803,8 @@
               <div v-for="(c, i) in group.applicants" :key="c.id" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #21262d">
                 <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
                 <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || '?'}}</span>
-                <span :class="ratingClass(c.rating)" style="font-size:11px;font-weight:700">r{{c.rating||'?'}}</span>
+                <span :class="staffApplicantRatingClass(c)" style="font-size:11px;font-weight:700">r{{c.rating||'?'}}</span>
+                <span v-if="group.currentRating != null" :class="c.rating > group.currentRating ? 'c-green' : c.rating === group.currentRating ? 'c-orange' : 'c-red'" style="font-size:10px">{{c.rating > group.currentRating ? '+' : ''}}{{c.rating - group.currentRating}}</span>
                 <span style="font-size:10px;color:#8b949e">£{{Math.round((c.weeklyWage||0)/1000)}}k</span>
                 <button @click="rejectApplicant(c)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Reject">×</button>
               </div>
