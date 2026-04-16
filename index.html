@@ -2049,75 +2049,154 @@
                     </div>
                   </template>
                 </div>
-                <div v-if="selectedClubSubmissions[0].setPieces" class="card" style="padding:10px;min-width:190px">
+              </div>
+
+              <!-- Set Pieces panel (third column) -->
+              <div v-if="selectedClubSubmissions[0].setPieces" style="flex:0 0 220px;display:flex;flex-direction:column;gap:8px">
+                <div class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:10px">Set Pieces</div>
 
-                  <!-- Attacking Corner -->
+                  <!-- ── Attacking Corner ── -->
                   <div style="font-size:9px;color:#d2a8ff;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:6px">⚑ Attacking Corner</div>
                   <template v-if="selectedClubSubmissions[0].setPieces.attackingCorner">
-                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.delivery" style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #21262d">
+
+                    <!-- Taker row -->
+                    <template v-if="selectedClubSubmissions[0].roles?.corner">
+                      <div style="padding:3px 0;border-bottom:1px solid #21262d"
+                           @mouseenter="spHoveredPlayer={name:selectedClubSubmissions[0].roles.corner,side:'taker',zoneKey:'taker'}"
+                           @mouseleave="spHoveredPlayer=null">
+                        <div style="display:flex;justify-content:space-between;gap:6px">
+                          <span style="color:#6e7681;font-size:10px;white-space:nowrap">Taker</span>
+                          <span @click.stop="xiPlayerInfo(selectedClubSubmissions[0].roles.corner)&&openModal(xiPlayerInfo(selectedClubSubmissions[0].roles.corner))"
+                                style="color:#ffa657;font-size:10px;cursor:pointer;border-bottom:1px dotted rgba(255,166,87,0.5);text-align:right">
+                            {{selectedClubSubmissions[0].roles.corner||'—'}}
+                          </span>
+                        </div>
+                        <div v-if="spHoveredPlayer?.side==='taker'" style="display:flex;gap:10px;padding:3px 0 1px;flex-wrap:wrap">
+                          <template v-for="attr in ['Passing','Vision']" :key="'tk-'+attr">
+                            <span style="font-size:10px;color:#6e7681">{{attr.slice(0,3)}}
+                              <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(selectedClubSubmissions[0].roles.corner)?.[attr])}">
+                                {{xiPlayerInfo(selectedClubSubmissions[0].roles.corner)?.[attr]||'—'}}
+                              </span>
+                            </span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Delivery -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.delivery" style="padding:4px 0;border-bottom:1px solid #21262d">
                       <div style="display:flex;justify-content:space-between;align-items:baseline">
                         <span style="color:#6e7681;font-size:10px">Delivery</span>
-                        <span style="color:#e6edf3;font-size:12px;font-weight:600">{{selectedClubSubmissions[0].setPieces.attackingCorner.delivery}}</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.attackingCorner.delivery}}</span>
                       </div>
-                      <div v-if="setPieceDesc('delivery', selectedClubSubmissions[0].setPieces.attackingCorner.delivery)" style="color:#8b949e;font-size:9px;margin-top:2px;font-style:italic">
-                        {{setPieceDesc('delivery', selectedClubSubmissions[0].setPieces.attackingCorner.delivery)}}
+                      <div v-if="setPieceDesc('delivery',selectedClubSubmissions[0].setPieces.attackingCorner.delivery)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('delivery',selectedClubSubmissions[0].setPieces.attackingCorner.delivery)}}
                       </div>
                     </div>
-                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.stayBack!=null" style="display:flex;justify-content:space-between;padding:2px 0 6px;border-bottom:1px solid #21262d">
+
+                    <!-- Stay Back -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.stayBack!=null" style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
                       <span style="color:#6e7681;font-size:10px">Stay Back</span>
-                      <span style="color:#e6edf3;font-size:11px">{{selectedClubSubmissions[0].setPieces.attackingCorner.stayBack}} player{{selectedClubSubmissions[0].setPieces.attackingCorner.stayBack == 1 ? '' : 's'}}</span>
+                      <span style="color:#e6edf3;font-size:11px">
+                        {{selectedClubSubmissions[0].setPieces.attackingCorner.stayBack==0?'None':selectedClubSubmissions[0].setPieces.attackingCorner.stayBack+' player'+(selectedClubSubmissions[0].setPieces.attackingCorner.stayBack==1?'':'s')}}
+                      </span>
                     </div>
-                    <!-- Attacking zones -->
+
+                    <!-- Attacking zone assignments -->
                     <template v-if="Object.keys(selectedClubSubmissions[0].setPieces.attackingCorner.zones||{}).length">
-                      <div style="margin-top:6px">
-                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.attackingCorner.zones" :key="'atz-'+zoneKey"
-                             style="padding:3px 0;border-bottom:1px solid #161b22"
-                             :title="setPieceDesc('atkZone', zoneKey)">
-                          <div style="display:flex;justify-content:space-between;gap:6px">
-                            <span style="color:#6e7681;font-size:10px;white-space:nowrap">{{setPieceZoneLabel('atk', zoneKey)}}</span>
-                            <span style="color:#e6edf3;font-size:10px;text-align:right">{{player}}</span>
+                      <div style="margin-top:4px">
+                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.attackingCorner.zones" :key="'az-'+zoneKey"
+                             style="margin-bottom:2px;border-radius:4px;transition:background 0.1s"
+                             :style="{
+                               background: spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery, zoneKey) ? 'rgba(63,185,80,0.07)' : 'transparent',
+                               outline: spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery, zoneKey) ? '1px solid rgba(63,185,80,0.3)' : '1px solid transparent',
+                             }"
+                             @mouseenter="spHoveredPlayer={name:player,side:'atk',zoneKey}"
+                             @mouseleave="spHoveredPlayer=null">
+                          <div style="display:flex;justify-content:space-between;padding:3px 4px;gap:6px">
+                            <span style="font-size:10px;white-space:nowrap" :title="setPieceDesc('atkZone',zoneKey)"
+                                  :style="{color:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'#3fb950':'#6e7681'}">
+                              {{setPieceZoneLabel('atk',zoneKey)}}
+                            </span>
+                            <span @click.stop="xiPlayerInfo(player)&&openModal(xiPlayerInfo(player))"
+                                  style="font-size:10px;text-align:right;cursor:pointer;border-bottom:1px dotted"
+                                  :style="{color:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'#7ee787':'#79c0ff',borderColor:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'rgba(126,231,135,0.4)':'rgba(121,192,255,0.4)'}">
+                              {{player}}
+                            </span>
+                          </div>
+                          <div v-if="spHoveredPlayer?.side==='atk'&&spHoveredPlayer?.zoneKey===zoneKey"
+                               style="display:flex;gap:10px;padding:2px 4px 4px;flex-wrap:wrap;border-top:1px solid #21262d">
+                            <template v-for="attr in spZoneAttrs('atk',zoneKey)" :key="'as-'+attr">
+                              <span style="font-size:10px;color:#6e7681">{{attr.slice(0,3)}}
+                                <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(player)?.[attr])}">
+                                  {{xiPlayerInfo(player)?.[attr]||'—'}}
+                                </span>
+                              </span>
+                            </template>
                           </div>
                         </div>
                       </div>
                     </template>
                   </template>
 
-                  <!-- Defensive Corner -->
+                  <!-- ── Defensive Corner ── -->
                   <div style="font-size:9px;color:#79c0ff;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-top:12px;margin-bottom:6px">⛨ Defensive Corner</div>
                   <template v-if="selectedClubSubmissions[0].setPieces.defensiveCorner">
-                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.scheme" style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #21262d">
+
+                    <!-- Scheme -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.scheme" style="padding:4px 0;border-bottom:1px solid #21262d">
                       <div style="display:flex;justify-content:space-between;align-items:baseline">
                         <span style="color:#6e7681;font-size:10px">Scheme</span>
-                        <span style="color:#e6edf3;font-size:12px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.scheme}}</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.scheme}}</span>
                       </div>
-                      <div v-if="setPieceDesc('scheme', selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)" style="color:#8b949e;font-size:9px;margin-top:2px;font-style:italic">
-                        {{setPieceDesc('scheme', selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)}}
+                      <div v-if="setPieceDesc('scheme',selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('scheme',selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)}}
                       </div>
                     </div>
-                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.press" style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #21262d">
+
+                    <!-- Press -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.press" style="padding:4px 0;border-bottom:1px solid #21262d">
                       <div style="display:flex;justify-content:space-between;align-items:baseline">
                         <span style="color:#6e7681;font-size:10px">Press</span>
-                        <span style="color:#e6edf3;font-size:12px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.press}}</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.press}}</span>
                       </div>
-                      <div v-if="setPieceDesc('press', selectedClubSubmissions[0].setPieces.defensiveCorner.press)" style="color:#8b949e;font-size:9px;margin-top:2px;font-style:italic">
-                        {{setPieceDesc('press', selectedClubSubmissions[0].setPieces.defensiveCorner.press)}}
+                      <div v-if="setPieceDesc('press',selectedClubSubmissions[0].setPieces.defensiveCorner.press)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('press',selectedClubSubmissions[0].setPieces.defensiveCorner.press)}}
                       </div>
                     </div>
-                    <!-- Defensive zones -->
+
+                    <!-- Defensive zone assignments -->
                     <template v-if="Object.keys(selectedClubSubmissions[0].setPieces.defensiveCorner.zones||{}).length">
-                      <div>
-                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.defensiveCorner.zones" :key="'dfz-'+zoneKey"
-                             style="padding:3px 0;border-bottom:1px solid #161b22"
-                             :title="setPieceDesc('defZone', zoneKey)">
-                          <div style="display:flex;justify-content:space-between;gap:6px">
-                            <span style="color:#6e7681;font-size:10px;white-space:nowrap">{{setPieceZoneLabel('def', zoneKey)}}</span>
-                            <span style="color:#e6edf3;font-size:10px;text-align:right">{{player}}</span>
+                      <div style="margin-top:4px">
+                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.defensiveCorner.zones" :key="'dz-'+zoneKey"
+                             style="margin-bottom:2px;border-radius:4px"
+                             @mouseenter="spHoveredPlayer={name:player,side:'def',zoneKey}"
+                             @mouseleave="spHoveredPlayer=null">
+                          <div style="display:flex;justify-content:space-between;padding:3px 4px;gap:6px">
+                            <span style="color:#6e7681;font-size:10px;white-space:nowrap" :title="setPieceDesc('defZone',zoneKey)">
+                              {{setPieceZoneLabel('def',zoneKey)}}
+                            </span>
+                            <span @click.stop="xiPlayerInfo(player)&&openModal(xiPlayerInfo(player))"
+                                  style="color:#79c0ff;font-size:10px;text-align:right;cursor:pointer;border-bottom:1px dotted rgba(121,192,255,0.4)">
+                              {{player}}
+                            </span>
+                          </div>
+                          <div v-if="spHoveredPlayer?.side==='def'&&spHoveredPlayer?.zoneKey===zoneKey"
+                               style="display:flex;gap:10px;padding:2px 4px 4px;flex-wrap:wrap;border-top:1px solid #21262d">
+                            <template v-for="attr in spZoneAttrs('def',zoneKey)" :key="'ds-'+attr">
+                              <span style="font-size:10px;color:#6e7681">{{attr.slice(0,3)}}
+                                <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(player)?.[attr])}">
+                                  {{xiPlayerInfo(player)?.[attr]||'—'}}
+                                </span>
+                              </span>
+                            </template>
                           </div>
                         </div>
                       </div>
                     </template>
                   </template>
+
                 </div>
               </div>
             </div>

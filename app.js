@@ -353,6 +353,7 @@ createApp({
       selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'transfers'
       clubSquadSort: 'pos',
       hoveredPitchPlayer: null,
+      spHoveredPlayer: null,   // { name, side, zoneKey } for set-piece zone hover
       allSubmissionsLoaded: false,
       clubTransferMap: {},
       // Espionage tab
@@ -2739,6 +2740,45 @@ createApp({
         def: { nearPost:'Near Post', farPost:'Far Post', sixYardAnchor:'6-Yard Box', penaltySpot:'Penalty Spot', edgeOfBox:'Edge of Box', counterRunner:'Counter Runner' },
       };
       return labels[side]?.[key] || key;
+    },
+    // Key attributes to show on hover for each zone assignment
+    spZoneAttrs(side, zoneKey) {
+      if (side === 'taker') return ['Passing', 'Vision'];
+      const map = {
+        atk: {
+          nearPost:    ['Heading', 'Speed'],
+          farPost:     ['Heading', 'Strength'],
+          penaltySpot: ['Heading', 'Shooting'],
+          blockade:    ['Strength', 'Heading'],
+          edgeOfBox:   ['Shooting', 'Vision'],
+          shortCorner: ['Passing', 'Dribbling'],
+          holdBack:    ['Speed', 'Tackling'],
+        },
+        def: {
+          nearPost:      ['Heading', 'Speed'],
+          farPost:       ['Heading', 'Strength'],
+          sixYardAnchor: ['Heading', 'Strength'],
+          penaltySpot:   ['Heading', 'Marking'],
+          edgeOfBox:     ['Speed', 'Marking'],
+          counterRunner: ['Speed', 'Stamina'],
+        },
+      };
+      return map[side]?.[zoneKey] || ['Heading'];
+    },
+    // Returns true if this zone should be highlighted for the given delivery type
+    spDeliveryHighlight(delivery, zoneKey) {
+      const map = {
+        'Inswinger':    'farPost',
+        'Outswinger':   'nearPost',
+        'Driven':       'penaltySpot',
+        'Short Corner': 'shortCorner',
+      };
+      return map[delivery] === zoneKey;
+    },
+    // Color an attribute value: green ≥80, orange ≥70, white otherwise
+    spAttrColor(v) {
+      const n = parseInt(v, 10);
+      return !n ? '#8b949e' : n >= 80 ? '#3fb950' : n >= 70 ? '#ffa657' : '#e6edf3';
     },
     negoStatusStyle(status) {
       const map = {
