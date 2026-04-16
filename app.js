@@ -2694,6 +2694,52 @@ createApp({
     // ── Espionage ─────────────────────────────────────────────────────────────
     espRatingClass(r) { if (!r) return 'c-gray'; return r >= 85 ? 'c-green' : r >= 75 ? 'c-orange' : 'c-gray'; },
     espFacClass(lv) { return lv >= 5 ? 'c-green' : lv >= 4 ? 'c-orange' : lv >= 3 ? 'c-blue' : 'c-gray'; },
+    setPieceDesc(type, value) {
+      const DESCS = {
+        delivery: {
+          'Inswinger':    'Curves toward goal — rewards far-post runners.',
+          'Outswinger':   'Curves away — near-post flick-on.',
+          'Driven':       'Flat and hard — penalty spot as target.',
+          'Short Corner': 'Short lay-off to pull defenders wide.',
+        },
+        scheme: {
+          'Zonal':      'Players hold areas of space — attack the ball when it enters their zone.',
+          'Man-to-Man': 'Each defender tracks a specific attacker through their run.',
+          'Hybrid':     'Zonal around the posts, man-marking on the most dangerous runners.',
+        },
+        press: {
+          'Hold Shape':   'Maintain structure — wait for delivery before engaging.',
+          'Press Taker':  'Rush the taker immediately to force a hurried or short delivery.',
+        },
+        // Attacking corner zone roles
+        atkZone: {
+          nearPost:    'Near Post — first to the ball on inswinging deliveries',
+          farPost:     'Far Post — ideal for outswinging deliveries',
+          penaltySpot: 'Penalty Spot — volleys, flick-ons, or second balls',
+          blockade:    'Blockade — screens the keeper, minimises overlap',
+          edgeOfBox:   'Edge of Box — recycles clearances or shoots from range',
+          shortCorner: 'Short Corner — pulls a defender wide to open space inside',
+          holdBack:    'Hold Back — counter cover, stays outside the box',
+        },
+        // Defensive corner zone roles
+        defZone: {
+          nearPost:      'Near Post — attacks the ball first on short deliveries',
+          farPost:       'Far Post — last aerial line of defence',
+          sixYardAnchor: '6-Yard Box — commands the box, best aerial defender',
+          penaltySpot:   'Penalty Spot — blocks shots and first balls',
+          edgeOfBox:     'Edge of Box — picks up second balls, drives forward',
+          counterRunner: 'Counter Runner — fastest player, lurks for the breakaway',
+        },
+      };
+      return DESCS[type]?.[value] || '';
+    },
+    setPieceZoneLabel(side, key) {
+      const labels = {
+        atk: { nearPost:'Near Post', farPost:'Far Post', penaltySpot:'Penalty Spot', blockade:'Blockade', edgeOfBox:'Edge of Box', shortCorner:'Short Corner', holdBack:'Hold Back' },
+        def: { nearPost:'Near Post', farPost:'Far Post', sixYardAnchor:'6-Yard Box', penaltySpot:'Penalty Spot', edgeOfBox:'Edge of Box', counterRunner:'Counter Runner' },
+      };
+      return labels[side]?.[key] || key;
+    },
     negoStatusStyle(status) {
       const map = {
         active:   {background:'#1a4a2e', color:'#7ee787'},
