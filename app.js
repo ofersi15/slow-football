@@ -2741,23 +2741,23 @@ createApp({
       };
       return labels[side]?.[key] || key;
     },
-    // Key attributes to show on hover for each zone assignment
+    // Key attributes to show for each zone assignment (no Strength in this game)
     spZoneAttrs(side, zoneKey) {
       if (side === 'taker') return ['Passing', 'Vision'];
       const map = {
         atk: {
           nearPost:    ['Heading', 'Speed'],
-          farPost:     ['Heading', 'Strength'],
+          farPost:     ['Heading', 'Stamina'],
           penaltySpot: ['Heading', 'Shooting'],
-          blockade:    ['Strength', 'Heading'],
+          blockade:    ['Heading', 'Tackling'],
           edgeOfBox:   ['Shooting', 'Vision'],
           shortCorner: ['Passing', 'Dribbling'],
           holdBack:    ['Speed', 'Tackling'],
         },
         def: {
           nearPost:      ['Heading', 'Speed'],
-          farPost:       ['Heading', 'Strength'],
-          sixYardAnchor: ['Heading', 'Strength'],
+          farPost:       ['Heading', 'Marking'],
+          sixYardAnchor: ['Heading', 'Marking'],
           penaltySpot:   ['Heading', 'Marking'],
           edgeOfBox:     ['Speed', 'Marking'],
           counterRunner: ['Speed', 'Stamina'],
