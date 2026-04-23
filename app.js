@@ -1426,6 +1426,7 @@ createApp({
       // Only clear squads cache — stats are independent season data, keep them
       // so stats re-apply instantly from cache once fresh squads land
       serverCacheDelete(PLAYERS_CACHE_KEY);
+      serverCacheDelete('sf_squads_raw_v1');  // force live per-club fetch, not stale cron cache
       try { localStorage.removeItem(PLAYERS_CACHE_KEY); } catch(e){}
       try { localStorage.removeItem('sf_youth_hist_v2'); } catch(e){}
       try { localStorage.removeItem('sf_youth_idx_v2'); } catch(e){}
