@@ -137,6 +137,7 @@ const FORMATIONS = {
   '433':  ['GK','FB','CB','CB','FB','CM','CM','CM','WF','WF','CF'],
   '3421': ['GK','CB','CB','CB','WM','CM','CM','WM','AM','AM','CF'],
   '352':  ['GK','CB','CB','CB','WM','CM','CM','CM','WM','CF','CF'],
+  '343':  ['GK','CB','CB','CB','WM','CM','CM','WM','WF','CF','WF'],
 };
 // Default slot positions per formation — pitch coordinates: x 0–68 (left→right), y 0–105 (attacking→GK end)
 // API sends right-side players first, then left-side. x values are flipped (68-x) to match.
@@ -154,6 +155,8 @@ const FORMATION_SLOT_POS = {
   '3421': [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:60,y:59},{x:43,y:59},{x:25,y:59},{x:8,y:59},{x:44,y:35},{x:24,y:35},{x:34,y:13}],
   // GK  RCB          CB           LCB          RWM          RCM          CM           LCM          LWM          RST          LST
   '352':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:61,y:58},{x:46,y:58},{x:34,y:58},{x:22,y:58},{x:7,y:58},{x:44,y:20},{x:24,y:20}],
+  // GK  RCB          CB           LCB          RWM          RCM          LCM          LWM          RWF          CF           LWF
+  '343':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:60,y:59},{x:43,y:59},{x:25,y:59},{x:8,y:59},{x:58,y:20},{x:34,y:13},{x:10,y:20}],
 };
 
 // Key attribute to display per base position in club XI view
