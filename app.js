@@ -3288,7 +3288,7 @@ createApp({
 
     // Look up player data from allPlayers by name (case-insensitive)
     xiPlayerInfo(name) {
-      if (!name) return null;
+      if (!name || typeof name !== 'string') return null;
       const lc = name.toLowerCase();
       return this.allPlayers.find(p => (p.Player||'').toLowerCase() === lc) || null;
     },
