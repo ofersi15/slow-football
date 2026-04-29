@@ -2749,6 +2749,13 @@ createApp({
       return labels[side]?.[key] || key;
     },
     // Key attributes to show for each zone assignment (no Strength in this game)
+    playerFitPct(name) {
+      const p = this.xiPlayerInfo(name);
+      return (p && p.fitnessPct != null) ? p.fitnessPct : null;
+    },
+    fitColor(pct) {
+      return pct == null ? '#8b949e' : pct >= 85 ? '#7ee787' : pct >= 70 ? '#ffa657' : '#ff7b72';
+    },
     roleAttrs(role) {
       const map = {
         captain:  ['Mentality','Leadership'],
