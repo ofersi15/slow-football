@@ -2032,7 +2032,10 @@
                 <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
                   <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
-                    <div style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name}}</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name||'—'}}</span>
+                      <span v-if="playerFitPct(p.name)!=null" style="font-size:10px;font-weight:700" :style="{color:fitColor(playerFitPct(p.name))}">{{playerFitPct(p.name)}}%</span>
+                    </div>
                     <div v-if="p.off||p.plan||p.time" style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;align-items:center">
                       <span v-if="p.off" style="font-size:10px;color:#8b949e">↔ {{p.off}}</span>
                       <span v-if="p.plan" style="background:#21262d;border-radius:3px;padding:1px 5px;font-size:9px;color:#ffa657">{{p.plan}}</span>
