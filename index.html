@@ -1981,7 +1981,6 @@
                       <text :x="pl.x" :y="pl.y+0.9" text-anchor="middle" font-size="2.2" fill="white" font-weight="800" font-family="system-ui,sans-serif">{{pl.bp}}</text>
                       <text :x="pl.x" :y="pl.y-4" text-anchor="middle" font-size="2.1" fill="rgba(255,255,255,0.9)" font-weight="700" font-family="system-ui,sans-serif">{{xiPlayerInfo(pl.name) ? (xiPlayerInfo(pl.name)._gameRating||xiPlayerInfo(pl.name).Rating||'') : ''}}</text>
                       <text :x="pl.x" :y="pl.y+5.8" text-anchor="middle" font-size="2.0" :fill="pl.textColor" font-weight="600" font-family="system-ui,sans-serif">{{pl.name.split(' ').pop().slice(0,11)}}</text>
-                      <text v-if="playerFitPct(pl.name)!=null" :x="pl.x" :y="pl.y+8.3" text-anchor="middle" font-size="1.8" :fill="fitColor(playerFitPct(pl.name))" font-family="system-ui,sans-serif">{{playerFitPct(pl.name)}}%</text>
                     </g>
                   </template>
                 </svg>
@@ -2033,13 +2032,7 @@
                 <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
                   <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:4px">
-                      <span style="font-size:12px;color:#e6edf3;font-weight:600;cursor:pointer" @click="xiPlayerInfo(p.name)&&openModal(xiPlayerInfo(p.name))">{{p.name||'—'}}</span>
-                      <span v-if="playerFitPct(p.name)!=null"
-                        :style="{color:fitColor(playerFitPct(p.name)),fontSize:'10px',fontWeight:'700',flexShrink:'0'}">
-                        {{playerFitPct(p.name)}}%
-                      </span>
-                    </div>
+                    <div style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name}}</div>
                     <div v-if="p.off||p.plan||p.time" style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;align-items:center">
                       <span v-if="p.off" style="font-size:10px;color:#8b949e">↔ {{p.off}}</span>
                       <span v-if="p.plan" style="background:#21262d;border-radius:3px;padding:1px 5px;font-size:9px;color:#ffa657">{{p.plan}}</span>
@@ -2050,15 +2043,9 @@
                 <div v-if="selectedClubSubmissions[0].roles" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Roles</div>
                   <template v-for="(name,role) in selectedClubSubmissions[0].roles" :key="role">
-                    <div style="display:flex;align-items:center;padding:4px 0;border-bottom:1px solid #161b22;gap:6px">
-                      <span style="color:#6e7681;text-transform:capitalize;font-size:10px;white-space:nowrap;flex:0 0 56px">{{role}}</span>
-                      <span style="color:#e6edf3;font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer"
-                            @click="xiPlayerInfo(name)&&openModal(xiPlayerInfo(name))">{{name}}</span>
-                      <template v-for="attr in roleAttrs(role)" :key="'ra-'+role+attr">
-                        <span style="flex:0 0 30px;text-align:right;font-size:9px;color:#6e7681;white-space:nowrap">
-                          {{attr.slice(0,3)}} <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(name)?.[attr])}">{{xiPlayerInfo(name)?.[attr]||'—'}}</span>
-                        </span>
-                      </template>
+                    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #161b22;gap:6px">
+                      <span style="color:#6e7681;text-transform:capitalize;font-size:11px;white-space:nowrap">{{role}}</span>
+                      <span style="color:#e6edf3;font-size:11px;text-align:right">{{name}}</span>
                     </div>
                   </template>
                 </div>
