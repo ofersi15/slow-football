@@ -135,6 +135,7 @@ const FORMATIONS = {
   '4411': ['GK','FB','CB','CB','FB','WM','CM','CM','WM','AM','CF'],
   '4231': ['GK','FB','CB','CB','FB','DM','DM','WF','AM','WF','CF'],
   '433':  ['GK','FB','CB','CB','FB','CM','CM','CM','WF','WF','CF'],
+  '4321': ['GK','FB','CB','CB','FB','CM','CM','CM','AM','AM','CF'],
   '3421': ['GK','CB','CB','CB','WM','CM','CM','WM','AM','AM','CF'],
   '352':  ['GK','CB','CB','CB','WM','CM','CM','CM','WM','CF','CF'],
   '343':  ['GK','CB','CB','CB','WM','CM','CM','WM','WF','CF','WF'],
@@ -157,6 +158,8 @@ const FORMATION_SLOT_POS = {
   '352':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:61,y:58},{x:46,y:58},{x:34,y:58},{x:22,y:58},{x:7,y:58},{x:44,y:20},{x:24,y:20}],
   // GK  RCB          CB           LCB          RWM          RCM          LCM          LWM          RWF          CF           LWF
   '343':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:60,y:59},{x:43,y:59},{x:25,y:59},{x:8,y:59},{x:58,y:20},{x:34,y:13},{x:10,y:20}],
+  // GK  RB           RCB          LCB          LB           RCM          CM           LCM          RAM          LAM          CF
+  '4321': [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:50,y:60},{x:34,y:60},{x:18,y:60},{x:44,y:37},{x:24,y:37},{x:34,y:13}],
 };
 
 // Key attribute to display per base position in club XI view
@@ -3418,6 +3421,17 @@ createApp({
           // Use gameweek as key; null/missing gameweek → 'upcoming'
           const key = s.gameweek ?? 'upcoming';
           if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
+        }
+        // Normalize subs: some entries arrive with name=JSON-string or as string elements
+        for (const s of Object.values(byGw)) {
+          if (!Array.isArray(s.subs)) continue;
+          s.subs = s.subs.map(sub => {
+            if (typeof sub === 'string') { try { sub = JSON.parse(sub); } catch(e) {} }
+            if (typeof sub?.name === 'string' && sub.name.trimStart().startsWith('{')) {
+              try { const p = JSON.parse(sub.name); sub = { ...p, name: p.name || '' }; } catch(e) {}
+            }
+            return sub;
+          }).filter(sub => typeof sub === 'object' && sub !== null && (sub.name || sub.off));
         }
         this.submissionsCache[club] = byGw;
       } catch(e) { this.submissionsCache[club] = {}; }
