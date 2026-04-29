@@ -1882,6 +1882,7 @@
         <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <button class="btn" @click="selectedClubName=null" style="font-size:12px">← Back</button>
           <button class="btn" @click="openClubDetail(selectedClubName)" style="font-size:12px" title="Reload latest submission">↺ Reload</button>
+          <button class="btn" @click="showRawSub=!showRawSub" style="font-size:12px" :style="{color:showRawSub?'#ffa657':''}">{ } Raw</button>
           <div style="flex:1;min-width:120px">
             <div style="font-size:20px;font-weight:800;color:#e6edf3;letter-spacing:-.3px">
               {{selectedClubName}}
@@ -2215,6 +2216,9 @@
                 </tbody>
               </table>
             </div>
+          <div v-if="showRawSub && selectedClubSubmissions.length" class="card" style="padding:10px">
+            <pre style="font-size:10px;color:#8b949e;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto;margin:0">{{JSON.stringify(selectedClubSubmissions[0],null,2)}}</pre>
+          </div>
           </template>
           <div v-else class="card c-gray" style="text-align:center;padding:30px">No submission data available</div>
         </div>

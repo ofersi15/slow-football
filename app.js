@@ -357,6 +357,7 @@ createApp({
       espionageSubmissions: {},  // club → latest submission object
       selectedClubName: null,
       selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'transfers'
+      showRawSub: false,
       clubSquadSort: 'pos',
       hoveredPitchPlayer: null,
       spHoveredPlayer: null,   // { name, side, zoneKey } for set-piece zone hover
@@ -2751,7 +2752,10 @@ createApp({
     // Key attributes to show for each zone assignment (no Strength in this game)
     playerFitPct(name) {
       const p = this.xiPlayerInfo(name);
-      return (p && p.fitnessPct != null) ? p.fitnessPct : null;
+      if (!p) return null;
+      if (p.fitnessPct != null) return p.fitnessPct;
+      if (p.Fitness != null) return p.Fitness;
+      return null;
     },
     fitColor(pct) {
       return pct == null ? '#8b949e' : pct >= 85 ? '#7ee787' : pct >= 70 ? '#ffa657' : '#ff7b72';
@@ -3438,29 +3442,28 @@ createApp({
           const key = s.gameweek ?? 'upcoming';
           if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
         }
-        // Normalize subs: some entries arrive with name=JSON-string or as string elements
-        for (const s of Object.values(byGw)) {
-          if (!Array.isArray(s.subs)) continue;
-          s.subs = s.subs.map(sub => {
-            if (typeof sub === 'string') { try { sub = JSON.parse(sub); } catch(e) {} }
-            if (typeof sub?.name === 'string' && sub.name.trimStart().startsWith('{')) {
-              try { const p = JSON.parse(sub.name); sub = { ...p, name: p.name || '' }; } catch(e) {}
-            }
-            return sub;
-          }).filter(sub => typeof sub === 'object' && sub !== null && (sub.name || sub.off));
-          // Deduplicate by 'off' player — prefer the entry that has a name
-          const bestByOff = new Map();
-          for (const sub of s.subs) {
-            if (!sub.off) continue;
-            const prev = bestByOff.get(sub.off);
-            if (!prev || (!prev.name && sub.name)) bestByOff.set(sub.off, sub);
-          }
-          s.subs = s.subs.filter(sub => !sub.off || bestByOff.get(sub.off) === sub);
-        }
+        for (const s of Object.values(byGw)) this._normalizeSubs(s);
         this.submissionsCache[club] = byGw;
       } catch(e) { this.submissionsCache[club] = {}; }
     },
 
+    _normalizeSubs(s) {
+      if (!Array.isArray(s.subs)) return;
+      s.subs = s.subs.map(sub => {
+        if (typeof sub === 'string') { try { sub = JSON.parse(sub); } catch(e) {} }
+        if (typeof sub?.name === 'string' && sub.name.trimStart().startsWith('{')) {
+          try { const parsed = JSON.parse(sub.name); sub = { ...parsed, name: parsed.name || '' }; } catch(e) {}
+        }
+        return sub;
+      }).filter(sub => typeof sub === 'object' && sub !== null && (sub.name || sub.off));
+      const bestByOff = new Map();
+      for (const sub of s.subs) {
+        if (!sub.off) continue;
+        const prev = bestByOff.get(sub.off);
+        if (!prev || (!prev.name && sub.name)) bestByOff.set(sub.off, sub);
+      }
+      s.subs = s.subs.filter(sub => !sub.off || bestByOff.get(sub.off) === sub);
+    },
     async loadCachedSubmissions() {
       // 1. localStorage first (no TTL — persists forever across sessions)
       try {
@@ -3468,7 +3471,10 @@ createApp({
         if (lsRaw) {
           const lsData = JSON.parse(lsRaw);
           for (const [club, byGw] of Object.entries(lsData?.clubs || {})) {
-            if (!this.submissionsCache[club]) this.submissionsCache[club] = byGw;
+            if (!this.submissionsCache[club]) {
+              for (const s of Object.values(byGw)) this._normalizeSubs(s);
+              this.submissionsCache[club] = byGw;
+            }
           }
           if (Object.keys(this.submissionsCache).length > 0) this.allSubmissionsLoaded = true;
         }
@@ -3512,6 +3518,7 @@ createApp({
       this.activeTab = 'clubs';
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
+      this.showRawSub = false;
       try { localStorage.setItem('sf_last_club', clubName); } catch(e) {}
       delete this.submissionsCache[clubName];
       await this._fetchClubSubmissions(clubName);
