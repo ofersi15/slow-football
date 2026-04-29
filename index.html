@@ -2032,10 +2032,7 @@
                 <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
                   <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
-                    <div style="display:flex;justify-content:space-between">
-                      <span style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name||'—'}}</span>
-                      <span v-if="playerFitPct(p.name)!=null" :style="{color:fitColor(playerFitPct(p.name)),fontSize:'10px',fontWeight:'700'}">{{playerFitPct(p.name)}}%</span>
-                    </div>
+                    <div style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name}}</div>
                     <div v-if="p.off||p.plan||p.time" style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;align-items:center">
                       <span v-if="p.off" style="font-size:10px;color:#8b949e">↔ {{p.off}}</span>
                       <span v-if="p.plan" style="background:#21262d;border-radius:3px;padding:1px 5px;font-size:9px;color:#ffa657">{{p.plan}}</span>
@@ -2046,11 +2043,9 @@
                 <div v-if="selectedClubSubmissions[0].roles" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Roles</div>
                   <template v-for="(name,role) in selectedClubSubmissions[0].roles" :key="role">
-                    <div style="display:flex;align-items:center;padding:3px 0;border-bottom:1px solid #161b22;gap:4px">
-                      <span style="color:#6e7681;text-transform:capitalize;font-size:10px;flex:0 0 54px">{{role}}</span>
-                      <span style="color:#e6edf3;font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{name}}</span>
-                      <span v-if="roleAttrs(role)[0]" style="font-size:9px;color:#6e7681">{{roleAttrs(role)[0].slice(0,3)}} <b :style="{color:spAttrColor(xiPlayerInfo(name)&&xiPlayerInfo(name)[roleAttrs(role)[0]])}">{{xiPlayerInfo(name)&&xiPlayerInfo(name)[roleAttrs(role)[0]]||'—'}}</b></span>
-                      <span v-if="roleAttrs(role)[1]" style="font-size:9px;color:#6e7681">{{roleAttrs(role)[1].slice(0,3)}} <b :style="{color:spAttrColor(xiPlayerInfo(name)&&xiPlayerInfo(name)[roleAttrs(role)[1]])}">{{xiPlayerInfo(name)&&xiPlayerInfo(name)[roleAttrs(role)[1]]||'—'}}</b></span>
+                    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #161b22;gap:6px">
+                      <span style="color:#6e7681;text-transform:capitalize;font-size:11px;white-space:nowrap">{{role}}</span>
+                      <span style="color:#e6edf3;font-size:11px;text-align:right">{{name}}</span>
                     </div>
                   </template>
                 </div>
