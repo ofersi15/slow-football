@@ -2749,6 +2749,15 @@ createApp({
       return labels[side]?.[key] || key;
     },
     // Key attributes to show for each zone assignment (no Strength in this game)
+    roleAttrs(role) {
+      const map = {
+        captain:  ['Mentality','Leadership'],
+        penalty:  ['Shooting','Mentality'],
+        freekick: ['Passing','Vision'],
+        corner:   ['Passing','Vision'],
+      };
+      return map[(role||'').toLowerCase()] || [];
+    },
     spZoneAttrs(side, zoneKey) {
       if (side === 'taker') return ['Passing', 'Vision'];
       const map = {
@@ -3432,6 +3441,14 @@ createApp({
             }
             return sub;
           }).filter(sub => typeof sub === 'object' && sub !== null && (sub.name || sub.off));
+          // Deduplicate by 'off' player — prefer the entry that has a name
+          const bestByOff = new Map();
+          for (const sub of s.subs) {
+            if (!sub.off) continue;
+            const prev = bestByOff.get(sub.off);
+            if (!prev || (!prev.name && sub.name)) bestByOff.set(sub.off, sub);
+          }
+          s.subs = s.subs.filter(sub => !sub.off || bestByOff.get(sub.off) === sub);
         }
         this.submissionsCache[club] = byGw;
       } catch(e) { this.submissionsCache[club] = {}; }
