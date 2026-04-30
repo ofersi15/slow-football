@@ -6,26 +6,60 @@ This file gives Claude Code full context about this project. Read it at the star
 
 ## What This Is
 
-A personal fantasy football analytics web app. It's a **single-page Vue 3 app** (CDN, no build step) that:
-- Fetches player/squad data from the slowfootball.club game API
-- Displays league standings, player stats, trade analyzer, espionage (opponent scouting), youth scouting, and auction draft tool
-- Caches API responses in a Cloudflare KV-backed cache worker to avoid re-fetching on every load
-
-**Live site:** https://sf.ofersi15.workers.dev
-**GitHub repo:** https://github.com/ofersi15/slow-football
+A personal fantasy football analytics web app for the **slowfootball.club** game.
+Built and maintained by Ofer (ofersi15@gmail.com) — non-developer, so keep everything simple and push after every change.
 
 ---
 
-## Hosting & Infrastructure
+## Live URLs
 
-| Component | Details |
-|-----------|---------|
-| **App** | Cloudflare Pages — auto-deploys from `main` branch of the GitHub repo |
-| **Cache Worker** | `https://sf-cache.ofersi15.workers.dev` — KV-backed persistent cache (replaces server.py) |
-| **Proxy Worker** | `sf-game-proxy.ofersi15.workers.dev` — token vending machine (not currently needed) |
-| GitHub Pages | **Inactive** — do not reference or use |
+| Thing | URL |
+|-------|-----|
+| **App** | https://sf.ofersi15.workers.dev |
+| **Cache worker** | https://sf-cache.ofersi15.workers.dev |
+| **Proxy worker** | https://sf-game-proxy.ofersi15.workers.dev (not currently needed) |
+| **GitHub repo** | https://github.com/ofersi15/slow-football |
+| **Game API** | https://slowfootball.club/api |
 
-**Deployment workflow:** Edit files locally → `git commit` → `git push origin main` → CF Pages auto-deploys within ~60s. Always push after every change.
+---
+
+## Full Architecture
+
+### Frontend
+- **Vue 3 CDN runtime-only** (`https://unpkg.com/vue@3/dist/vue.global.js`) — no build step
+- Template in `index.html` (DOM template), all logic in `app.js`, styles in `style.css`
+- Chart.js via CDN for charts
+- **Never put `</script>` at end of app.js** — breaks the HTML parser
+- **`v-if` on SVG child elements inside `<g>` crashes Vue CDN build** — avoid entirely; use `:opacity` or just omit
+- **`<` operator inside SVG attribute bindings** (e.g. `:fill="x<70?..."`) also crashes — use helper methods
+
+### Hosting: Cloudflare Pages
+- Auto-deploys from `main` branch of GitHub repo within ~60s
+- No manual deploy needed for frontend changes — just `git push origin main`
+- GitHub Actions workflow: `.github/workflows/auto-merge-claude.yml`
+
+### Cache Worker: `sf-cache` (Cloudflare Worker + KV)
+- **URL**: `https://sf-cache.ofersi15.workers.dev`
+- **Code**: `cf-worker/index.js`
+- **Config**: `cf-worker/wrangler.toml`
+- **KV namespace**: `SF_CACHE` (bound in wrangler.toml)
+- Exposes: `GET/POST/DELETE /sf-cache/<key>`
+- POST with `?permanent=1` = no TTL (lives forever until replaced)
+- **Deploy**: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
+- **Cron**: runs 4×/day (`0 0,6,12,18 * * *`) — fetches all squads + league tables, stores as `sf_squads_raw_v1` and `sf_tables_raw_v1`
+- **Secrets** (set via `wrangler secret put`): `SF_USERNAME`, `SF_PASSWORD`
+
+### Proxy Worker: `sf-game-proxy` (not currently needed)
+- **Code**: `cf-worker/proxy.js`, **Config**: `cf-worker/wrangler-proxy.toml`
+- Token vending machine — vends Bearer tokens using stored credentials
+
+### Cache routing in app.js
+```javascript
+const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
+  ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
+  : '/sf-cache';
+```
+Falls back to `localStorage` then local `/sf-cache` (old server.py) on other hostnames.
 
 ---
 
@@ -33,107 +67,212 @@ A personal fantasy football analytics web app. It's a **single-page Vue 3 app** 
 
 ```
 slow-football/
-├── index.html        # All Vue template markup
-├── app.js            # All Vue logic, data fetching, computed props
-├── style.css         # Styles
-├── CLAUDE.md         # This file
+├── index.html              # All Vue template markup
+├── app.js                  # All Vue logic (~4300 lines)
+├── style.css               # Styles
+├── CLAUDE.md               # This file
+├── SESSION_CONTEXT.md      # Session context for Claude Chat reviews
+├── wrangler.jsonc          # CF Pages config
+├── .github/workflows/
+│   ├── auto-merge-claude.yml
+│   └── deploy-cf-worker.yml
 └── cf-worker/
-    ├── index.js              # Cache worker (sf-cache.ofersi15.workers.dev)
-    ├── proxy.js              # Token proxy worker (sf-game-proxy, not needed)
-    └── wrangler-proxy.toml   # Wrangler config for proxy worker
+    ├── index.js            # Cache worker (sf-cache)
+    ├── proxy.js            # Token proxy (not needed)
+    ├── wrangler.toml       # Cache worker config
+    └── wrangler-proxy.toml # Proxy worker config
 ```
-
----
-
-## Critical Architecture Notes
-
-### Vue 3 CDN Runtime — No Build Step
-The app uses Vue 3 via unpkg CDN with the **runtime-only** build. The template lives in `index.html` as a real DOM template (not a string template or render function). This means:
-- `index.html` and `app.js` are separate files — Vue mounts from the DOM
-- **Never put `</script>` at the end of app.js** — it will break the HTML parser
-- `app.js` must NOT be wrapped in `<script>` tags; `index.html` includes it via `<script src="app.js">`
-
-### index.html Structure
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div id="app">
-    <!-- ALL Vue template markup here -->
-  </div>
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
-```
-
-### Cache Strategy (CF Worker KV)
-The app routes cache reads/writes through `sf-cache.ofersi15.workers.dev` when running on `sf.ofersi15.workers.dev`. Falls back to `localStorage` and then `/sf-cache` (local server.py) on other hostnames.
-
-```javascript
-const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
-  ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
-  : '/sf-cache';
-```
-
-Cache worker (cf-worker/index.js) exposes GET/POST/DELETE on `/sf-cache/<key>`, backed by a KV namespace bound as `SF_CACHE`.
-
-All cache read/write points in `loadData()`, `enrichStats()`, `fetchFreshData()`, `loadEspionage()`, `clearPlayersCache()` use server-first with localStorage fallback.
 
 ---
 
 ## Game API
 
-```javascript
-const API = 'https://slowfootball.club/api';
-const MY_CLUB = 'Leverkusen';
-```
-
-Auth: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`. Token obtained from `POST /api/auth/login` — vended by the proxy worker using secrets `SF_USERNAME` / `SF_PASSWORD`.
+- **Base**: `https://slowfootball.club/api`
+- **Auth**: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`
+- **My club**: `MY_CLUB = 'Leverkusen'`
+- Token from `POST /api/auth/login`
 
 Key endpoints:
-- `GET /api/squads` — all clubs' squads (dict keyed by club name)
-- `GET /api/squads?club=<name>` — single club squad `{club, players}`
-- `GET /api/scouting/jobs?club=<name>` — active scouting jobs `{items, cap}`
-- `GET /api/scouting/jobs?club=<name>&status=rejected|accepted` — history
-- `GET /api/transfers/done` — transfer history `{deals}`
-- `GET /api/agents/international-players` — international scouting pool (108 players)
-- `GET /api/managers`, `GET /api/admin/squads/public/clubs`, `GET /api/clubs`
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/squads` | All clubs' squads (dict by club name) |
+| `GET /api/squads?club=X` | Single club `{club, players}` |
+| `GET /api/submissions?club=X&limit=50` | Club's GW submissions |
+| `GET /api/scouting/jobs?club=X` | Active scouting jobs |
+| `GET /api/scouting/jobs?club=X&status=accepted\|rejected` | History |
+| `GET /api/transfers/done` | Transfer history `{deals}` |
+| `GET /api/agents/international-players` | International scouting pool |
+| `GET /api/tables/from-fixtures` | League tables |
+| `GET /api/managers` | All managers |
+| `GET /api/admin/squads/public/clubs` | All club names |
+| `GET /api/facilities?club=X` | Club facilities |
+| `GET /api/staff/effects?club=X` | Staff effects |
+| `GET /api/academy?club=X` | Academy players |
 
 ---
 
 ## Key Constants (top of app.js)
 
 ```javascript
-const LEAGUE_ID = '...';
-const PLAYERS_CACHE_KEY = 'sf_players_v2';
-const STATS_CACHE_KEY = 'sf_stats_v2';
-const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+const MY_CLUB = 'Leverkusen';
+const PLAYERS_CACHE_KEY = 'sf_players_v6';
+const STATS_CACHE_KEY = 'sf_stats_v1';
+const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina',
+                        'Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
 ```
 
 ---
 
-## Known Quirks & Past Bugs
+## Tabs
 
-- **`</script>` in app.js**: Was accidentally included during a file-split refactor. Always verify app.js does NOT end with `</script>`
-- **Duplicate Vue CDN line**: Was accidentally added during refactor. index.html should have exactly ONE Vue CDN script tag
-- **Missing `<body>` tag**: Was missing after a refactor. `<div id="app">` must be inside `<body>`
-- **Incomplete player stats**: 32 players across squads have fewer than 11 stats. null-ID real-world players (Musiala, Rashford, etc.) and custom-ID transfers (jaap-martin-cb, mason-mount-am, etc.) only have 4 position-key stats — no more data exists on the server. Exception: Ernesto Gentile (Monaco) has full stats in Monaco's accepted scouting job records. These players are flagged with `_incompleteStats` and show an orange "partial" badge in the player table.
+| Tab | Label | Description |
+|-----|-------|-------------|
+| scout | 🔍 Scout | Filterable player table with sidebar (search, position, ratings, age, flags, attrs, weighted rating) |
+| squad | 🛡 My Squad | Leverkusen squad management + Best XI builder |
+| moneyball | 📊 Moneyball | Value analysis, gems, overperformers, top lists |
+| analysis | 🔬 Analysis | Tactical matchup stats across all historical GWs |
+| youth | 🌱 Youth | Scouting jobs, academy, facilities, staff, history scan |
+| club | 🏟 My Club | My club's facilities, staff, training |
+| clubs | 🏟 Clubs | All clubs — Latest XI (pitch viz), Academy, History, Transfers sub-tabs |
+| espionage | 💰 Transfers | Opponent scouting, negotiations, submissions |
+| matches | 📺 Matches | Match archive with detail view, filters, rebuild/append tools |
 
 ---
 
-## What Has Been Built (Feature List)
+## Clubs Tab — Latest XI Detail
 
-- **Standings tab** — league standings with win/loss, points
-- **Player Stats tab** — filterable stats table with enriched data; "partial" badge for incomplete players
-- **Trade Analyzer tab** — compare players across rosters for trade evaluation
-- **Espionage tab** — scout opponents; auto-loads on app start; cached
-- **Youth tab** — own club scouting jobs, academy, facilities, staff; history scan across all managed clubs (active + rejected + accepted)
-- **Auction Draft tool** — budget tracking for auction-style drafts
+### What it shows (per submission)
+- **Pitch visualization**: SVG pitch with player nodes, run arrows, hover tooltips
+- **Subs panel**: sub name + fitness %, swap target, plan, time condition
+- **Roles panel**: captain/penalty/freekick/corner with key attributes inline
+- **Set Pieces panel**: attacking + defensive corner config, zone assignments with player attrs
+- **Full Squad table**: all club players sortable by pos/rating/value/age
+- **`{ } Raw` button**: toggles full JSON of the submission at the bottom (for debugging incomplete data)
+
+### Formations supported (FORMATIONS + FORMATION_SLOT_POS)
+`442, 4411, 4231, 433, 4321, 3421, 352, 343`
+- **4321 added 2026-04-29** (Christmas tree: 4 def, 3 CM, 2 AM, 1 CF)
+
+### Run arrow coordinate system (hard-won — do not change)
+```javascript
+runX = (run.x / 90) * 68
+// slot1 (right-side): runY = (run.y - 27.5) / 95 * 105
+// slot2 (left-side):  runY = 105 - (run.y / 100) * 105
+```
+
+### Key methods
+- `pitchLayout(submission)` — maps xi players to SVG coordinates + run targets
+- `xiPlayerInfo(name)` — looks up player by name in allPlayers (guards `typeof name !== 'string'`)
+- `playerFitPct(name)` — returns fitnessPct or Fitness field, null if missing
+- `fitColor(pct)` — color for fitness % (green ≥85, orange ≥70, red below)
+- `roleAttrs(role)` — key attrs per role (captain→Mentality/Leadership, penalty→Shooting/Mentality, etc.)
+- `spZoneAttrs(side, zoneKey)` — attrs for set piece zone players
+- `openClubDetail(clubName)` — always force-refetches submissions (clears cache entry first)
+- `_normalizeSubs(submission)` — fixes stale/malformed sub entries from API or localStorage cache
+
+---
+
+## Caching Architecture
+
+### Philosophy: Stale-While-Revalidate
+- Cache exists → show immediately, refresh in background if stale
+- Block UI only when no cache at all
+- All KV writes permanent (no expiry) — replaced not deleted
+
+### Cache keys
+| Key | Content | Strategy |
+|-----|---------|----------|
+| `sf_players_v6` | Processed players + meta | 6h stale bg-refresh |
+| `sf_stats_v1` | Player stats (attrs, career) | show always, bg-refresh if >24h |
+| `sf_squads_raw_v1` | Raw bulk squads (cron) | permanent, cron replaces |
+| `sf_tables_raw_v1` | League tables (cron) | permanent, cron replaces |
+| `sf_espionage_v3` | Espionage clubs + negos | show always, bg-refresh if >30min |
+| `sf_negos_history_v1` | All-time nego history | permanent, merges forever (never delete) |
+| `sf_youth_idx_v2` | Youth data | localStorage only |
+| `sf_club_v1` | My Club data | localStorage only, bg-refresh >30min |
+| `sf_match_archive_v3` | Match archive index | permanent |
+| `sf_match_archive_v3_gw_{N}` | Per-GW match data | permanent |
+| `SUBMISSIONS_CACHE_KEY` | Submissions by club | no TTL — always use cached |
+| `sf_vacancies_v1` | Vacant clubs list | cron-populated |
+
+---
+
+## Match Archive
+
+- **Rebuild** 🔄: full rebuild, reuses cached GW chunks
+- **Append GW** ➕: incremental — only new fixtures, only involved clubs' submissions
+- `extractTactics(narrativeArr, club)` — parses narrative tactics (NOT `parseInstructions`)
+- `extractFormation(narrativeArr, club)` — extracts formation string from narrative
+- `deriveFormation(ratingsArr)` — derives formation from player position counts (fallback)
+
+---
+
+## Analysis Tab
+
+6 tactical matchup cards with dual dropdowns + drill-down table:
+1. Formation Matchups
+2. Mentality Matchups
+3. Pressing Matchups
+4. Passing Style vs Pressing
+5. Defensive Line Matchups
+6. Transition Speed vs Defensive Line
+
+---
+
+## Player Data
+
+### Flags (added game update 2026-03-23)
+- `retiring` → 🚨 red badge, "hide retiring" filter (default ON)
+- `homegrown` → 🏠 green badge
+- `slowIcon`/`isSlowIcon`/`icon` → ⭐ gold badge
+- `inAcademy` → 🎓 blue badge
+
+### Incomplete stats
+- 32 players have `_incompleteStats` — only 4 position-key attrs, no full data
+- Shown with orange "partial" badge in scout table
+- Null-ID real-world players (Musiala, Rashford etc.) + custom-ID transfers
+
+---
+
+## Submissions / Subs Normalization
+
+The submissions API sometimes returns malformed `subs` entries:
+- Some entries are JSON strings instead of objects
+- Some have `name` field containing a stringified JSON object
+- Stale localStorage cache may have these
+
+`_normalizeSubs(s)` handles all of this and is called:
+1. In `_fetchClubSubmissions` (fresh API fetch)
+2. In `loadCachedSubmissions` (localStorage load on startup)
+
+---
+
+## Agent / Tamagotchi Feature
+
+- `GET /api/agents/status?club=Leverkusen` — streak, fedToday, activeOffer, giftsCount
+- `GET /api/agents/gifts?club=Leverkusen` — pending gifts
+- `POST /api/agents/feed?club=Leverkusen` — feeds (once/day). **DO NOT call without explicit user intent.**
+- `POST /api/agents/claim?club=Leverkusen` `{id}` — claims gift. **Irreversible.**
+- **Incident 2026-03-23**: accidental feed + claim → Wataru Endo (DM 75.5) added to Leverkusen squad
+
+---
+
+## Known Bugs / Quirks
+
+- `v-if` on SVG `<text>` inside `<g>` in Vue 3 CDN runtime crashes entire app — do not use
+- `<` operator inside SVG `:bind` attributes crashes Vue CDN parser — use helper methods (fitColor, etc.)
+- `xiPlayerInfo(name)` must guard `typeof name !== 'string'` — stale cache can have object values as name
+- `mounted()` restores last club: `setTimeout(() => this.openClubDetail(lastClub), 800)`
+- 1 unclosed `<div>` exists in index.html (pre-existing, browsers handle it fine)
+
+---
+
+## Deployment Checklist
+
+1. Edit `index.html` / `app.js` / `style.css`
+2. `git add <files> && git commit -m "..." && git push origin main`
+3. CF Pages auto-deploys in ~60s
+4. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 ---
 
