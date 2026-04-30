@@ -9,7 +9,7 @@ See /home/codespace/.claude/plans/breezy-juggling-pine.md for full plan.
 - [DONE] A-2: Created src/constants.js, removed from app.js
 - [DONE] A-3: Created src/utils.js, removed from app.js
 - [DONE] A-4: Created src/cache.js, removed from app.js
-- [TODO] A-5: Verified app.js line count, pushed, verified live
+- [DONE] A-5: Verified app.js line count (4089, was 4461), pushed, verified live
 
 ## Phase B — Introduce Vite + migrate 3 simple tabs
 - [TODO] B-1: Add Vite + plugin-vue to package.json, create vite.config.js
