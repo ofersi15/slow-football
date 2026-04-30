@@ -261,6 +261,116 @@ function calcEstValue(p) {
 function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
 function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
 
+// ── Chemistry & Traits ────────────────────────────────────────────────────────
+// Game start date (from game source) + week duration
+const GAME_START = new Date("2025-08-23T00:00:00Z").getTime();
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function gameWeekNow() {
+  return Math.max(0, Math.round((Date.now() - GAME_START) / WEEK_MS));
+}
+
+// Returns how many weeks the player has been at their current club (from done deals).
+// Returns null if no arrival deal found (caller should default to gameWeekNow() = "founder").
+function playerArrivalWeeks(playerName, club, deals) {
+  const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  const pn = norm(playerName);
+  const cl = norm(club);
+  const arrivals = (deals||[])
+    .filter(d => norm(d.playerName||d.player||d.name||'') === pn &&
+                 norm(d.toClub||d.buyer||d.buyerClub||d.to||'') === cl)
+    .map(d => {
+      const ts = d.ts||d.updatedAt||d.createdAt||d.date;
+      if (!ts) return null;
+      const t = new Date(ts).getTime();
+      if (!t || t < GAME_START) return 0;
+      return Math.round((t - GAME_START) / WEEK_MS);
+    })
+    .filter(w => w !== null)
+    .sort((a,b) => a-b);
+  if (!arrivals.length) return null;
+  return Math.max(0, gameWeekNow() - arrivals[0]);
+}
+
+// Compute trait badges for a player (ported from game source cG function)
+function computeTraits(player) {
+  const pos = player.Position || '';
+  const a = attr => Number(player[attr] || 0);
+  const traits = [];
+  if (pos === 'CF' || pos === 'WF') {
+    if (a('Shooting') >= 80) traits.push({n:'Clinical Finisher', d:'Consistently puts away their chances.'});
+    if (a('Speed') >= 82)    traits.push({n:'Pace Merchant',      d:"Explosive behind defensive lines."});
+    if (a('Heading') >= 80 && pos === 'CF') traits.push({n:'Aerial Threat', d:'Dominant in the air from crosses and corners.'});
+    if (a('Dribbling') >= 80) traits.push({n:'Close Control',     d:'Exceptional in tight areas, difficult to dispossess.'});
+  }
+  if (pos === 'CM' || pos === 'AM' || pos === 'DM') {
+    if (a('Vision') >= 82)   traits.push({n:'Visionary',   d:'Sees passes others miss. Finds runners in behind.'});
+    if (a('Passing') >= 82)  traits.push({n:'Metronome',   d:'High pass completion with the range to switch play.'});
+    if (pos === 'DM' && a('Tackling') >= 80) traits.push({n:'Ball Winner', d:'Reads attacks early to break up play.'});
+    if (a('Dribbling') >= 80) traits.push({n:'Carrier',    d:'Drives through midfield under pressure.'});
+  }
+  if (pos === 'CB' || pos === 'FB') {
+    if (a('Tackling') >= 82)  traits.push({n:'Tackle Machine',    d:'Ferocious in the challenge.'});
+    if (a('Heading') >= 82)   traits.push({n:'Aerial Dominator',  d:'Set piece threat at both ends of the pitch.'});
+    if (a('Passing') >= 78)   traits.push({n:'Distribution',      d:'Comfortable on the ball, plays out from the back.'});
+    if (pos === 'FB' && a('Speed') >= 80) traits.push({n:'Overlap Merchant', d:'Creates width and overloads in wide areas.'});
+  }
+  if (pos === 'GK') {
+    if (a('Reflexes') >= 82)  traits.push({n:'Reaction Royalty', d:'Makes saves that look impossible.'});
+    if (a('Handling') >= 80)  traits.push({n:'Safe Hands',       d:'Commanding under crosses.'});
+    if (a('Speed') >= 72)     traits.push({n:'Sweeper Keeper',   d:'Comfortable with the ball at their feet.'});
+  }
+  const posAttrs = GAME_ATTRS[pos] || [];
+  if (posAttrs.length) {
+    const avg = posAttrs.reduce((s, attr) => s + a(attr), 0) / posAttrs.length;
+    if (avg >= 83) {
+      const archetype = player.Archetype || player.archetype || pos;
+      traits.push({n:`Complete ${archetype}`, d:'Exceptionally well-rounded — no significant weaknesses.'});
+    }
+  }
+  return traits.slice(0, 4);
+}
+
+// Compute chemistry bonds between a player and their squadmates (ported from game source lG function)
+function computeBonds(player, squadPlayers, deals) {
+  if (!player || !player.Player || !player.Club) return [];
+  const now = gameWeekNow();
+  const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
+  const nat = player.Nationality || '';
+  return (squadPlayers||[])
+    .filter(m => m.Player !== player.Player && m.Position)
+    .slice(0, 12)
+    .map(m => {
+      const mWeeks = playerArrivalWeeks(m.Player, player.Club, deals) ?? now;
+      const shared = Math.min(playerWeeks, mWeeks);
+      if (shared < 13) return null;
+      const sameNat = !!(nat && nat === (m.Nationality || ''));
+      const category = (shared >= 30 || (sameNat && shared >= 25)) ? 'great' : 'good';
+      const label = shared >= 60 ? 'Long-term' : shared >= 30 ? 'Established' : 'Building';
+      return { name: m.Player, pos: m.Position, weeks: shared, category, label, sameNat };
+    })
+    .filter(Boolean)
+    .sort((a,b) => b.weeks - a.weeks);
+}
+
+// Compute overall team chemistry score 0–100 for a set of club players
+function computeClubChem(clubPlayers, deals) {
+  if (!clubPlayers || clubPlayers.length < 2) return null;
+  const club = clubPlayers[0].Club;
+  if (!club) return null;
+  const now = gameWeekNow();
+  const weeks = clubPlayers.map(p => playerArrivalWeeks(p.Player, club, deals) ?? now);
+  let total = 0, pairs = 0;
+  for (let i = 0; i < weeks.length; i++) {
+    for (let j = i+1; j < weeks.length; j++) {
+      total += Math.min(weeks[i], weeks[j]) / 60;
+      pairs++;
+    }
+  }
+  return pairs ? Math.min(100, Math.round(total / pairs * 100)) : null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const { createApp, nextTick } = Vue;
 
 createApp({
@@ -274,7 +384,8 @@ createApp({
       posFilter: new Set(ALL_POSITIONS),
       maxAge: 40, search: '',
       hideOwn: false, hideVacant: true, managedOnly: false, forSaleOnly: false,
-      transferListedOnly: false, injuredOnly: false, hideRetiring: true,
+      transferListedOnly: false, injuredOnly: false, hideRetiring: true, traitFilter: '',
+      allDeals: [],
       ageGroupFilter: 'all', // 'all' | 'u21' | 'u20'
       sortCol: '_gameRating', sortDir: -1, page: 0,
       // Per-position rating filters — each pos has its own min threshold
@@ -735,6 +846,23 @@ createApp({
       if (this.selectedPlayerStatsTab === 'career') return d.career || d.seasonStats || null;
       return null;
     },
+    selectedPlayerTraits() {
+      return this.selectedPlayer ? computeTraits(this.selectedPlayer) : [];
+    },
+    selectedPlayerBonds() {
+      if (!this.selectedPlayer || !this.selectedPlayer.Club) return [];
+      const squad = this.allPlayers.filter(p => p.Club === this.selectedPlayer.Club);
+      return computeBonds(this.selectedPlayer, squad, this.allDeals);
+    },
+    mySquadChem() {
+      const squad = this.allPlayers.filter(p => p.Club === MY_CLUB);
+      return computeClubChem(squad, this.allDeals);
+    },
+    availableTraits() {
+      const seen = new Set();
+      this.allPlayers.forEach(p => computeTraits(p).forEach(t => seen.add(t.n)));
+      return ['', ...Array.from(seen).sort()];
+    },
     selectedPlayerNegos() {
       if (!this.selectedPlayer) return [];
       const name = (this.selectedPlayer.Player||this.selectedPlayer.name||'').toLowerCase();
@@ -839,6 +967,11 @@ createApp({
         if (this.transferListedOnly && !p._transferListed) return false;
         if (this.injuredOnly && !p.injured && !p.suspended) return false;
         if (this.hideRetiring && p.retiring) return false;
+        // Trait filter
+        if (this.traitFilter) {
+          const tNames = computeTraits(p).map(t => t.n);
+          if (!tNames.includes(this.traitFilter)) return false;
+        }
         // Attribute filters
         for (const [attr, minVal] of Object.entries(this.attrFilters)) {
           if (minVal > 0 && (p[attr]||0) < minVal) return false;
@@ -1283,6 +1416,16 @@ createApp({
         this.posFilter = s;
       }
     },
+    clubChemScore(clubName) {
+      const squad = this.allPlayers.filter(p => p.Club === clubName);
+      return computeClubChem(squad, this.allDeals);
+    },
+    chemColor(score) {
+      if (score === null || score === undefined) return '#6e7681';
+      if (score >= 70) return '#3fb950';
+      if (score >= 40) return '#d29922';
+      return '#f85149';
+    },
     setAttrFilter(attr, val) {
       const n = parseInt(val) || 0;
       const f = {...this.attrFilters};
@@ -1672,6 +1815,7 @@ createApp({
           });
           [allTxMap, realTxMap].forEach(m=>Object.values(m).forEach(arr=>arr.sort((a,b)=>new Date(b.date)-new Date(a.date))));
           this.transferMap=realTxMap;
+          this.allDeals = txRes.deals || [];
           // Build club-keyed transfer map for the club detail view
           const cTxMap = {};
           (txRes.deals||[]).forEach(d => {
