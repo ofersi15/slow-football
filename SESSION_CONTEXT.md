@@ -142,6 +142,7 @@ Key endpoints:
 ### Formations supported (FORMATIONS + FORMATION_SLOT_POS)
 `442, 4411, 4231, 433, 4321, 3421, 352, 343`
 - **4321 added 2026-04-29** (Christmas tree: 4 def, 3 CM, 2 AM, 1 CF)
+- **Formation gating (2026-03-15)**: the game gates formations behind Analytics Dept facility level — not all clubs can use all formations; worth noting when showing opponent formations in analysis
 
 ### Run arrow coordinate system (hard-won — do not change)
 ```javascript
@@ -217,6 +218,24 @@ runX = (run.x / 90) * 68
 - `slowIcon`/`isSlowIcon`/`icon` → ⭐ gold badge
 - `inAcademy` → 🎓 blue badge
 
+### New fields (added game update 2026-03-08)
+- `dateOfBirth` — player DOB, replaces manually-tracked ages
+- `preferredFoot` — left/right/both; opens up tactical analysis possibilities
+
+### Traits & Chemistry (live as of 2026-04-27)
+- Players now have **traits** and **chemistry** relationships with teammates
+- These are visible on the player profile pop-up **only from the Transfer Market page** (not from squad view)
+- Team chemistry is visible on the game homepage
+- May appear in API responses — worth checking if we want to surface these in the app
+
+### Seasonal stats breakdown
+- Player stats API now returns seasonal, competitional, and club breakdowns (not just career totals)
+- Already available in one of the existing API responses — could be used for richer analysis
+
+### Academy eligible
+- Players are flagged as academy-eligible if they are **more than 10 weeks from their 21st birthday**
+- Already implemented in the app
+
 ### Incomplete stats
 - 32 players have `_incompleteStats` — only 4 position-key attrs, no full data
 - Shown with orange "partial" badge in scout table
@@ -230,6 +249,38 @@ const STATS_CACHE_KEY = 'sf_stats_v1';
 const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina',
                         'Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
 ```
+
+---
+
+## Game Rules (relevant to analysis)
+
+### Veteran degradation (2026-03-22 / 2026-04-27)
+- **Outfield players 33+**: weekly risk of stat decrements; risk increases with each additional year
+- **Goalkeepers**: degradation threshold is **36+** (not 33)
+- Veterans and Icons do **not** train
+- Relevant when evaluating older players in scout/moneyball tabs
+
+### Fitness model (overhauled GW29 / 2026-04-19)
+- Fitness updated weekly based on **minutes played** — overused players lose fitness
+- Players can be rested in training to restore fitness (one-week rest plan)
+- Veterans and Icons are exempt from training plans entirely
+
+### Position flexibility (2026-04-27)
+- **Full-backs can now play on the wing**
+- **Centre-backs can now play up top**
+- Affects any position-based filtering or analysis — these were newly unlocked cross-position combos
+
+---
+
+## Competitions
+
+### Super Duper Cup (SDC) — launched 2026-02-22
+- New cross-league knockout tournament with group stage + play-offs
+- 12 groups (A–L), 4 teams each, all games at neutral venue (Saudi Arabia)
+- Play-off paths: Gold (top 16), Silver (17–32), Bronze (rest)
+- **Leverkusen in Group E** with Milan, Leeds, Bournemouth
+- League tables section shows SDC mega-table + group-by-group breakdown toggle
+- SDC fixtures appear in the fixtures list — filter/display should account for this competition type
 
 ---
 
@@ -272,3 +323,7 @@ The submissions API sometimes returns malformed `subs` entries:
 2. `git add <files> && git commit -m "..." && git push origin main`
 3. CF Pages auto-deploys in ~60s
 4. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
+
+
+## Game Updates / Patch Notes (from game dev)
+
