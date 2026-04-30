@@ -13,7 +13,7 @@ See /home/codespace/.claude/plans/breezy-juggling-pine.md for full plan.
 
 ## Phase B — Introduce Vite + migrate 3 simple tabs
 - [DONE] B-1: Add Vite + vue + chart.js to package.json, create vite.config.js
-- [TODO] B-2: Create src/main.js entry, update wrangler.jsonc, update CF Pages dashboard
+- [DONE] B-2: ES module imports in app.js, vite.config.js (lib mode), wrangler.jsonc → dist, fixed index.html (closed root div). CF Pages dashboard update is a manual user step.
 - [TODO] B-3: Extract TabScout.vue
 - [TODO] B-4: Extract TabSquad.vue
 - [TODO] B-5: Extract TabMoneyball.vue

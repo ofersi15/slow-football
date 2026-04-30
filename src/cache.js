@@ -2,7 +2,7 @@
 // parseAsync: avoids a 200ms freeze when reading the 1940KB player cache on load.
 // stringifyAsync: avoids the 2–5s freeze when writing the cache after a fresh squad fetch.
 // Both fall back to synchronous equivalents if Workers aren't available.
-function parseAsync(jsonStr) {
+export function parseAsync(jsonStr) {
   if (typeof Worker === 'undefined') return Promise.resolve(JSON.parse(jsonStr));
   return new Promise((resolve, reject) => {
     const blob = new Blob(
@@ -20,7 +20,7 @@ function parseAsync(jsonStr) {
   });
 }
 
-function stringifyAsync(data) {
+export function stringifyAsync(data) {
   if (typeof Worker === 'undefined') return Promise.resolve(JSON.stringify(data));
   return new Promise((resolve, reject) => {
     const blob = new Blob(
@@ -40,25 +40,25 @@ function stringifyAsync(data) {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 let _cachedToken = null;
-async function getAuthToken() {
+export async function getAuthToken() {
   if (_cachedToken) return _cachedToken;
   const data = await fetch(PROXY_TOKEN_URL).then(r => r.json());
   _cachedToken = data.token || null;
   return _cachedToken;
 }
-function authHeaders() {
+export function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (_cachedToken) { h['Authorization'] = `Bearer ${_cachedToken}`; h['X-Club'] = MY_CLUB; h['X-Role'] = 'manager'; }
   return h;
 }
 
 // ── Server-side cache helpers ─────────────────────────────────────────────────
-const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
+export const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
   ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
   : '/sf-cache';
-const SF_WORKER_BASE = 'https://sf-cache.ofersi15.workers.dev';
+export const SF_WORKER_BASE = 'https://sf-cache.ofersi15.workers.dev';
 
-async function serverCacheGet(key, noStore = false) {
+export async function serverCacheGet(key, noStore = false) {
   if (location.protocol === 'file:') return null;
   try {
     const opts = {signal: AbortSignal.timeout(3000)};
@@ -69,7 +69,7 @@ async function serverCacheGet(key, noStore = false) {
   } catch(e) { return null; }
 }
 
-async function serverCacheSet(key, str) {
+export async function serverCacheSet(key, str) {
   if (location.protocol === 'file:') return;
   try {
     await fetch(`${SF_CACHE_BASE}/${key}?permanent=1`, {
@@ -81,7 +81,7 @@ async function serverCacheSet(key, str) {
   } catch(e) {}
 }
 
-async function serverCacheDelete(key) {
+export async function serverCacheDelete(key) {
   if (location.protocol === 'file:') return;
   try {
     await fetch(`${SF_CACHE_BASE}/${key}`, {method: 'DELETE', signal: AbortSignal.timeout(3000)});

@@ -1,6 +1,6 @@
 // ── Slot / formation helpers ──────────────────────────────────────────────────
 // Build slot key array for a formation: '433' → ['GK1','FB1','CB1','CB2','FB2',...]
-function buildSlotKeys(code) {
+export function buildSlotKeys(code) {
   const slots = FORMATIONS[code];
   if (!slots) return [];
   const counts = {};
@@ -8,7 +8,7 @@ function buildSlotKeys(code) {
 }
 
 // ── Rating calculations ───────────────────────────────────────────────────────
-function calcGameRating(p, pos) {
+export function calcGameRating(p, pos) {
   const attrs = GAME_ATTRS[pos];
   if (!attrs) return null;
   const vals = attrs.map(a => p[a]).filter(v => v != null && v > 0);
@@ -16,7 +16,7 @@ function calcGameRating(p, pos) {
   return Math.round(vals.reduce((a,b) => a+b, 0) / vals.length * 10) / 10;
 }
 
-function calcWeightedRating(p, pos, mentalAttrs, mentalWeightPct) {
+export function calcWeightedRating(p, pos, mentalAttrs, mentalWeightPct) {
   const gameRtg = calcGameRating(p, pos);
   if (gameRtg === null) return null;
   if (!mentalWeightPct || !mentalAttrs.length) return gameRtg;
@@ -28,7 +28,7 @@ function calcWeightedRating(p, pos, mentalAttrs, mentalWeightPct) {
 }
 
 // Estimated true transfer value — in-game values track Transfermarkt but transactions run 2-4× higher
-function calcEstValue(p) {
+export function calcEstValue(p) {
   if (!p.Value || !p.Rating) return null;
   const r = p.Rating;
   const age = p.Age || 26;
@@ -39,17 +39,17 @@ function calcEstValue(p) {
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
-function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
+export function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
+export function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
 
 // ── Chemistry & Traits ────────────────────────────────────────────────────────
-function gameWeekNow() {
+export function gameWeekNow() {
   return Math.max(0, Math.round((Date.now() - GAME_START) / WEEK_MS));
 }
 
 // Returns weeks the player has been at their current club (from done deals).
 // Returns null if no arrival deal found (caller defaults to gameWeekNow() = "founder").
-function playerArrivalWeeks(playerName, club, deals) {
+export function playerArrivalWeeks(playerName, club, deals) {
   const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
   const pn = norm(playerName);
   const cl = norm(club);
@@ -70,7 +70,7 @@ function playerArrivalWeeks(playerName, club, deals) {
 }
 
 // Compute trait badges for a player (ported from game source cG function)
-function computeTraits(player) {
+export function computeTraits(player) {
   const pos = player.Position || '';
   const a = attr => Number(player[attr] || 0);
   const traits = [];
@@ -109,7 +109,7 @@ function computeTraits(player) {
 }
 
 // Compute chemistry bonds between a player and their squadmates (ported from game source lG function)
-function computeBonds(player, squadPlayers, deals) {
+export function computeBonds(player, squadPlayers, deals) {
   if (!player || !player.Player || !player.Club) return [];
   const now = gameWeekNow();
   const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
@@ -131,7 +131,7 @@ function computeBonds(player, squadPlayers, deals) {
 }
 
 // Compute overall team chemistry score 0–100
-function computeClubChem(clubPlayers, deals) {
+export function computeClubChem(clubPlayers, deals) {
   if (!clubPlayers || clubPlayers.length < 2) return null;
   const club = clubPlayers[0].Club;
   if (!club) return null;
