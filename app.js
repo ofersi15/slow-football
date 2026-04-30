@@ -496,7 +496,7 @@ createApp({
       playersCacheDate: null, playersRefreshing: false, cacheWorking: true,
       bookmarkletHref: '',
       allLeagues: ALL_LEAGUES, allPositions: ALL_POSITIONS,
-      selectedPlayer: null, selectedPlayerStats: null, selectedPlayerStatsTab: 'career', selectedPlayerStatsLoading: false,
+      selectedPlayer: null, selectedPlayerStats: null, selectedPlayerStatsTab: 'career', selectedPlayerStatsLoading: false, playerModalTab: 'overview',
       highlightedPos: null,
       // Mental attr configuration for weighted position rating
       mentalCfgOpen: false,
@@ -862,6 +862,18 @@ createApp({
       const seen = new Set();
       this.allPlayers.forEach(p => computeTraits(p).forEach(t => seen.add(t.n)));
       return ['', ...Array.from(seen).sort()];
+    },
+    selectedPlayerBondSummary() {
+      const bonds = this.selectedPlayerBonds;
+      if (!bonds.length) return null;
+      const longTerm  = bonds.filter(b => b.label === 'Long-term').length;
+      const established = bonds.filter(b => b.label === 'Established').length;
+      const building  = bonds.filter(b => b.label === 'Building').length;
+      const parts = [];
+      if (longTerm)   parts.push({label: `${longTerm} Long-term`,   color: '#3fb950'});
+      if (established) parts.push({label: `${established} Established`, color: '#d29922'});
+      if (building)   parts.push({label: `${building} Building`,    color: '#8b949e'});
+      return parts;
     },
     selectedPlayerNegos() {
       if (!this.selectedPlayer) return [];
@@ -1446,7 +1458,7 @@ createApp({
     },
     async openModal(p, jobCtx=null) {
       this.selectedPlayer=p; this.highlightedPos=null; this.selectedJobCtx=jobCtx||null; this.negoShowAllModal=false;
-      this.selectedPlayerStats=null; this.selectedPlayerStatsTab='career'; this.selectedPlayerStatsLoading=true;
+      this.selectedPlayerStats=null; this.selectedPlayerStatsTab='career'; this.selectedPlayerStatsLoading=true; this.playerModalTab='overview';
       // Load negos history if not already populated
       if (this.espionageNegos.length === 0) {
         try {
