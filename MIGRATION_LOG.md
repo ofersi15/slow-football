@@ -12,7 +12,7 @@ See /home/codespace/.claude/plans/breezy-juggling-pine.md for full plan.
 - [DONE] A-5: Verified app.js line count (4089, was 4461), pushed, verified live
 
 ## Phase B — Introduce Vite + migrate 3 simple tabs
-- [TODO] B-1: Add Vite + plugin-vue to package.json, create vite.config.js
+- [DONE] B-1: Add Vite + vue + chart.js to package.json, create vite.config.js
 - [TODO] B-2: Create src/main.js entry, update wrangler.jsonc, update CF Pages dashboard
 - [TODO] B-3: Extract TabScout.vue
 - [TODO] B-4: Extract TabSquad.vue
