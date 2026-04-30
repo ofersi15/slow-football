@@ -3209,27 +3209,28 @@
         </div>
       </div>
 
-      <!-- Traits -->
-      <div v-if="selectedPlayerTraits.length" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Traits</span>
-        <span v-for="t in selectedPlayerTraits" :key="t.n" :title="t.d"
-              style="background:#1e1b2e;border:1px solid #3d2a6e;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:700;color:#c9b1ff;cursor:help">
-          {{t.n}}
-        </span>
-      </div>
-
-      <!-- Chemistry bonds -->
-      <div v-if="selectedPlayerBonds.length" style="margin-bottom:14px">
-        <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Chemistry</div>
-        <div style="display:flex;flex-direction:column;gap:3px">
-          <div v-for="b in selectedPlayerBonds.slice(0,6)" :key="b.name"
-               style="display:flex;align-items:center;gap:8px;padding:4px 8px;background:#0d1117;border-radius:4px;font-size:11px">
-            <span :class="'pos pos-'+b.pos" style="font-size:9px;flex-shrink:0">{{b.pos}}</span>
-            <span style="flex:1;color:#e6edf3">{{b.name}}</span>
-            <span style="font-size:10px;color:#6e7681">{{b.weeks}}w</span>
-            <span :style="{fontSize:'10px',fontWeight:'700',color:b.category==='great'?'#3fb950':'#d29922'}">
-              {{b.label}}<span v-if="b.sameNat"> 🤝</span>
-            </span>
+      <!-- Traits + Chemistry (compact) -->
+      <div v-if="selectedPlayerTraits.length || selectedPlayerBonds.length" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap">
+        <!-- Traits -->
+        <div v-if="selectedPlayerTraits.length" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+          <span style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin-right:2px">Traits</span>
+          <span v-for="t in selectedPlayerTraits" :key="t.n" :title="t.d"
+                style="background:#1e1b2e;border:1px solid #3d2a6e;border-radius:3px;padding:2px 6px;font-size:10px;font-weight:700;color:#c9b1ff;cursor:help">
+            {{t.n}}
+          </span>
+        </div>
+        <!-- Chemistry bonds: 2-col grid -->
+        <div v-if="selectedPlayerBonds.length" style="flex:1;min-width:200px">
+          <div style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Chemistry</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
+            <div v-for="b in selectedPlayerBonds.slice(0,6)" :key="b.name"
+                 style="display:flex;align-items:center;gap:5px;padding:3px 6px;background:#0d1117;border-radius:3px;font-size:10px;min-width:0">
+              <span :class="'pos pos-'+b.pos" style="font-size:8px;flex-shrink:0">{{b.pos}}</span>
+              <span style="flex:1;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{b.name}}</span>
+              <span :style="{fontSize:'9px',fontWeight:'700',flexShrink:0,color:b.category==='great'?'#3fb950':'#d29922'}">
+                {{b.label}}<span v-if="b.sameNat">🤝</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
