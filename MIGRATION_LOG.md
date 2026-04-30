@@ -5,8 +5,8 @@ Read this first when resuming a session. Each step is committed separately.
 See /home/codespace/.claude/plans/breezy-juggling-pine.md for full plan.
 
 ## Phase A — Extract utilities (no build step)
-- [TODO] A-1: Created MIGRATION_LOG.md
-- [TODO] A-2: Created src/constants.js, removed from app.js
+- [DONE] A-1: Created MIGRATION_LOG.md
+- [DONE] A-2: Created src/constants.js, removed from app.js
 - [TODO] A-3: Created src/utils.js, removed from app.js
 - [TODO] A-4: Created src/cache.js, removed from app.js
 - [TODO] A-5: Verified app.js line count, pushed, verified live
