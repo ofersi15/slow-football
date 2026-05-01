@@ -1,137 +1,75 @@
 # Session Context — Slow Football Analytics
 
-> Use this file at the start of a new Claude Code session to get up to speed instantly.
-> **Keep this file updated after every session.**
+> Read at the start of every session via `/start`. Keep this file updated after every session.
 
 ---
 
 ## What This Is
 
-A personal fantasy football analytics web app for the **slowfootball.club** game.
-Built and maintained by Ofer (ofersi15@gmail.com) — non-developer, so keep everything simple and push after every change.
+Personal fantasy football analytics app for **slowfootball.club**. Owner: Ofer (ofersi15@gmail.com), non-developer.
 
 ---
 
 ## Live URLs
 
-| Thing | URL |
-|-------|-----|
+| | URL |
+|-|-----|
 | **App** | https://sf.ofersi15.workers.dev |
 | **Cache worker** | https://sf-cache.ofersi15.workers.dev |
-| **Proxy worker** | https://sf-game-proxy.ofersi15.workers.dev (not currently needed) |
 | **GitHub repo** | https://github.com/ofersi15/slow-football |
 | **Game API** | https://slowfootball.club/api |
 
 ---
 
-## Full Architecture
+## Architecture
 
-### Frontend
-- **Vue 3 + Vite build** — `npm run build` → `dist/` served by Cloudflare Pages
-- DOM template in `index.html` (**generated** — edit `src/templates/*.html` partials, not index.html directly)
-- Logic split across `app.js` (~1150 lines) + `src/methods/*.js` (6 files, 200–650 lines each)
-- Chart.js via npm (chart.js/auto)
-- **Never put `</script>` at end of app.js** — breaks the HTML parser
-- **`v-if` on SVG child elements inside `<g>` crashes Vue** — avoid entirely; use `:opacity` or just omit
-- **`<` operator inside SVG attribute bindings** crashes — use helper methods
+**Stack**: Vue 3 (DOM template) + Vite build → Cloudflare Pages (`dist/`)
 
-### Template editing — CRITICAL
-`index.html` is generated. **Always edit the source partial**, then run `npm run assemble`:
+**Logic files** — all spread into the same Vue instance via `...xMethods`:
 
-| UI area | Edit this file |
-|---------|----------------|
-| Scout tab | `src/templates/tab-scout.html` |
-| Squad tab | `src/templates/tab-squad.html` |
-| Moneyball tab | `src/templates/tab-moneyball.html` |
-| Analysis tab | `src/templates/tab-analysis.html` |
-| Youth tab | `src/templates/tab-youth.html` |
-| My Club tab | `src/templates/tab-club.html` |
-| Clubs tab | `src/templates/tab-clubs.html` |
-| Transfers tab | `src/templates/tab-espionage.html` |
-| Matches tab | `src/templates/tab-matches.html` |
-| Player modal | `src/templates/modal.html` |
-| Scout sidebar | `src/templates/sidebar.html` |
-| Tab bar / layout shell | `src/index.html` |
+| File | Contents |
+|------|----------|
+| `app.js` | data(), computed (~800 lines), watch, mounted — ~1150 lines total |
+| `src/methods/data.js` | loadData, fetchFreshData, enrichStats, openModal, charts |
+| `src/methods/youth.js` | loadYouth, loadYouthHistory, bgAutoRefresh |
+| `src/methods/matches.js` | buildMatchArchive, appendLatestGw, loadMatchArchive |
+| `src/methods/espionage.js` | loadEspionage, negotiations, auctions |
+| `src/methods/clubs.js` | pitchLayout, match helpers, submissions fetch |
+| `src/methods/helpers.js` | sort helpers, staff recruitment |
+| `src/constants.js` | MY_CLUB, API, FORMATIONS, all cache keys, etc. |
+| `src/utils.js` | calcGameRating, fmtVal, computeTraits, computeBonds, etc. |
+| `src/cache.js` | serverCacheGet/Set, parseAsync, authHeaders |
 
-`npm run build` and `npm run dev` run assemble automatically.
+**Template files** — `index.html` is generated; edit partials in `src/templates/`:
 
-### Hosting: Cloudflare Pages
-- Auto-deploys from `main` branch of GitHub repo within ~60s
-- No manual deploy needed for frontend changes — just `git push origin main`
-- GitHub Actions workflow: `.github/workflows/auto-merge-claude.yml`
+| File | Lines |
+|------|-------|
+| `src/index.html` | Shell with `<!-- include:X -->` markers (57 lines) |
+| `src/templates/sidebar.html` | Scout sidebar filters (180) |
+| `src/templates/tab-scout.html` | (92) |
+| `src/templates/tab-squad.html` | (238) |
+| `src/templates/tab-moneyball.html` | (205) |
+| `src/templates/tab-analysis.html` | (413) |
+| `src/templates/tab-youth.html` | (352) |
+| `src/templates/tab-club.html` | (348) |
+| `src/templates/tab-clubs.html` | (669) |
+| `src/templates/tab-espionage.html` | (300) |
+| `src/templates/tab-matches.html` | (338) |
+| `src/templates/modal.html` | Player modal (374) |
 
-### Cache Worker: `sf-cache` (Cloudflare Worker + KV)
-- **URL**: `https://sf-cache.ofersi15.workers.dev`
-- **Code**: `cf-worker/index.js`
-- **Config**: `cf-worker/wrangler.toml`
-- **KV namespace**: `SF_CACHE` (bound in wrangler.toml)
-- Exposes: `GET/POST/DELETE /sf-cache/<key>`
-- POST with `?permanent=1` = no TTL (lives forever until replaced)
-- **Deploy**: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
-- **Cron**: runs 4×/day (`0 0,6,12,18 * * *`) — fetches all squads + league tables, stores as `sf_squads_raw_v1` and `sf_tables_raw_v1`
-- **Secrets** (set via `wrangler secret put`): `SF_USERNAME`, `SF_PASSWORD`
-
-### Proxy Worker: `sf-game-proxy` (not currently needed)
-- **Code**: `cf-worker/proxy.js`, **Config**: `cf-worker/wrangler-proxy.toml`
-- Token vending machine — vends Bearer tokens using stored credentials
-- Not in active use; app fetches token directly or uses cached one
-
-### Cache routing in app.js
-```javascript
-const SF_CACHE_BASE = location.hostname === 'sf.ofersi15.workers.dev'
-  ? 'https://sf-cache.ofersi15.workers.dev/sf-cache'
-  : '/sf-cache';
-```
-Falls back to `localStorage` then local `/sf-cache` (old server.py) on other hostnames.
+**Cache worker**: `cf-worker/index.js` — deployed separately via `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 ---
 
-## File Structure
+## Deployment
 
-```
-slow-football/
-├── index.html              # GENERATED — do not edit directly
-├── app.js                  # Vue app shell: data(), computed, watch, mounted (~1150 lines)
-├── style.css               # Styles
-├── CLAUDE.md               # Project guide for Claude Code (authoritative)
-├── SESSION_CONTEXT.md      # This file — keep updated each session
-├── wrangler.jsonc          # CF Pages config (assets.directory: "dist")
-├── package.json            # Scripts: assemble, dev, build
-├── vite.config.js          # Vite lib-mode build config
-├── scripts/assemble.js     # Assembles index.html from src/index.html + src/templates/
-├── src/
-│   ├── index.html          # HTML shell with <!-- include:X --> markers (~57 lines)
-│   ├── constants.js        # All constants (MY_CLUB, API, FORMATIONS, cache keys, etc.)
-│   ├── utils.js            # Pure helpers (calcGameRating, fmtVal, computeTraits, etc.)
-│   ├── cache.js            # Cache helpers (serverCacheGet/Set, parseAsync, authHeaders)
-│   ├── templates/          # Template partials — EDIT THESE for HTML/UI changes
-│   │   ├── sidebar.html    # Scout sidebar filters (180 lines)
-│   │   ├── tab-scout.html  # (92 lines)
-│   │   ├── tab-squad.html  # (238 lines)
-│   │   ├── tab-moneyball.html # (205 lines)
-│   │   ├── tab-analysis.html  # (413 lines)
-│   │   ├── tab-youth.html  # (352 lines)
-│   │   ├── tab-club.html   # (348 lines)
-│   │   ├── tab-clubs.html  # (669 lines)
-│   │   ├── tab-espionage.html # (300 lines)
-│   │   ├── tab-matches.html   # (338 lines)
-│   │   └── modal.html      # Player profile modal (374 lines)
-│   └── methods/            # Vue methods split by topic — EDIT THESE for logic changes
-│       ├── data.js         # loadData, fetchFreshData, enrichStats, openModal, charts (~650 lines)
-│       ├── youth.js        # loadYouth, loadYouthHistory, bgAutoRefresh (~550 lines)
-│       ├── matches.js      # buildMatchArchive, appendLatestGw, loadMatchArchive (~650 lines)
-│       ├── espionage.js    # loadEspionage, negotiations, auctions (~520 lines)
-│       ├── clubs.js        # pitchLayout, match helpers, submissions fetch (~390 lines)
-│       └── helpers.js      # Sort helpers, staff recruitment (~205 lines)
-├── .github/workflows/
-│   ├── auto-merge-claude.yml
-│   └── deploy-cf-worker.yml
-└── cf-worker/
-    ├── index.js            # Cache worker (sf-cache)
-    ├── proxy.js            # Token proxy (not needed)
-    ├── wrangler.toml       # Cache worker config
-    └── wrangler-proxy.toml # Proxy worker config
-```
+**Template change**: edit `src/templates/<tab>.html` → `npm run assemble` → commit partial + `index.html` → push
+
+**Logic change**: edit `src/methods/<file>.js` or `app.js` → `npm run build` → commit → push
+
+**Style change**: edit `style.css` → commit → push
+
+CF Pages auto-deploys in ~60s on push to main.
 
 ---
 
@@ -140,21 +78,18 @@ slow-football/
 - **Base**: `https://slowfootball.club/api`
 - **Auth**: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`
 - **My club**: `MY_CLUB = 'Leverkusen'`
-- Token from `POST /api/auth/login`
 
 Key endpoints:
 | Endpoint | Returns |
 |----------|---------|
-| `GET /api/squads` | All clubs' squads (dict by club name) |
-| `GET /api/squads?club=X` | Single club `{club, players}` |
-| `GET /api/submissions?club=X&limit=50` | Club's GW submissions |
+| `GET /api/squads` | All clubs' squads |
+| `GET /api/squads?club=X` | Single club squad |
+| `GET /api/submissions?club=X&limit=50` | Club GW submissions |
 | `GET /api/scouting/jobs?club=X` | Active scouting jobs |
-| `GET /api/scouting/jobs?club=X&status=accepted\|rejected` | History |
-| `GET /api/transfers/done` | Transfer history `{deals}` |
+| `GET /api/transfers/done` | Transfer history |
 | `GET /api/agents/international-players` | International scouting pool |
 | `GET /api/tables/from-fixtures` | League tables |
 | `GET /api/managers` | All managers |
-| `GET /api/admin/squads/public/clubs` | All club names |
 | `GET /api/facilities?club=X` | Club facilities |
 | `GET /api/staff/effects?club=X` | Staff effects |
 | `GET /api/academy?club=X` | Academy players |
@@ -165,221 +100,83 @@ Key endpoints:
 
 | Tab | Label | Description |
 |-----|-------|-------------|
-| scout | 🔍 Scout | Filterable player table with sidebar (search, position, ratings, age, flags, attrs, weighted rating) |
-| squad | 🛡 My Squad | Leverkusen squad management + Best XI builder |
-| moneyball | 📊 Moneyball | Value analysis, gems, overperformers, top lists |
-| analysis | 🔬 Analysis | Tactical matchup stats across all historical GWs |
-| youth | 🌱 Youth | Scouting jobs, academy, facilities, staff, history scan |
-| club | 🏟 My Club | My club's facilities, staff, training |
-| clubs | 🏟 Clubs | All clubs — Latest XI (pitch viz), Academy, History, Transfers sub-tabs |
-| espionage | 💰 Transfers | Opponent scouting, negotiations, submissions |
-| matches | 📺 Matches | Match archive with detail view, filters, rebuild/append tools |
+| scout | 🔍 Scout | Filterable player table + sidebar |
+| squad | 🛡 My Squad | Squad management + Best XI builder |
+| moneyball | 📊 Moneyball | Value analysis, gems, overperformers |
+| analysis | 🔬 Analysis | Tactical matchup stats (6 cards) |
+| youth | 🌱 Youth | Scouting jobs, academy, facilities, staff |
+| club | 🏟 My Club | Facilities, staff, training |
+| clubs | 🏟 Clubs | All clubs — Latest XI pitch viz, Academy, History, Transfers |
+| espionage | 💰 Transfers | Opponent scouting, negotiations, auctions |
+| matches | 📺 Matches | Match archive, filters, rebuild/append |
 
 ---
 
-## Clubs Tab — Latest XI Detail
+## Clubs Tab — Pitch Viz Details
 
-### What it shows (per submission)
-- **Pitch visualization**: SVG pitch with player nodes, run arrows, hover tooltips
-- **Subs panel**: sub name + fitness %, swap target, plan, time condition
-- **Roles panel**: captain/penalty/freekick/corner with key attributes inline
-- **Set Pieces panel**: attacking + defensive corner config, zone assignments with player attrs
-- **Full Squad table**: all club players sortable by pos/rating/value/age
-- **`{ } Raw` button**: toggles full JSON of the submission at the bottom (for debugging incomplete data)
-
-### Formations supported (FORMATIONS + FORMATION_SLOT_POS)
-`442, 4411, 4231, 433, 4321, 3421, 352, 343`
-- **4321 added 2026-04-29** (Christmas tree: 4 def, 3 CM, 2 AM, 1 CF)
-- **Formation gating (2026-03-15)**: the game gates formations behind Analytics Dept facility level — not all clubs can use all formations; worth noting when showing opponent formations in analysis
-
-### Run arrow coordinate system (hard-won — do not change)
-```javascript
-runX = (run.x / 90) * 68
-// slot1 (right-side): runY = (run.y - 27.5) / 95 * 105
-// slot2 (left-side):  runY = 105 - (run.y / 100) * 105
-```
-
-### Key methods
-- `pitchLayout(submission)` — maps xi players to SVG coordinates + run targets
-- `xiPlayerInfo(name)` — looks up player by name in allPlayers (guards `typeof name !== 'string'`)
-- `playerFitPct(name)` — returns fitnessPct or Fitness field, null if missing
-- `fitColor(pct)` — color for fitness % (green ≥85, orange ≥70, red below)
-- `roleAttrs(role)` — key attrs per role (captain→Mentality/Leadership, penalty→Shooting/Mentality, etc.)
-- `spZoneAttrs(side, zoneKey)` — attrs for set piece zone players
-- `openClubDetail(clubName)` — always force-refetches submissions (clears cache entry first)
-- `_normalizeSubs(submission)` — fixes stale/malformed sub entries from API or localStorage cache
+- SVG pitch with player nodes, run arrows, hover tooltips
+- `pitchLayout(submission)` — in `src/methods/clubs.js`
+- Run arrow coords (do not change): `runX = (run.x/90)*68` | slot1: `runY = (run.y-27.5)/95*105` | slot2: `runY = 105-(run.y/100)*105`
+- Formations: `442, 4411, 4231, 433, 4321, 3421, 352, 343`
+- Clicking the Clubs tab always resets to club list (clears `selectedClubName`)
 
 ---
 
-## Caching Architecture
+## Caching
 
-### Philosophy: Stale-While-Revalidate
-- Cache exists → show immediately, refresh in background if stale
-- Block UI only when no cache at all
-- All KV writes permanent (no expiry) — replaced not deleted
-
-### Cache keys
-| Key | Content | Strategy |
-|-----|---------|----------|
-| `sf_players_v6` | Processed players + meta | 6h stale bg-refresh |
-| `sf_stats_v1` | Player stats (attrs, career) | show always, bg-refresh if >24h |
-| `sf_squads_raw_v1` | Raw bulk squads (cron) | permanent, cron replaces |
-| `sf_tables_raw_v1` | League tables (cron) | permanent, cron replaces |
-| `sf_espionage_v3` | Espionage clubs + negos | show always, bg-refresh if >30min |
-| `sf_negos_history_v1` | All-time nego history | permanent, merges forever (never delete) |
-| `sf_youth_idx_v2` | Youth data | localStorage only |
-| `sf_club_v1` | My Club data | localStorage only, bg-refresh >30min |
-| `sf_match_archive_v3` | Match archive index | permanent |
-| `sf_match_archive_v3_gw_{N}` | Per-GW match data | permanent |
-| `SUBMISSIONS_CACHE_KEY` | Submissions by club | no TTL — always use cached |
-| `sf_vacancies_v1` | Vacant clubs list | cron-populated |
-
----
-
-## Match Archive
-
-- **Rebuild** 🔄: full rebuild, reuses cached GW chunks
-- **Append GW** ➕: incremental — only new fixtures, only involved clubs' submissions
-- `extractTactics(narrativeArr, club)` — parses narrative tactics (NOT `parseInstructions`)
-- `extractFormation(narrativeArr, club)` — extracts formation string from narrative
-- `deriveFormation(ratingsArr)` — derives formation from player position counts (fallback)
-
----
-
-## Analysis Tab
-
-6 tactical matchup cards with dual dropdowns + drill-down table:
-1. Formation Matchups
-2. Mentality Matchups
-3. Pressing Matchups
-4. Passing Style vs Pressing
-5. Defensive Line Matchups
-6. Transition Speed vs Defensive Line
+| Key | Content | TTL |
+|-----|---------|-----|
+| `sf_players_v6` | All players | 6h stale |
+| `sf_stats_v1` | Player stats | 24h stale |
+| `sf_espionage_v3` | Espionage data | 30min stale |
+| `sf_negos_history_v1` | All-time nego history | permanent, never delete |
+| `sf_match_archive_v3` | Archive index | permanent |
+| `sf_match_archive_v3_gw_{N}` | Per-GW data | permanent |
+| `SUBMISSIONS_CACHE_KEY` | Submissions by club | no TTL |
 
 ---
 
 ## Player Data
 
-### Flags (added game update 2026-03-23)
-- `retiring` → 🚨 red badge, "hide retiring" filter (default ON)
-- `homegrown` → 🏠 green badge
-- `slowIcon`/`isSlowIcon`/`icon` → ⭐ gold badge
-- `inAcademy` → 🎓 blue badge
-
-### New fields (added game update 2026-03-08)
-- `dateOfBirth` — player DOB, replaces manually-tracked ages
-- `preferredFoot` — left/right/both; opens up tactical analysis possibilities
-
-### Traits & Chemistry (live as of 2026-04-27)
-- Players now have **traits** and **chemistry** relationships with teammates
-- These are visible on the player profile pop-up **only from the Transfer Market page** (not from squad view)
-- Team chemistry is visible on the game homepage
-- May appear in API responses — worth checking if we want to surface these in the app
-
-### Seasonal stats breakdown
-- Player stats API now returns seasonal, competitional, and club breakdowns (not just career totals)
-- Already available in one of the existing API responses — could be used for richer analysis
-
-### Academy eligible
-- Players are flagged as academy-eligible if they are **more than 10 weeks from their 21st birthday**
-- Already implemented in the app
-
-### Incomplete stats
-- 32 players have `_incompleteStats` — only 4 position-key attrs, no full data
-- Shown with orange "partial" badge in scout table
-- Null-ID real-world players (Musiala, Rashford etc.) + custom-ID transfers
-
-### Key constants
-```javascript
-const MY_CLUB = 'Leverkusen';
-const PLAYERS_CACHE_KEY = 'sf_players_v6';
-const STATS_CACHE_KEY = 'sf_stats_v1';
-const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina',
-                        'Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
-```
+- `retiring` → 🚨, `homegrown` → 🏠, `slowIcon` → ⭐, `inAcademy` → 🎓
+- 32 players have `_incompleteStats` (partial badge) — null-ID or custom-transfer players
+- `FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']`
 
 ---
 
-## Game Rules (relevant to analysis)
+## Game Rules
 
-### Veteran degradation (2026-03-22 / 2026-04-27)
-- **Outfield players 33+**: weekly risk of stat decrements; risk increases with each additional year
-- **Goalkeepers**: degradation threshold is **36+** (not 33)
-- Veterans and Icons do **not** train
-- Relevant when evaluating older players in scout/moneyball tabs
-
-### Fitness model (overhauled GW29 / 2026-04-19)
-- Fitness updated weekly based on **minutes played** — overused players lose fitness
-- Players can be rested in training to restore fitness (one-week rest plan)
-- Veterans and Icons are exempt from training plans entirely
-
-### Position flexibility (2026-04-27)
-- **Full-backs can now play on the wing**
-- **Centre-backs can now play up top**
-- Affects any position-based filtering or analysis — these were newly unlocked cross-position combos
+- **Veteran degradation**: outfield 33+, GK 36+ — weekly stat decrements; Veterans/Icons don't train
+- **Fitness model**: weekly decay from minutes played; rest plan restores; Veterans/Icons exempt
+- **Position flexibility**: FBs can play wing, CBs can play up top
+- **Academy eligible**: >10 weeks from 21st birthday
 
 ---
 
 ## Competitions
 
-### Super Duper Cup (SDC) — launched 2026-02-22
-- New cross-league knockout tournament with group stage + play-offs
-- 12 groups (A–L), 4 teams each, all games at neutral venue (Saudi Arabia)
-- Play-off paths: Gold (top 16), Silver (17–32), Bronze (rest)
-- **Leverkusen in Group E** with Milan, Leeds, Bournemouth
-- League tables section shows SDC mega-table + group-by-group breakdown toggle
-- SDC fixtures appear in the fixtures list — filter/display should account for this competition type
+- **Super Duper Cup (SDC)**: cross-league knockout, 12 groups (A–L), 4 teams, Saudi Arabia venue
+- Leverkusen in Group E (Milan, Leeds, Bournemouth)
+- SDC fixtures appear in match archive — filter accounts for this competition type
 
 ---
 
-## Submissions / Subs Normalization
+## Known Quirks
 
-The submissions API sometimes returns malformed `subs` entries:
-- Some entries are JSON strings instead of objects
-- Some have `name` field containing a stringified JSON object
-- Stale localStorage cache may have these
-
-`_normalizeSubs(s)` handles all of this and is called:
-1. In `_fetchClubSubmissions` (fresh API fetch)
-2. In `loadCachedSubmissions` (localStorage load on startup)
+- 1 unclosed `<div>` in index.html — pre-existing, browsers handle it, do not touch
+- `xiPlayerInfo(name)` guards `typeof name !== 'string'` — stale cache can store objects as names
+- `_normalizeSubs(s)` — called on both fresh fetch and localStorage load; fixes malformed subs entries
+- Subs normalization handles JSON strings, stringified objects in the `name` field
 
 ---
 
-## Agent / Tamagotchi Feature
+## Game Updates Log
 
-- `GET /api/agents/status?club=Leverkusen` — streak, fedToday, activeOffer, giftsCount
-- `GET /api/agents/gifts?club=Leverkusen` — pending gifts
-- `POST /api/agents/feed?club=Leverkusen` — feeds (once/day). **DO NOT call without explicit user intent.**
-- `POST /api/agents/claim?club=Leverkusen` `{id}` — claims gift. **Irreversible.**
-- **Incident 2026-03-23**: accidental feed + claim → Wataru Endo (DM 75.5) added to Leverkusen squad
-
----
-
-## Known Bugs / Quirks
-
-- `v-if` on SVG `<text>` inside `<g>` crashes Vue — do not use; use `:opacity` instead
-- `<` operator inside SVG `:bind` attributes crashes Vue parser — use helper methods (fitColor, etc.)
-- `xiPlayerInfo(name)` must guard `typeof name !== 'string'` — stale cache can have object values as name
-- 1 unclosed `<div>` exists in index.html (pre-existing, browsers handle it fine — do not try to fix)
-
----
-
-## Deployment Checklist
-
-**Template changes** (HTML/UI):
-1. Edit `src/templates/<tab>.html`
-2. `npm run assemble` — regenerates `index.html`
-3. `git add src/templates/<file>.html index.html && git commit -m "..." && git push origin main`
-
-**Logic changes** (JS):
-1. Edit `src/methods/<file>.js` or `app.js` or `src/constants.js` / `src/utils.js` / `src/cache.js`
-2. `npm run build` (runs assemble + Vite automatically)
-3. `git add <files> && git commit -m "..." && git push origin main`
-
-**Style changes**: edit `style.css`, commit + push.
-
-CF Pages auto-deploys in ~60s. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
-
-
-## Game Updates / Patch Notes (from game dev)
-
+| Date | Change |
+|------|--------|
+| 2026-04-29 | Formation 4321 (Christmas tree) added |
+| 2026-04-27 | Traits + chemistry live; position flexibility (FB→wing, CB→up top); veteran degradation GK threshold 36 |
+| 2026-04-19 | Fitness model overhauled (GW29) |
+| 2026-03-23 | Player flags added (retiring, homegrown, slowIcon, inAcademy) |
+| 2026-03-15 | Formation gating by Analytics Dept facility level |
+| 2026-02-22 | Super Duper Cup launched |
