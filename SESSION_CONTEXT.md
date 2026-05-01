@@ -27,12 +27,33 @@ Built and maintained by Ofer (ofersi15@gmail.com) — non-developer, so keep eve
 ## Full Architecture
 
 ### Frontend
-- **Vue 3 CDN runtime-only** (`https://unpkg.com/vue@3/dist/vue.global.js`) — no build step
-- Template in `index.html` (DOM template), all logic in `app.js`, styles in `style.css`
-- Chart.js via CDN for charts
+- **Vue 3 + Vite build** — `npm run build` → `dist/` served by Cloudflare Pages
+- DOM template in `index.html` (**generated** — edit `src/templates/*.html` partials, not index.html directly)
+- Logic split across `app.js` (~1150 lines) + `src/methods/*.js` (6 files, 200–650 lines each)
+- Chart.js via npm (chart.js/auto)
 - **Never put `</script>` at end of app.js** — breaks the HTML parser
-- **`v-if` on SVG child elements inside `<g>` crashes Vue CDN build** — avoid entirely; use `:opacity` or just omit
-- **`<` operator inside SVG attribute bindings** (e.g. `:fill="x<70?..."`) also crashes — use helper methods
+- **`v-if` on SVG child elements inside `<g>` crashes Vue** — avoid entirely; use `:opacity` or just omit
+- **`<` operator inside SVG attribute bindings** crashes — use helper methods
+
+### Template editing — CRITICAL
+`index.html` is generated. **Always edit the source partial**, then run `npm run assemble`:
+
+| UI area | Edit this file |
+|---------|----------------|
+| Scout tab | `src/templates/tab-scout.html` |
+| Squad tab | `src/templates/tab-squad.html` |
+| Moneyball tab | `src/templates/tab-moneyball.html` |
+| Analysis tab | `src/templates/tab-analysis.html` |
+| Youth tab | `src/templates/tab-youth.html` |
+| My Club tab | `src/templates/tab-club.html` |
+| Clubs tab | `src/templates/tab-clubs.html` |
+| Transfers tab | `src/templates/tab-espionage.html` |
+| Matches tab | `src/templates/tab-matches.html` |
+| Player modal | `src/templates/modal.html` |
+| Scout sidebar | `src/templates/sidebar.html` |
+| Tab bar / layout shell | `src/index.html` |
+
+`npm run build` and `npm run dev` run assemble automatically.
 
 ### Hosting: Cloudflare Pages
 - Auto-deploys from `main` branch of GitHub repo within ~60s
@@ -69,12 +90,39 @@ Falls back to `localStorage` then local `/sf-cache` (old server.py) on other hos
 
 ```
 slow-football/
-├── index.html              # All Vue template markup
-├── app.js                  # All Vue logic (~4300 lines)
+├── index.html              # GENERATED — do not edit directly
+├── app.js                  # Vue app shell: data(), computed, watch, mounted (~1150 lines)
 ├── style.css               # Styles
-├── CLAUDE.md               # Project guide for Claude Code
-├── SESSION_CONTEXT.md      # This file
-├── wrangler.jsonc          # CF Pages config
+├── CLAUDE.md               # Project guide for Claude Code (authoritative)
+├── SESSION_CONTEXT.md      # This file — keep updated each session
+├── wrangler.jsonc          # CF Pages config (assets.directory: "dist")
+├── package.json            # Scripts: assemble, dev, build
+├── vite.config.js          # Vite lib-mode build config
+├── scripts/assemble.js     # Assembles index.html from src/index.html + src/templates/
+├── src/
+│   ├── index.html          # HTML shell with <!-- include:X --> markers (~57 lines)
+│   ├── constants.js        # All constants (MY_CLUB, API, FORMATIONS, cache keys, etc.)
+│   ├── utils.js            # Pure helpers (calcGameRating, fmtVal, computeTraits, etc.)
+│   ├── cache.js            # Cache helpers (serverCacheGet/Set, parseAsync, authHeaders)
+│   ├── templates/          # Template partials — EDIT THESE for HTML/UI changes
+│   │   ├── sidebar.html    # Scout sidebar filters (180 lines)
+│   │   ├── tab-scout.html  # (92 lines)
+│   │   ├── tab-squad.html  # (238 lines)
+│   │   ├── tab-moneyball.html # (205 lines)
+│   │   ├── tab-analysis.html  # (413 lines)
+│   │   ├── tab-youth.html  # (352 lines)
+│   │   ├── tab-club.html   # (348 lines)
+│   │   ├── tab-clubs.html  # (669 lines)
+│   │   ├── tab-espionage.html # (300 lines)
+│   │   ├── tab-matches.html   # (338 lines)
+│   │   └── modal.html      # Player profile modal (374 lines)
+│   └── methods/            # Vue methods split by topic — EDIT THESE for logic changes
+│       ├── data.js         # loadData, fetchFreshData, enrichStats, openModal, charts (~650 lines)
+│       ├── youth.js        # loadYouth, loadYouthHistory, bgAutoRefresh (~550 lines)
+│       ├── matches.js      # buildMatchArchive, appendLatestGw, loadMatchArchive (~650 lines)
+│       ├── espionage.js    # loadEspionage, negotiations, auctions (~520 lines)
+│       ├── clubs.js        # pitchLayout, match helpers, submissions fetch (~390 lines)
+│       └── helpers.js      # Sort helpers, staff recruitment (~205 lines)
 ├── .github/workflows/
 │   ├── auto-merge-claude.yml
 │   └── deploy-cf-worker.yml
@@ -309,20 +357,28 @@ The submissions API sometimes returns malformed `subs` entries:
 
 ## Known Bugs / Quirks
 
-- `v-if` on SVG `<text>` inside `<g>` in Vue 3 CDN runtime crashes entire app — do not use
-- `<` operator inside SVG `:bind` attributes crashes Vue CDN parser — use helper methods (fitColor, etc.)
+- `v-if` on SVG `<text>` inside `<g>` crashes Vue — do not use; use `:opacity` instead
+- `<` operator inside SVG `:bind` attributes crashes Vue parser — use helper methods (fitColor, etc.)
 - `xiPlayerInfo(name)` must guard `typeof name !== 'string'` — stale cache can have object values as name
-- `mounted()` restores last club: `setTimeout(() => this.openClubDetail(lastClub), 800)`
-- 1 unclosed `<div>` exists in index.html (pre-existing, browsers handle it fine)
+- 1 unclosed `<div>` exists in index.html (pre-existing, browsers handle it fine — do not try to fix)
 
 ---
 
 ## Deployment Checklist
 
-1. Edit `index.html` / `app.js` / `style.css`
-2. `git add <files> && git commit -m "..." && git push origin main`
-3. CF Pages auto-deploys in ~60s
-4. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
+**Template changes** (HTML/UI):
+1. Edit `src/templates/<tab>.html`
+2. `npm run assemble` — regenerates `index.html`
+3. `git add src/templates/<file>.html index.html && git commit -m "..." && git push origin main`
+
+**Logic changes** (JS):
+1. Edit `src/methods/<file>.js` or `app.js` or `src/constants.js` / `src/utils.js` / `src/cache.js`
+2. `npm run build` (runs assemble + Vite automatically)
+3. `git add <files> && git commit -m "..." && git push origin main`
+
+**Style changes**: edit `style.css`, commit + push.
+
+CF Pages auto-deploys in ~60s. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 
 ## Game Updates / Patch Notes (from game dev)
