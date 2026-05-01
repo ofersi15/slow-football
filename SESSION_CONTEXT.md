@@ -25,17 +25,24 @@ Personal fantasy football analytics app for **slowfootball.club**. Owner: Ofer (
 
 **Stack**: Vue 3 (DOM template) + Vite build → Cloudflare Pages (`dist/`)
 
-**Logic files** — all spread into the same Vue instance via `...xMethods`:
+**Logic files** — methods spread via `...xMethods`, computeds via `...xComputed`:
 
 | File | Contents |
 |------|----------|
-| `app.js` | data(), computed (~800 lines), watch, mounted — ~1150 lines total |
+| `app.js` | data(), 2 core computeds, watch, mounted — ~433 lines |
 | `src/methods/data.js` | loadData, fetchFreshData, enrichStats, openModal, charts |
 | `src/methods/youth.js` | loadYouth, loadYouthHistory, bgAutoRefresh |
 | `src/methods/matches.js` | buildMatchArchive, appendLatestGw, loadMatchArchive |
 | `src/methods/espionage.js` | loadEspionage, negotiations, auctions |
 | `src/methods/clubs.js` | pitchLayout, match helpers, submissions fetch |
 | `src/methods/helpers.js` | sort helpers, staff recruitment |
+| `src/computed/matches.js` | matchArchiveFiltered, tacticsAnalysis, subsDbStats, … |
+| `src/computed/squad.js` | mySquadPlayers, bestXIPlayers, lineupWithStats, … |
+| `src/computed/espionage.js` | espionageFiltered, auctionsByPlayer, nextAuctionClose, … |
+| `src/computed/modal.js` | selectedPlayerTraits, selectedPlayerBonds, mySquadChem, … |
+| `src/computed/scout.js` | filteredPlayers, sortedPlayers, topLists, mbMarketList, … |
+| `src/computed/youth.js` | youthAcademySorted, youthFilteredHistory, youthHistFiltered, … |
+| `src/computed/clubs.js` | selectedClubPlayers, selectedClubSubmissions, … |
 | `src/constants.js` | MY_CLUB, API, FORMATIONS, all cache keys, etc. |
 | `src/utils.js` | calcGameRating, fmtVal, computeTraits, computeBonds, etc. |
 | `src/cache.js` | serverCacheGet/Set, parseAsync, authHeaders |
