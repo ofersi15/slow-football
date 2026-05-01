@@ -43,6 +43,30 @@ export function calcEstValue(p) {
 // ── Formatters ────────────────────────────────────────────────────────────────
 export function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
 export function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
+export function fmtFormation(code) { return code ? String(code).split('').join('-') : null; }
+export function stripDashes(s) { return s ? String(s).replace(/-/g, '') : null; }
+export function fmtSubStatus(sub) {
+  if (!sub) return '—';
+  const map = {
+    withdrawn:'↩ Withdrawn', declined:'✗ Declined', agreed:'✓ Agreed',
+    offer:'Offer out', finalised:'✓ Done', moved_elsewhere:'Went elsewhere',
+    adjusted:'Adjusted', closed:'Closed', finalising:'Finalising…',
+    outbid:'Outbid', counter_rejected:'Counter rejected', won:'✓ Won',
+    insufficient_funds:'$ Insufficient', 'auction-bid':'Auction bid',
+  };
+  return map[sub] || sub;
+}
+export function fmtNegoDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  const diff = Date.now() - d.getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  if (diff < 7*86400000) return Math.floor(diff/86400000) + 'd ago';
+  return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
+}
 
 // ── Chemistry & Traits ────────────────────────────────────────────────────────
 export function gameWeekNow() {

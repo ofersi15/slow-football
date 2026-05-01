@@ -1,5 +1,6 @@
 import { API, MY_CLUB, FORMATIONS, FORMATION_SLOT_POS, POS_COLORS, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync, stringifyAsync } from '../cache.js'
+import { fmtFormation } from '../utils.js'
 
 export const clubsMethods = {
     // ── Match processing helpers (all from stored data, no API calls) ────────
@@ -167,10 +168,7 @@ export const clubsMethods = {
     },
 
     // Format a formation code like "4231" → "4-2-3-1"
-    fmtFormation(code) {
-      if (!code) return null;
-      return String(code).split('').join('-');
-    },
+    fmtFormation,
 
     // Extract tactical settings for a club from Pre-match narrative paragraphs
     // Maps free-form narrative language to actual game API instruction values

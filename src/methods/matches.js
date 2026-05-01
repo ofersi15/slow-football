@@ -1,6 +1,6 @@
 import { API } from '../constants.js'
 import { SF_CACHE_BASE, parseAsync, serverCacheGet, serverCacheSet } from '../cache.js'
-import { calcGameRating } from '../utils.js'
+import { calcGameRating, stripDashes } from '../utils.js'
 
 export const matchesMethods = {
     async buildMatchArchive() {
@@ -172,7 +172,6 @@ export const matchesMethods = {
 
         // Build compact index — _gw field points to the gameweek chunk
         // Formation fallback chain: submission → extracted from narrative → derived from ratings
-        const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
         const fmSrc = { sub:0, narr:0, derived:0, none:0 };
         const getFm = (sub, narrative, club, ratingsArr) => {
           if (sub?.formation) { fmSrc.sub++; return sub.formation; }
@@ -361,7 +360,6 @@ export const matchesMethods = {
         }
 
         // Build compact entries for new matches
-        const stripDashes = s => s ? String(s).replace(/-/g, '') : null;
         const playerByName = new Map(this.allPlayers.map(p => [(p.Player||'').toLowerCase().trim(), p]));
         const avgArr = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10 : null;
         const SLOT_SECTION = { CB:'def', FB:'def', DM:'mid', CM:'mid', WM:'mid', AM:'att', WF:'att', CF:'att' };
@@ -553,7 +551,6 @@ export const matchesMethods = {
         }
       }
       const src = { sub:0, narr:0, derived:0, none:0, noRatings:0 };
-      const stripDashes = s => s ? String(s).replace(/-/g,'') : null;
       for (const gw of Object.keys(this.matchChunks)) {
         for (const m of (this.matchChunks[gw] || [])) {
           for (const side of ['home','away']) {

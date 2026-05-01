@@ -1,5 +1,6 @@
 import { API } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync } from '../cache.js'
+import { fmtSubStatus, fmtNegoDate } from '../utils.js'
 
 export const espionageMethods = {
     espRatingClass(r) { if (!r) return 'c-gray'; return r >= 85 ? 'c-green' : r >= 75 ? 'c-orange' : 'c-gray'; },
@@ -129,28 +130,8 @@ export const espionageMethods = {
       if (['offer','finalising','adjusted','auction-bid'].includes(sub)) return {color:'#ffa657'};
       return {color:'#8b949e'};
     },
-    fmtSubStatus(sub) {
-      if (!sub) return '—';
-      const map = {
-        withdrawn: '↩ Withdrawn', declined: '✗ Declined', agreed: '✓ Agreed',
-        offer: 'Offer out', finalised: '✓ Done', moved_elsewhere: 'Went elsewhere',
-        adjusted: 'Adjusted', closed: 'Closed', finalising: 'Finalising…',
-        outbid: 'Outbid', counter_rejected: 'Counter rejected', won: '✓ Won',
-        insufficient_funds: '$ Insufficient', 'auction-bid': 'Auction bid',
-      };
-      return map[sub] || sub;
-    },
-    fmtNegoDate(ts) {
-      if (!ts) return '—';
-      const d = new Date(ts);
-      if (isNaN(d.getTime())) return '—';
-      const diff = Date.now() - d.getTime();
-      if (diff < 60000) return 'just now';
-      if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
-      if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
-      if (diff < 7*86400000) return Math.floor(diff/86400000) + 'd ago';
-      return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
-    },
+    fmtSubStatus,
+    fmtNegoDate,
     computeTrueValues() {
       if (!this.allPlayers.length) return;
       const now = Date.now();
