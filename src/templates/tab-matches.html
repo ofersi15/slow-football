@@ -208,8 +208,8 @@
       <div v-else>
         <!-- Sub-tab switcher -->
         <div style="display:flex;gap:4px;margin-bottom:12px">
-          <button @click="matchSubTab='list'" :style="{background:matchSubTab==='list'?'#238636':'#21262d',color:matchSubTab==='list'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Match List</button>
-          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmissions.length&&!mySubmissionLoading)fetchMySubmission()" :style="{background:matchSubTab==='lineups'?'#238636':'#21262d',color:matchSubTab==='lineups'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Club Lineups</button>
+          <button @click="matchSubTab='list'" :class="['btn',{active:matchSubTab==='list'}]">Match List</button>
+          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmissions.length&&!mySubmissionLoading)fetchMySubmission()" :class="['btn',{active:matchSubTab==='lineups'}]">Club Lineups</button>
         </div>
 
         <!-- Club Lineups panel -->

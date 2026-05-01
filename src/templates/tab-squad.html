@@ -106,7 +106,7 @@
                   <div style="font-size:10px;color:#8b949e;display:flex;gap:4px;align-items:center">
                     <span :class="'pos pos-'+slot.player.Position" style="font-size:9px">{{slot.player.Position}}</span>
                     <span>Age {{slot.player.Age}}</span>
-                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position'">⚠ OOP</span>
+                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position — reduces slot rating vs natural position'">⚠ OOP</span>
                   </div>
                 </div>
                 <div v-else class="c-gray" style="font-size:11px;font-style:italic">— no player —</div>

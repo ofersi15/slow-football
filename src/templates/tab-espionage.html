@@ -30,7 +30,8 @@
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="pullBudgetNow()" :disabled="pullingBudget">{{pullingBudget?'⟳ Pulling…':'⟳ Pull budget'}}</button>
           </template>
           <template v-else>
-            <input v-model="budgetEditVal" type="number" placeholder="49280574" style="width:110px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">
+            <input v-model="budgetEditVal" type="number" placeholder="e.g. 49000000" title="Enter budget in £ (e.g. 49000000 = £49m)" style="width:130px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">
+            <span class="c-gray" style="font-size:9px">£ raw</span>
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="saveBudget()">Save</button>
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=false">✕</button>
           </template>
@@ -267,12 +268,14 @@
             </template>
           </tbody>
         </table>
-        <!-- infinite scroll sentinel -->
-        <div v-if="espionageNegoFiltered.length > negoDisplayCount"
-             style="text-align:center;padding:10px;color:#8b949e;font-size:11px">
-          ↓ {{espionageNegoFiltered.length - negoDisplayCount}} more — keep scrolling
-        </div>
         </div><!-- end scrollable inner -->
+        <div v-if="espionageNegoFiltered.length > negoDisplayCount"
+             style="text-align:center;padding:8px;border-top:1px solid #21262d">
+          <button class="btn" style="font-size:11px" @click="negoDisplayCount+=50">
+            Load {{Math.min(50, espionageNegoFiltered.length - negoDisplayCount)}} more
+            <span class="c-gray" style="font-size:10px">({{espionageNegoFiltered.length - negoDisplayCount}} remaining)</span>
+          </button>
+        </div>
       </div>
       <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found.</div>
     </template>

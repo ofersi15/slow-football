@@ -37,6 +37,7 @@ createApp({
       posRatingMax: 99,            // global max rating cap
       posRatingUseWeighted: false, // filter by weighted rating instead of game rating
       posRatingsOpen: false,
+      scoutFiltersOpen: true,
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: (() => {

@@ -54,7 +54,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.formations||[]).filter(x=>(!analysisFilterFormation||x.key.split(' vs ')[0]===analysisFilterFormation)&&(!analysisFilterOpp||x.key.split(' vs ')[1]===analysisFilterOpp)), 'fm')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657;cursor:pointer" @click="fmDrillDown=fmDrillDown===r.key.split(' vs ')[0]?null:r.key.split(' vs ')[0]">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff;cursor:pointer" @click="fmDrillDown=fmDrillDown===r.key.split(' vs ')[1]?null:r.key.split(' vs ')[1]">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -157,7 +157,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.mentalities||[]).filter(x=>(!analysisFilterMentality||x.key.split(' vs ')[0]===analysisFilterMentality)&&(!analysisFilterMentalityOpp||x.key.split(' vs ')[1]===analysisFilterMentalityOpp)), 'men')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -214,7 +214,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.pressing||[]).filter(x=>(!analysisFilterPressing||x.key.split(' vs ')[0]===analysisFilterPressing)&&(!analysisFilterPressingOpp||x.key.split(' vs ')[1]===analysisFilterPressingOpp)), 'pre')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -271,7 +271,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.styleVpress||[]).filter(x=>(!analysisFilterStyle||x.key.split(' vs ')[0]===analysisFilterStyle)&&(!analysisFilterStyleOpp||x.key.split(' vs ')[1]===analysisFilterStyleOpp)), 'sty')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -328,7 +328,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.defLine||[]).filter(x=>(!analysisFilterLine||x.key.split(' vs ')[0]===analysisFilterLine)&&(!analysisFilterLineOpp||x.key.split(' vs ')[1]===analysisFilterLineOpp)), 'line')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -385,7 +385,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.transVline||[]).filter(x=>(!analysisFilterTrans||x.key.split(' vs ')[0]===analysisFilterTrans)&&(!analysisFilterTransOpp||x.key.split(' vs ')[1]===analysisFilterTransOpp)), 'tvl')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>

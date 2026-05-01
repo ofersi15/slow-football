@@ -17598,6 +17598,7 @@ Ho({
       posRatingUseWeighted: !1,
       // filter by weighted rating instead of game rating
       posRatingsOpen: !1,
+      scoutFiltersOpen: !0,
       // Stats enrichment state
       statsEnriching: !1,
       statsProgress: 0,

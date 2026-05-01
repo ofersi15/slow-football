@@ -35,15 +35,31 @@
     <div class="main">
       <!-- TABS -->
       <div class="header">
-        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</button>
-        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+        <div class="tab-bar">
+          <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]"
+                  :aria-label="t.label" role="tab" :aria-selected="activeTab===t.id"
+                  @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</button>
+          <span class="header-meta" style="margin-left:auto;flex-shrink:0;display:block">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+        </div>
       </div>
       <div style="display:flex;flex:1;overflow:hidden">
       <!-- SIDEBAR FILTERS -->
-      <div class="sidebar" v-show="activeTab==='scout'">
+      <div class="sidebar" v-show="activeTab==='scout' && scoutFiltersOpen">
       <div>
         <span class="label">Search</span>
         <input type="text" v-model="search" placeholder="Name, club, nation…">
+      </div>
+      <!-- Column Groups — moved to top for discoverability -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <span class="label">📋 Columns</span>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">
+          <label v-for="(label, key) in {stats:'Stats',per90:'Per 90',fitness:'Fitness',attrs:'Attributes',mental:'Mental',bio:'Bio'}" :key="key"
+                 style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:3px 7px"
+                 :style="{borderColor:colGroups[key]?'#388bfd':'#21262d',color:colGroups[key]?'#79c0ff':'#8b949e'}">
+            <input type="checkbox" v-model="colGroups[key]" style="accent-color:#1f6feb">
+            {{label}}
+          </label>
+        </div>
       </div>
       <div>
         <span class="label">Position</span>
@@ -181,18 +197,6 @@
           </div>
         </div>
       </div>
-      <!-- Column Groups -->
-      <div style="border-top:1px solid #21262d;padding-top:8px">
-        <span class="label">📋 Columns</span>
-        <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">
-          <label class="check-row"><input type="checkbox" v-model="colGroups.stats" style="accent-color:#1f6feb"> Season Stats</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.per90" style="accent-color:#1f6feb"> Per 90</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.fitness" style="accent-color:#1f6feb"> Fitness</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.attrs" style="accent-color:#1f6feb"> Attributes</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.mental" style="accent-color:#1f6feb"> Mental</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.bio" style="accent-color:#1f6feb"> Bio</label>
-        </div>
-      </div>
       <div style="border-top:1px solid #21262d;padding-top:8px;font-size:11px;color:#8b949e">
         <div>{{filteredPlayers.length}} players · {{filteredClubs}} clubs</div>
         <div style="margin-top:3px">Wk {{asOfWeek}} · <span :class="playersRefreshing?'c-orange':''">{{playersRefreshing?'⟳ refreshing…':playersCacheDate?'cached '+playersCacheDate:'live'}}</span></div>
@@ -221,17 +225,25 @@
 
       <!-- ── SCOUT TAB ── -->
       <div v-if="activeTab==='scout'" class="content">
+        <!-- Mobile filter toggle (hidden on desktop via CSS) -->
+        <div style="padding:6px 10px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:8px">
+          <button class="btn mobile-filter-btn" @click="scoutFiltersOpen=!scoutFiltersOpen">
+            🎛 {{scoutFiltersOpen?'Hide Filters':'Show Filters'}}
+            <span v-if="activeAttrFilterCount>0||Object.values(posRatingFilters).some(v=>v>60)" style="background:#1f6feb;color:#fff;border-radius:8px;padding:0 5px;font-size:9px;margin-left:3px">active</span>
+          </button>
+          <span class="c-gray" style="font-size:11px;margin-left:auto">{{filteredPlayers.length}} players · click a row to open profile</span>
+        </div>
         <table>
           <thead>
             <tr>
-              <th v-for="c in visibleTableCols" :key="c.key" @click="sortBy(c.key)" :style="{minWidth:c.w+'px'}" :title="c.full||c.label">
-                {{c.label}}<span v-if="sortCol===c.key" class="sort-arrow"> {{sortDir>0?'▲':'▼'}}</span>
+              <th v-for="(c,ci) in visibleTableCols" :key="c.key" @click="sortBy(c.key)" :style="{minWidth:c.w+'px'}" :title="c.full||c.label" :class="ci===0?'scout-sticky':''">
+                {{c.label}}<span v-if="sortCol===c.key" class="sort-arrow"> {{sortDir>0?'▲':'▼'}}</span><span v-else style="opacity:.25;font-size:8px"> ↕</span>
               </th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(p,i) in pagedPlayers" :key="p.Player+p.Club+i" class="clickable" @click="openModal(p)">
-              <td>
+              <td class="scout-sticky">
                 <span style="color:#e6edf3;font-weight:500">{{p.Player}}</span>
                 <span v-if="p.retiring" title="Retiring — contract limited, cannot be sold" style="margin-left:4px;background:#3a0f0f;color:#ff7b72;font-size:9px;padding:1px 5px;border-radius:8px;vertical-align:middle">🚨 retiring</span>
                 <span v-if="p.homegrown" title="Homegrown — more likely to renew" style="margin-left:4px;background:#1a3a1a;color:#7ee787;font-size:9px;padding:1px 5px;border-radius:8px;vertical-align:middle">🏠 HG</span>
@@ -303,11 +315,13 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="totalPages>1" style="padding:8px 12px;border-top:1px solid #21262d;display:flex;gap:6px;align-items:center;background:#0d1117">
-          <button class="btn" @click="page=Math.max(0,page-1)" :disabled="page===0">←</button>
-          <span class="c-gray">{{page+1}} / {{totalPages}}</span>
-          <button class="btn" @click="page=Math.min(totalPages-1,page+1)" :disabled="page===totalPages-1">→</button>
-          <span class="c-gray" style="margin-left:8px;font-size:11px">{{filteredPlayers.length}} total · click row for profile</span>
+        <div style="padding:8px 12px;border-top:1px solid #21262d;display:flex;gap:6px;align-items:center;background:#0d1117">
+          <template v-if="totalPages>1">
+            <button class="btn" @click="page=Math.max(0,page-1)" :disabled="page===0">←</button>
+            <span class="c-gray">{{page+1}} / {{totalPages}}</span>
+            <button class="btn" @click="page=Math.min(totalPages-1,page+1)" :disabled="page===totalPages-1">→</button>
+          </template>
+          <span class="c-gray" style="margin-left:auto;font-size:11px">{{filteredPlayers.length}} total</span>
         </div>
       </div>
 
@@ -419,7 +433,7 @@
                   <div style="font-size:10px;color:#8b949e;display:flex;gap:4px;align-items:center">
                     <span :class="'pos pos-'+slot.player.Position" style="font-size:9px">{{slot.player.Position}}</span>
                     <span>Age {{slot.player.Age}}</span>
-                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position'">⚠ OOP</span>
+                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position — reduces slot rating vs natural position'">⚠ OOP</span>
                   </div>
                 </div>
                 <div v-else class="c-gray" style="font-size:11px;font-style:italic">— no player —</div>
@@ -617,7 +631,7 @@
         <div v-if="mbChart==='gems'" style="padding:14px;overflow-y:auto">
           <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
             <span style="font-size:13px;font-weight:700">💎 Hidden Gems</span>
-            <span class="c-gray" style="font-size:11px">Age ≤ 27 · Rated 68+ · Not at Leverkusen · sorted by rating² ÷ value (£M)</span>
+            <span class="c-gray" style="font-size:11px">Age ≤ 27 · Rated 68+ · Not at {{myClub}} · sorted by rating² ÷ value (£M)</span>
             <span class="c-gray" style="font-size:11px;margin-left:auto">{{mbGemsList.length}} players</span>
           </div>
           <div v-if="!mbGemsList.length" class="card" style="text-align:center;padding:40px;color:#8b949e">No gems found — load player data first.</div>
@@ -810,7 +824,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.formations||[]).filter(x=>(!analysisFilterFormation||x.key.split(' vs ')[0]===analysisFilterFormation)&&(!analysisFilterOpp||x.key.split(' vs ')[1]===analysisFilterOpp)), 'fm')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657;cursor:pointer" @click="fmDrillDown=fmDrillDown===r.key.split(' vs ')[0]?null:r.key.split(' vs ')[0]">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff;cursor:pointer" @click="fmDrillDown=fmDrillDown===r.key.split(' vs ')[1]?null:r.key.split(' vs ')[1]">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -913,7 +927,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.mentalities||[]).filter(x=>(!analysisFilterMentality||x.key.split(' vs ')[0]===analysisFilterMentality)&&(!analysisFilterMentalityOpp||x.key.split(' vs ')[1]===analysisFilterMentalityOpp)), 'men')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -970,7 +984,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.pressing||[]).filter(x=>(!analysisFilterPressing||x.key.split(' vs ')[0]===analysisFilterPressing)&&(!analysisFilterPressingOpp||x.key.split(' vs ')[1]===analysisFilterPressingOpp)), 'pre')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -1027,7 +1041,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.styleVpress||[]).filter(x=>(!analysisFilterStyle||x.key.split(' vs ')[0]===analysisFilterStyle)&&(!analysisFilterStyleOpp||x.key.split(' vs ')[1]===analysisFilterStyleOpp)), 'sty')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -1084,7 +1098,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.defLine||[]).filter(x=>(!analysisFilterLine||x.key.split(' vs ')[0]===analysisFilterLine)&&(!analysisFilterLineOpp||x.key.split(' vs ')[1]===analysisFilterLineOpp)), 'line')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -1141,7 +1155,7 @@
                 </thead>
                 <tbody>
                   <tr v-for="r in tblSorted((tacticsAnalysis.transVline||[]).filter(x=>(!analysisFilterTrans||x.key.split(' vs ')[0]===analysisFilterTrans)&&(!analysisFilterTransOpp||x.key.split(' vs ')[1]===analysisFilterTransOpp)), 'tvl')"
-                      :key="r.key" style="border-bottom:1px solid #161b22">
+                      :key="r.key" :class="r.n<3?'low-n-row':''" style="border-bottom:1px solid #161b22">
                     <td style="padding:4px 8px;font-weight:600;color:#ffa657">{{r.key.split(' vs ')[0]}}</td>
                     <td style="padding:4px 8px;color:#79c0ff">{{r.key.split(' vs ')[1]}}</td>
                     <td style="padding:4px 6px;text-align:right" :class="r.n<5?'c-gray':''">{{r.n}}</td>
@@ -1281,7 +1295,6 @@
               <span :class="ratingClass(job.player.rating||job.player.Rating)" style="font-weight:700">{{job.player.rating||job.player.Rating}}</span>
               vs hint {{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}}
             </div>
-            <button class="btn" style="margin-left:auto;font-size:11px" @click.stop="openModal({...job.player,...(job.player.stats||{})},job)">Full Stats →</button>
           </div>
         </div>
       </div>
@@ -1955,7 +1968,7 @@
         <div v-if="selectedClubSubTab==='xi'" style="display:flex;flex-direction:column;gap:12px">
           <template v-if="selectedClubSubmissions.length">
             <!-- Pitch + Subs side by side -->
-            <div style="display:flex;gap:12px;align-items:flex-start">
+            <div class="pitch-detail-row">
 
               <!-- Big interactive pitch -->
               <div style="flex:1;min-width:260px;max-width:480px;position:relative">
@@ -2429,16 +2442,15 @@
 
       <!-- All Clubs browser -->
       <div v-else>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-          <input type="text" v-model="espionageSearch" placeholder="Search club…" style="width:180px">
+        <!-- Controls bar -->
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <input type="text" v-model="espionageSearch" placeholder="Search club…" style="width:160px">
           <select v-model="espionageSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
-            <option value="club">Club A→Z</option>
+            <option value="club">A → Z</option>
             <option value="mgr_a">Vacant first</option>
             <option value="mgr_d">Manager A→Z</option>
-            <option value="ceo_d">CEO rating ↓</option>
-            <option value="td_d">TD rating ↓</option>
-            <option value="asst_d">Assistant ↓</option>
-            <option value="physio_d">Physio ↓</option>
+            <option value="ceo_d">CEO ↓</option>
+            <option value="td_d">TD ↓</option>
             <option value="training_d">Training Lv ↓</option>
             <option value="scouting_d">Scouting Lv ↓</option>
             <option value="academy_d">Academy Lv ↓</option>
@@ -2446,91 +2458,84 @@
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;white-space:nowrap">
             <input type="checkbox" v-model="espShowVacantOnly"> 🔴 Vacant only
           </label>
-          <span class="c-gray" style="font-size:11px">{{espionageFiltered.length}} clubs · click a row to view</span>
+          <span class="c-gray" style="font-size:11px">{{espionageFiltered.length}} clubs</span>
           <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
             <span v-if="espionageCacheDate" class="c-gray" style="font-size:10px">cached {{espionageCacheDate}}</span>
             <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
           </div>
         </div>
-        <div class="card" style="padding:0;overflow:hidden">
-          <table style="font-size:11px">
-            <thead>
-              <tr style="cursor:pointer">
-                <th style="min-width:120px" @click="espSortBy('club')">Club{{espSortIcon('club')}}</th>
-                <th style="min-width:90px" title="Manager username" @click="espSortBy('mgr')">Manager{{espSortIcon('mgr')}}</th>
-                <th title="CEO rating" @click="espSortBy('ceo')">CEO{{espSortIcon('ceo')}}</th>
-                <th title="Technical Director rating" @click="espSortBy('td')">TD{{espSortIcon('td')}}</th>
-                <th title="Assistant rating" @click="espSortBy('asst')">Asst{{espSortIcon('asst')}}</th>
-                <th title="Physio rating" @click="espSortBy('physio')">Physio{{espSortIcon('physio')}}</th>
-                <th title="Training facility level" @click="espSortBy('training')">Trn{{espSortIcon('training')}}</th>
-                <th title="Scouting facility level" @click="espSortBy('scouting')">Sct{{espSortIcon('scouting')}}</th>
-                <th title="Academy facility level" @click="espSortBy('academy')">Aca{{espSortIcon('academy')}}</th>
-                <th title="Medical facility level" @click="espSortBy('medical')">Med{{espSortIcon('medical')}}</th>
-                <th title="Analytics facility level" @click="espSortBy('analytics')">Ana{{espSortIcon('analytics')}}</th>
-                <th title="Stadium facility level" @click="espSortBy('stadium')">Std{{espSortIcon('stadium')}}</th>
-                <th title="Active open job ads" @click="espSortBy('ads')">Ads{{espSortIcon('ads')}}</th>
-                <th title="Latest submitted formation, tactics & set pieces">Tactics</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in espionageFiltered" :key="c.club"
-                  @click="openClubDetail(c.club)" style="cursor:pointer"
-                  :style="{background:c.club===myClub?'#1f3a1f':'transparent'}">
-                <td style="font-weight:600">
+
+        <!-- Club cards grid -->
+        <div class="clubs-grid">
+          <div v-for="c in espionageFiltered" :key="c.club"
+               class="card club-card"
+               :style="{borderColor:c.club===myClub?'#2ea043':'#21262d',background:c.club===myClub?'#0d1f0d':'#161b22'}"
+               @click="openClubDetail(c.club)">
+
+            <!-- Club name + View XI -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="min-width:0">
+                <span style="font-size:14px;font-weight:700;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block">
                   {{c.club}}
-                  <span v-if="c.club===myClub" style="color:#ffa657;font-size:10px"> ★</span>
-                  <span v-if="c.project" class="c-orange" style="font-size:10px" :title="'Upgrading '+c.project.key+' Lv'+c.project.from+'→'+c.project.to"> 🔨</span>
-                </td>
-                <td style="font-size:10px">
-                  <span v-if="managedSet.has(c.club)" style="color:#79c0ff">{{managerMap[c.club]||'?'}}</span>
-                  <span v-else style="color:#ff7b72;font-weight:700">🔴 Vacant</span>
-                </td>
-                <td :class="espRatingClass(c.current?.CEO?.rating)">{{c.current?.CEO?.rating||'—'}}</td>
-                <td :class="espRatingClass(c.current?.['Technical Director']?.rating)">{{c.current?.['Technical Director']?.rating||'—'}}</td>
-                <td :class="espRatingClass(c.current?.Assistant?.rating)">{{c.current?.Assistant?.rating||'—'}}</td>
-                <td :class="espRatingClass(c.current?.Physio?.rating)">{{c.current?.Physio?.rating||'—'}}</td>
-                <td :class="espFacClass(c.levels?.training)" style="text-align:center">{{c.levels?.training||'—'}}</td>
-                <td :class="espFacClass(c.levels?.scouting)" style="text-align:center">{{c.levels?.scouting||'—'}}</td>
-                <td :class="espFacClass(c.levels?.academy)" style="text-align:center">{{c.levels?.academy||'—'}}</td>
-                <td :class="espFacClass(c.levels?.medical)" style="text-align:center">{{c.levels?.medical||'—'}}</td>
-                <td :class="espFacClass(c.levels?.analytics)" style="text-align:center">{{c.levels?.analytics||'—'}}</td>
-                <td :class="espFacClass(c.levels?.stadium)" style="text-align:center">{{c.levels?.stadium||'—'}}</td>
-                <td style="text-align:center">
-                  <span v-if="c.ads && c.ads.length" class="c-orange" style="font-size:10px;font-weight:700">{{c.ads.length}}</span>
-                  <span v-else class="c-gray">—</span>
-                </td>
-                <td style="min-width:110px">
-                  <template v-if="espionageSubmissions[c.club]">
-                    <span style="color:#79c0ff;font-weight:600;font-size:11px">{{fmtFormation(espionageSubmissions[c.club].formation)}}</span>
-                    <span class="c-gray" style="font-size:9px"> GW{{espionageSubmissions[c.club]._gw}}</span>
-                    <div style="font-size:9px;color:#8b949e;margin-top:1px;line-height:1.4">
-                      <span v-if="espionageSubmissions[c.club].instructions?.mentality">{{espionageSubmissions[c.club].instructions.mentality}}</span>
-                      <span v-if="espionageSubmissions[c.club].instructions?.style"> · {{espionageSubmissions[c.club].instructions.style}}</span>
-                    </div>
-                    <div v-if="espionageSubmissions[c.club].setPieces" style="font-size:9px;margin-top:3px;line-height:1.6">
-                      <div v-if="espionageSubmissions[c.club].setPieces.attackingCorner?.delivery"
-                           :title="setPieceDesc('delivery', espionageSubmissions[c.club].setPieces.attackingCorner.delivery)">
-                        <span style="color:#8b6cc8">⚑</span>
-                        <span style="color:#d2a8ff;margin-left:3px">{{espionageSubmissions[c.club].setPieces.attackingCorner.delivery}}</span>
-                        <span v-if="espionageSubmissions[c.club].setPieces.attackingCorner.stayBack" style="color:#6e7681;margin-left:3px">· {{espionageSubmissions[c.club].setPieces.attackingCorner.stayBack}}↩</span>
-                      </div>
-                      <div v-if="espionageSubmissions[c.club].setPieces.defensiveCorner?.scheme"
-                           :title="setPieceDesc('scheme', espionageSubmissions[c.club].setPieces.defensiveCorner.scheme)">
-                        <span style="color:#79c0ff">⛨</span>
-                        <span style="color:#8b949e;margin-left:3px">{{espionageSubmissions[c.club].setPieces.defensiveCorner.scheme}}</span>
-                        <span v-if="espionageSubmissions[c.club].setPieces.defensiveCorner.press"
-                              :title="setPieceDesc('press', espionageSubmissions[c.club].setPieces.defensiveCorner.press)"
-                              style="color:#6e7681;margin-left:3px">· {{espionageSubmissions[c.club].setPieces.defensiveCorner.press}}</span>
-                      </div>
-                    </div>
-                  </template>
-                  <span v-else class="c-gray">—</span>
-                </td>
-                <td><button @click.stop="openClubDetail(c.club)" style="border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#21262d;color:#79c0ff">View XI</button></td>
-              </tr>
-            </tbody>
-          </table>
+                  <span v-if="c.club===myClub" style="color:#ffa657;font-size:11px;font-weight:600;margin-left:4px">★ My Club</span>
+                  <span v-if="c.project" style="color:#ffa657;font-size:11px;margin-left:4px" :title="'Upgrading '+c.project.key+' Lv'+c.project.from+'→'+c.project.to">🔨</span>
+                </span>
+              </div>
+              <button @click.stop="openClubDetail(c.club)"
+                      style="border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;background:#21262d;color:#79c0ff;flex-shrink:0;font-weight:600">
+                View XI
+              </button>
+            </div>
+
+            <!-- Manager -->
+            <div style="font-size:12px">
+              <span v-if="managedSet.has(c.club)" style="color:#79c0ff">👤 {{managerMap[c.club]||'?'}}</span>
+              <span v-else style="color:#ff7b72;font-weight:700">🔴 Vacant</span>
+            </div>
+
+            <!-- Tactics -->
+            <div v-if="espionageSubmissions[c.club]" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+              <span style="background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">{{fmtFormation(espionageSubmissions[c.club].formation)}}</span>
+              <span v-if="espionageSubmissions[c.club].instructions?.mentality" style="font-size:10px;color:#8b949e">{{espionageSubmissions[c.club].instructions.mentality}}</span>
+              <span v-if="espionageSubmissions[c.club].instructions?.style" style="font-size:10px;color:#8b949e">· {{espionageSubmissions[c.club].instructions.style}}</span>
+              <template v-if="espionageSubmissions[c.club].setPieces">
+                <span v-if="espionageSubmissions[c.club].setPieces.attackingCorner?.delivery"
+                      :title="setPieceDesc('delivery',espionageSubmissions[c.club].setPieces.attackingCorner.delivery)"
+                      style="font-size:10px;color:#d2a8ff">⚑ {{espionageSubmissions[c.club].setPieces.attackingCorner.delivery}}</span>
+                <span v-if="espionageSubmissions[c.club].setPieces.defensiveCorner?.scheme"
+                      :title="setPieceDesc('scheme',espionageSubmissions[c.club].setPieces.defensiveCorner.scheme)"
+                      style="font-size:10px;color:#79c0ff">⛨ {{espionageSubmissions[c.club].setPieces.defensiveCorner.scheme}}</span>
+              </template>
+              <span class="c-gray" style="font-size:9px;margin-left:auto">GW{{espionageSubmissions[c.club]._gw}}</span>
+            </div>
+            <div v-else style="font-size:11px;color:#484f58;font-style:italic">No submission yet</div>
+
+            <!-- Facilities -->
+            <div style="border-top:1px solid #21262d;padding-top:7px;display:flex;gap:10px;flex-wrap:wrap">
+              <div v-for="[fk, fl] in [['training','Trn'],['scouting','Sct'],['academy','Aca'],['medical','Med'],['analytics','Ana'],['stadium','Std']]" :key="fk"
+                   style="display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span style="font-size:9px;color:#6e7681;font-weight:700;text-transform:uppercase">{{fl}}</span>
+                <div style="display:flex;gap:2px">
+                  <span v-for="i in 5" :key="i"
+                        :style="{width:'7px',height:'7px',borderRadius:'50%',display:'inline-block',
+                          background: i<=(c.levels?.[fk]||0)
+                            ? (c.levels[fk]>=4?'#3fb950':c.levels[fk]>=3?'#79c0ff':'#ffa657')
+                            : '#2d333b'}"></span>
+                </div>
+                <span style="font-size:9px;font-weight:700" :class="espFacClass(c.levels?.[fk])">{{c.levels?.[fk]||'—'}}</span>
+              </div>
+            </div>
+
+            <!-- Staff ratings -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px">
+              <span v-for="[role, label] in [['CEO','CEO'],['Technical Director','TD'],['Assistant','Asst'],['Physio','Phy']]" :key="role">
+                <span style="color:#6e7681">{{label}} </span>
+                <span :class="espRatingClass(c.current?.[role]?.rating)" style="font-weight:700">{{c.current?.[role]?.rating||'—'}}</span>
+              </span>
+              <span v-if="c.ads?.length" style="margin-left:auto;background:#2d2a0e;color:#e3b341;border-radius:6px;padding:1px 7px;font-size:10px;font-weight:700">{{c.ads.length}} ad{{c.ads.length>1?'s':''}}</span>
+            </div>
+
+          </div>
         </div>
       </div>
     </template>
@@ -2568,7 +2573,8 @@
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="pullBudgetNow()" :disabled="pullingBudget">{{pullingBudget?'⟳ Pulling…':'⟳ Pull budget'}}</button>
           </template>
           <template v-else>
-            <input v-model="budgetEditVal" type="number" placeholder="49280574" style="width:110px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">
+            <input v-model="budgetEditVal" type="number" placeholder="e.g. 49000000" title="Enter budget in £ (e.g. 49000000 = £49m)" style="width:130px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">
+            <span class="c-gray" style="font-size:9px">£ raw</span>
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="saveBudget()">Save</button>
             <button class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=false">✕</button>
           </template>
@@ -2805,12 +2811,14 @@
             </template>
           </tbody>
         </table>
-        <!-- infinite scroll sentinel -->
-        <div v-if="espionageNegoFiltered.length > negoDisplayCount"
-             style="text-align:center;padding:10px;color:#8b949e;font-size:11px">
-          ↓ {{espionageNegoFiltered.length - negoDisplayCount}} more — keep scrolling
-        </div>
         </div><!-- end scrollable inner -->
+        <div v-if="espionageNegoFiltered.length > negoDisplayCount"
+             style="text-align:center;padding:8px;border-top:1px solid #21262d">
+          <button class="btn" style="font-size:11px" @click="negoDisplayCount+=50">
+            Load {{Math.min(50, espionageNegoFiltered.length - negoDisplayCount)}} more
+            <span class="c-gray" style="font-size:10px">({{espionageNegoFiltered.length - negoDisplayCount}} remaining)</span>
+          </button>
+        </div>
       </div>
       <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found.</div>
     </template>
@@ -3046,8 +3054,8 @@
       <div v-else>
         <!-- Sub-tab switcher -->
         <div style="display:flex;gap:4px;margin-bottom:12px">
-          <button @click="matchSubTab='list'" :style="{background:matchSubTab==='list'?'#238636':'#21262d',color:matchSubTab==='list'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Match List</button>
-          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmissions.length&&!mySubmissionLoading)fetchMySubmission()" :style="{background:matchSubTab==='lineups'?'#238636':'#21262d',color:matchSubTab==='lineups'?'#fff':'#8b949e',border:'1px solid #30363d',borderRadius:'5px',padding:'4px 12px',fontSize:'11px',fontWeight:'600',cursor:'pointer'}">Club Lineups</button>
+          <button @click="matchSubTab='list'" :class="['btn',{active:matchSubTab==='list'}]">Match List</button>
+          <button @click="matchSubTab='lineups';if(!clubLineupsLoaded)buildClubLineups();if(!mySubmissions.length&&!mySubmissionLoading)fetchMySubmission()" :class="['btn',{active:matchSubTab==='lineups'}]">Club Lineups</button>
         </div>
 
         <!-- Club Lineups panel -->
@@ -3540,7 +3548,7 @@
             <div class="attr-row"><span class="c-gray">Morale</span><span :class="(selectedPlayer.moraleScore||0)>=70?'c-green':(selectedPlayer.moraleScore||0)>=50?'c-orange':'c-red'">{{selectedPlayer.moraleOverrideLabel||selectedPlayer.moraleScore!=null?selectedPlayer.moraleOverrideLabel||(selectedPlayer.moraleScore.toFixed(0)):'—'}}</span></div>
           </div>
           <div style="font-size:10px;color:#6e7681;border-top:1px solid #21262d;padding-top:8px;margin-top:4px">
-            Full last-10-games breakdown coming soon (requires match archive update)
+            Per-match breakdown in the Matches tab · Confidence and Morale affect training and performance
           </div>
         </template>
 

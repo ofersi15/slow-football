@@ -66,7 +66,7 @@
         <div v-if="mbChart==='gems'" style="padding:14px;overflow-y:auto">
           <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px">
             <span style="font-size:13px;font-weight:700">💎 Hidden Gems</span>
-            <span class="c-gray" style="font-size:11px">Age ≤ 27 · Rated 68+ · Not at Leverkusen · sorted by rating² ÷ value (£M)</span>
+            <span class="c-gray" style="font-size:11px">Age ≤ 27 · Rated 68+ · Not at {{myClub}} · sorted by rating² ÷ value (£M)</span>
             <span class="c-gray" style="font-size:11px;margin-left:auto">{{mbGemsList.length}} players</span>
           </div>
           <div v-if="!mbGemsList.length" class="card" style="text-align:center;padding:40px;color:#8b949e">No gems found — load player data first.</div>
