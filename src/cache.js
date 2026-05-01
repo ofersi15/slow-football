@@ -1,3 +1,5 @@
+import { PROXY_TOKEN_URL, MY_CLUB } from './constants.js'
+
 // ── Off-thread JSON helpers ───────────────────────────────────────────────────
 // parseAsync: avoids a 200ms freeze when reading the 1940KB player cache on load.
 // stringifyAsync: avoids the 2–5s freeze when writing the cache after a fresh squad fetch.

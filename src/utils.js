@@ -1,3 +1,5 @@
+import { FORMATIONS, GAME_ATTRS, GAME_START, WEEK_MS } from './constants.js'
+
 // ── Slot / formation helpers ──────────────────────────────────────────────────
 // Build slot key array for a formation: '433' → ['GK1','FB1','CB1','CB2','FB2',...]
 export function buildSlotKeys(code) {
