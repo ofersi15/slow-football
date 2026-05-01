@@ -1,7 +1,7 @@
-# Refactor Migration Log
+# Refactor Migration Log — ARCHIVED
 
-This file tracks progress of the token-efficiency refactor.
-Read this first when resuming a session.
+Migration complete as of 2026-05-01. Do not update this file.
+Current architecture is documented in SESSION_CONTEXT.md and CLAUDE.md.
 
 ## Phase A — Extract utilities ✅
 - [DONE] src/constants.js, src/utils.js, src/cache.js extracted from app.js

@@ -64,4 +64,4 @@ Personal fantasy football analytics app for slowfootball.club. Owner: Ofer (ofer
 
 ## MD File Rule
 
-After any meaningful change, update CLAUDE.md, SESSION_CONTEXT.md, and MIGRATION_LOG.md in the same or a follow-up commit.
+After any meaningful change, update CLAUDE.md and SESSION_CONTEXT.md in the same or a follow-up commit.
