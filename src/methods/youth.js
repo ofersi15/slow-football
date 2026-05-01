@@ -50,9 +50,6 @@ export const youthMethods = {
             if (histAge < HIST_TTL) {
               // History fresh — background refresh of live/static only
               setTimeout(async () => {
-              const fetchLive = liveAge >= LIVE_TTL;
-              const fetchStatic = staticAge >= STATIC_TTL;
-
                 try {
                   const fetchLive = liveAge >= LIVE_TTL;
                   const fetchStatic = staticAge >= STATIC_TTL;
