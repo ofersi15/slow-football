@@ -1,5 +1,6 @@
 import { API } from '../constants.js'
 import { SF_CACHE_BASE, parseAsync, serverCacheGet, serverCacheSet } from '../cache.js'
+import { calcGameRating } from '../utils.js'
 
 export const matchesMethods = {
     async buildMatchArchive() {

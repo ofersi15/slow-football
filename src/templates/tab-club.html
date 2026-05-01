@@ -1,0 +1,348 @@
+  <!-- ── CLUB TAB (Facilities + Staff) ── -->
+      <div v-if="activeTab==='club'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading -->
+    <div v-if="clubLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">{{clubMsg||'Loading club data…'}}</div>
+    </div>
+    <!-- Error -->
+    <div v-else-if="clubMsg && !clubLoaded" class="card" style="text-align:center;padding:30px;color:#ff7b72">⚠ {{clubMsg}}</div>
+    <!-- Initial -->
+    <div v-else-if="!clubLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">Initializing…</div>
+    </div>
+
+    <!-- Loaded -->
+    <div v-if="clubLoaded">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:15px;font-weight:700">🏟 {{myClub}}</div>
+        <button class="btn" style="font-size:11px" @click="loadClub(true)">🔄 Refresh</button>
+      </div>
+
+      <!-- Active project banner -->
+      <div v-if="clubFacData && clubFacData.project" class="card" style="border-left:3px solid #ffa657;padding:10px 14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:18px">🔨</span>
+          <div>
+            <span style="font-weight:700;color:#ffa657">{{facTitle(clubFacData.project.key)}} upgrade in progress</span>
+            <span class="c-gray" style="font-size:11px;margin-left:8px">Lv {{clubFacData.project.from}} → {{clubFacData.project.to}}</span>
+          </div>
+          <div class="c-gray" style="font-size:11px;margin-left:auto">Complete: {{new Date(clubFacData.project.completeAt).toLocaleDateString()}}</div>
+        </div>
+      </div>
+
+      <!-- ── FACILITIES ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facilities</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;margin-bottom:16px">
+        <div v-for="key in ['training','scouting','academy','medical','analytics','stadium']" :key="key"
+          class="card" style="position:relative;padding:11px">
+
+          <!-- Upgrading badge -->
+          <div v-if="clubFacData && clubFacData.project && clubFacData.project.key===key"
+            style="position:absolute;top:9px;right:9px;background:#ffa657;color:#0d1117;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px">UPGRADING</div>
+
+          <!-- Header -->
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+            <span style="font-size:17px">{{facEmoji(key)}}</span>
+            <span style="font-weight:700;font-size:13px">{{facTitle(key)}}</span>
+            <span style="margin-left:auto;font-size:13px;font-weight:700"
+              :class="(clubFacData&&clubFacData.levels&&clubFacData.levels[key]||0)>=4?'c-green':(clubFacData&&clubFacData.levels&&clubFacData.levels[key]||0)>=3?'c-orange':'c-gray'">
+              Lv {{clubFacData&&clubFacData.levels?clubFacData.levels[key]:'?'}}
+            </span>
+          </div>
+
+          <!-- Level dots -->
+          <div style="display:flex;gap:3px;margin-bottom:6px">
+            <div v-for="i in 5" :key="i"
+              :style="{width:'26px',height:'5px',borderRadius:'3px',
+                background:i<=(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)?'#238636':'#21262d',
+                border:'1px solid #30363d'}"></div>
+          </div>
+
+          <!-- Flavor text -->
+          <div style="font-style:italic;color:#8b949e;font-size:11px;margin-bottom:6px">
+            "{{facDescription(key, clubFacData&&clubFacData.levels?clubFacData.levels[key]:1)}}"
+          </div>
+
+          <!-- Live effects: training -->
+          <div v-if="key==='training' && clubStaffEffects && clubStaffEffects.training"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">XP gains: <b :class="(clubStaffEffects.training.xpMult||1)>1?'c-green':'c-gray'">
+              +{{Math.round(((clubStaffEffects.training.xpMult||1)-1)*100)}}%
+            </b></span>
+            <span class="c-gray">Fatigue recovery: <b :class="(clubStaffEffects.training.fatigueRecovery||0)>0?'c-green':'c-gray'">
+              +{{Math.round((clubStaffEffects.training.fatigueRecovery||0)*100)}}%
+            </b></span>
+          </div>
+
+          <!-- Live effects: scouting -->
+          <div v-if="key==='scouting' && clubStaffEffects && clubStaffEffects.scouting"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">Prospects/wk: <b class="c-blue">{{clubStaffEffects.scouting.weeklyProspects||0}}</b></span>
+            <span class="c-gray">Quality bump: <b class="c-green">+{{clubStaffEffects.scouting.qualityBump||0}}</b></span>
+            <span v-if="clubStaffEffects.scouting.biasToAdverts" class="c-orange">📋 Bias to ads</span>
+          </div>
+
+          <!-- Live effects: medical -->
+          <div v-if="key==='medical' && clubStaffEffects && clubStaffEffects.medical"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">Injury risk: <b :class="(clubStaffEffects.medical.injuryRiskMult||1)<1?'c-green':'c-gray'">
+              {{(clubStaffEffects.medical.injuryRiskMult||1)<1?'-'+Math.round((1-(clubStaffEffects.medical.injuryRiskMult||1))*100)+'%':'No bonus'}}
+            </b></span>
+            <span class="c-gray">Recovery: <b :class="(clubStaffEffects.medical.recoverySpeedMult||1)>1?'c-green':'c-gray'">
+              +{{Math.round(((clubStaffEffects.medical.recoverySpeedMult||1)-1)*100)}}%
+            </b></span>
+          </div>
+
+          <!-- Live effects: analytics (automation) -->
+          <div v-if="key==='analytics' && clubStaffEffects && clubStaffEffects.automation"
+            style="font-size:11px;color:#d2a8ff;padding:3px 2px">
+            Auto: {{Object.entries(clubStaffEffects.automation||{}).filter(([k,v])=>v).map(([k])=>k.replace(/([A-Z])/g,' $1')).join(', ')||'None enabled'}}
+          </div>
+
+          <!-- Live effects: stadium (CEO/finances) -->
+          <div v-if="key==='stadium' && clubStaffEffects && clubStaffEffects.finances"
+            style="font-size:11px;display:flex;gap:12px;padding:3px 2px">
+            <span class="c-gray">CEO discount: <b :class="(clubStaffEffects.finances.facilityDiscount||0)>0?'c-green':'c-gray'">
+              {{Math.round((clubStaffEffects.finances.facilityDiscount||0)*100)}}%
+            </b></span>
+            <span class="c-gray">Sponsorship: <b class="c-blue">£{{((clubStaffEffects.finances.weeklySponsorship||0)/1000).toFixed(0)}}k/wk</b></span>
+          </div>
+
+          <!-- Upgrade quote -->
+          <div v-if="clubFacQuotes[key] && clubFacQuotes[key].ok !== false"
+            style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px;font-size:11px">
+            <div v-if="clubFacData && clubFacData.project && clubFacData.project.key===key" class="c-orange">
+              Upgrade already in progress ({{clubFacData.project.days}} days total)
+            </div>
+            <div v-else style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+              <span class="c-gray">Next: Lv {{clubFacQuotes[key].to}} · {{clubFacQuotes[key].days}} days
+                <span v-if="clubFacQuotes[key].discountPct" class="c-green"> ({{clubFacQuotes[key].discountPct}}% off)</span>
+              </span>
+              <span style="font-weight:700" :class="clubFacQuotes[key].canAfford?'c-green':'c-red'">
+                £{{(clubFacQuotes[key].finalCost/1e6).toFixed(2)}}m
+              </span>
+            </div>
+          </div>
+          <div v-else-if="(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)>=5"
+            style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px;font-size:11px;color:#238636">✓ Max level</div>
+        </div>
+      </div>
+
+      <!-- ── STAFF ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Staff</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+
+        <!-- Roster + Responsibilities -->
+        <div class="card" style="flex:1;min-width:260px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-weight:700">👥 Roster</span>
+            <button class="btn" style="font-size:10px;padding:2px 8px" @click="loadClub(true)" title="Reload staff from game">⟳</button>
+          </div>
+          <div v-if="clubStaff && clubStaff.current && Object.keys(clubStaff.current).length">
+            <div style="overflow-x:auto"><table>
+              <thead><tr style="cursor:pointer"><th @click="tblSortBy('ros','role')">Role{{tblSortIcon('ros','role')}}</th><th @click="tblSortBy('ros','name')">Name{{tblSortIcon('ros','name')}}</th><th @click="tblSortBy('ros','rating')">Rtg{{tblSortIcon('ros','rating')}}</th><th @click="tblSortBy('ros','weeklyWage')">Wage{{tblSortIcon('ros','weeklyWage')}}</th><th @click="tblSortBy('ros','contractWeeks')">Wks{{tblSortIcon('ros','contractWeeks')}}</th></tr></thead>
+              <tbody>
+                <tr v-for="item in tblSorted(Object.entries(clubStaff.current||{}).map(([role,p])=>({...p,role})), 'ros')" :key="item.role">
+                  <td style="font-weight:700;color:#79c0ff">{{item.role}}</td>
+                  <td>{{item.name}}</td>
+                  <td :class="item.rating>=80?'c-green':item.rating>=70?'c-orange':'c-gray'" style="font-weight:700">{{item.rating||'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{item.weeklyWage?'£'+Math.round(item.weeklyWage/1000)+'k':'—'}}</td>
+                  <td class="c-gray" style="font-size:11px">{{item.contractWeeks!=null?item.contractWeeks:'—'}}</td>
+                </tr>
+              </tbody>
+            </table></div>
+            <div v-if="clubStaff.openAds && clubStaff.openAds.length" class="c-orange" style="font-size:11px;margin-top:7px">
+              ⚡ {{clubStaff.openAds.length}} open ad(s) posted
+            </div>
+          </div>
+          <div v-else class="c-gray" style="padding:12px;text-align:center">No staff data</div>
+
+          <!-- Responsibilities -->
+          <div v-if="clubStaff && clubStaff.responsibilities" style="border-top:1px solid #21262d;margin-top:10px;padding-top:9px">
+            <div style="font-size:11px;font-weight:700;color:#8b949e;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em">Responsibilities</div>
+            <div style="font-size:11px;color:#8b949e;line-height:1.9">
+              <span v-for="(section, sKey) in (clubStaff.responsibilities||{})" :key="sKey">
+                <span v-for="(who, task) in section" :key="task">
+                  <b style="color:#e6edf3;text-transform:capitalize">{{task.replace(/([A-Z])/g,' $1')}}:</b>
+                  <span :style="{color:who==='User'?'#79c0ff':'#7ee787'}"> {{who}}</span> &nbsp;
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Effects grid -->
+        <div class="card" style="flex:1.5;min-width:300px">
+          <div style="font-weight:700;margin-bottom:10px">📈 Staff Effects</div>
+          <div v-if="clubStaffEffects && Object.keys(clubStaffEffects).length"
+            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px">
+
+            <!-- Training -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">⚽ Training</div>
+              <div v-if="clubStaffEffects.training" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">XP bonus</span>
+                  <span :class="(clubStaffEffects.training.xpMult||1)>1?'c-green':'c-gray'" style="font-weight:700">+{{Math.round(((clubStaffEffects.training.xpMult||1)-1)*100)}}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Fatigue recovery</span>
+                  <span :class="(clubStaffEffects.training.fatigueRecovery||0)>0?'c-green':'c-gray'" style="font-weight:700">+{{Math.round((clubStaffEffects.training.fatigueRecovery||0)*100)}}%</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No coach hired</div>
+            </div>
+
+            <!-- Technical Director / Scouting -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🔭 Technical Director</div>
+              <div v-if="clubStaffEffects.scouting" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Weekly prospects</span>
+                  <span class="c-blue" style="font-weight:700">+{{clubStaffEffects.scouting.weeklyProspects||0}}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Quality bump</span>
+                  <span :class="(clubStaffEffects.scouting.qualityBump||0)>0?'c-green':'c-gray'" style="font-weight:700">+{{clubStaffEffects.scouting.qualityBump||0}}</span>
+                </div>
+                <div v-if="clubStaffEffects.scouting.biasToAdverts" style="color:#d2a8ff;font-size:10px;margin-top:2px">✓ Bias toward advertised positions</div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No Technical Director hired</div>
+            </div>
+
+            <!-- Medical -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🏥 Medical</div>
+              <div v-if="clubStaffEffects.medical" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Injury risk</span>
+                  <span :class="(clubStaffEffects.medical.injuryRiskMult||1)<1?'c-green':'c-gray'" style="font-weight:700">
+                    {{(clubStaffEffects.medical.injuryRiskMult||1)<1?'-'+Math.round((1-(clubStaffEffects.medical.injuryRiskMult||1))*100)+'%':'No bonus'}}
+                  </span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Recovery speed</span>
+                  <span :class="(clubStaffEffects.medical.recoverySpeedMult||1)>1?'c-green':'c-gray'" style="font-weight:700">+{{Math.round(((clubStaffEffects.medical.recoverySpeedMult||1)-1)*100)}}%</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No physio hired</div>
+            </div>
+
+            <!-- CEO / Finances -->
+            <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">💰 CEO</div>
+              <div v-if="clubStaffEffects.finances" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Facility discount</span>
+                  <span :class="(clubStaffEffects.finances.facilityDiscount||0)>0?'c-green':'c-gray'" style="font-weight:700">{{Math.round((clubStaffEffects.finances.facilityDiscount||0)*100)}}%</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span class="c-gray">Weekly sponsorship</span>
+                  <span class="c-blue" style="font-weight:700">£{{((clubStaffEffects.finances.weeklySponsorship||0)/1000).toFixed(0)}}k/wk</span>
+                </div>
+              </div>
+              <div v-else class="c-gray" style="font-size:11px">No CEO hired</div>
+            </div>
+
+            <!-- Automation -->
+            <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubStaffEffects.automation">
+              <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🤖 Automation</div>
+              <div style="font-size:11px;display:flex;flex-direction:column;gap:3px">
+                <div v-for="(val, k) in (clubStaffEffects.automation||{})" :key="k" style="display:flex;justify-content:space-between">
+                  <span class="c-gray" style="text-transform:capitalize">{{k.replace(/([A-Z])/g,' $1')}}</span>
+                  <span :class="val?'c-green':'c-gray'">{{val?'✓':'—'}}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div v-else class="c-gray" style="padding:12px;text-align:center">No effects data</div>
+        </div>
+
+      </div>
+
+      <!-- ── STAFF RECRUITMENT ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:4px">Staff Recruitment</div>
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-weight:700;font-size:13px">📣 Staff Recruitment</span>
+          <span v-if="staffWeek" style="font-size:10px;color:#6e7681">wk{{staffWeek}}</span>
+          <button class="btn" style="font-size:11px" :disabled="staffApplicantsLoading || staffGenLoading" @click="loadApplicants()">
+            {{staffApplicantsLoading ? '⟳ Loading…' : '⟳ Load Applicants'}}
+          </button>
+          <button class="btn green" style="font-size:11px;margin-left:auto" :disabled="staffGenLoading || staffApplicantsLoading" @click="generateApplicants()">
+            {{staffGenLoading ? '⟳ Generating…' : '⚡ Generate New'}}
+          </button>
+        </div>
+        <div v-if="staffApplicantsMsg" :style="{color:'#ff7b72',fontSize:'12px',marginBottom:'6px'}">{{staffApplicantsMsg}}</div>
+        <div v-if="staffGenMsg" :style="{color:staffGenMsg.startsWith('⚠')?'#ff7b72':'#ffa657',fontSize:'12px',marginBottom:'8px'}">{{staffGenMsg}}</div>
+        <div v-if="staffApplicants !== null">
+          <div v-if="staffApplicants.length === 0" class="c-gray" style="font-size:11px;font-style:italic;padding:4px 0">No applicants found for this week.</div>
+          <div v-else style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div v-for="group in staffApplicantsByRole" :key="group.role" style="background:#0d1117;border-radius:6px;padding:8px 10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-weight:700;color:#79c0ff;font-size:11px">{{group.role}}<span v-if="group.currentRating != null" style="color:#6e7681;font-weight:400"> (now r{{group.currentRating}})</span></span>
+                <button @click="toggleAd(group.role)" :disabled="staffAdsUpdating"
+                  :style="{background:'none',border:'1px solid',borderColor:group.isLive?'#238636':'#30363d',borderRadius:'4px',color:group.isLive?'#7ee787':'#6e7681',cursor:'pointer',fontSize:'10px',padding:'1px 6px'}"
+                  :title="group.isLive ? 'Ad is live — click to unpost' : 'Ad is off — click to post'">
+                  {{group.isLive ? '● Live' : '○ Off'}}
+                </button>
+              </div>
+              <div v-for="(c, i) in group.applicants" :key="c.id" style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #21262d">
+                <span style="font-size:10px;color:#6e7681;min-width:12px">{{i+1}}</span>
+                <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3">{{c.name || '?'}}</span>
+                <span :class="staffApplicantRatingClass(c)" style="font-size:11px;font-weight:700">r{{c.rating||'?'}}</span>
+                <span v-if="group.currentRating != null" :class="c.rating > group.currentRating ? 'c-green' : c.rating === group.currentRating ? 'c-orange' : 'c-red'" style="font-size:10px">{{c.rating > group.currentRating ? '+' : ''}}{{c.rating - group.currentRating}}</span>
+                <span style="font-size:10px;color:#8b949e">£{{Math.round((c.weeklyWage||0)/1000)}}k</span>
+                <button @click="rejectApplicant(c)" style="background:none;border:none;color:#6e7681;cursor:pointer;font-size:14px;line-height:1;padding:0 2px" title="Reject">×</button>
+              </div>
+              <div v-if="!group.applicants.length" class="c-gray" style="font-size:11px;font-style:italic">No applicants</div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="!staffGenLoading && !staffApplicantsLoading" class="c-gray" style="font-size:11px">To get fresh candidates: unpost any ad in the game, then click <b style="color:#e6edf3">Generate New</b>. Or click <b style="color:#e6edf3">Load Applicants</b> to see existing ones.</div>
+      </div>
+
+      <!-- ── FACILITY LEVEL REFERENCE ── -->
+      <div style="margin-top:20px">
+        <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facility Level Reference</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead>
+              <tr style="color:#8b949e;border-bottom:1px solid #21262d">
+                <th style="text-align:left;padding:5px 8px;font-weight:600">Lv</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏋️ Training</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🔭 Scouting</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🎓 Academy</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏥 Medical</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">📊 Analytics</th>
+                <th style="text-align:left;padding:5px 8px;font-weight:600">🏟️ Stadium</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="lv in [1,2,3,4,5]" :key="lv" style="border-bottom:1px solid #21262d">
+                <td style="padding:5px 8px;font-weight:700;color:#e6edf3">{{lv}}</td>
+                <td v-for="fk in ['training','scouting','academy','medical','analytics','stadium']" :key="fk"
+                  :style="{padding:'5px 8px',
+                    background: facCurLv(fk)===lv ? '#1c2d1e' : (clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv) ? '#2d1f0e' : 'transparent',
+                    fontWeight: facCurLv(fk)===lv ? '700' : '400',
+                    color: fk==='training'?'#7ee787':fk==='scouting'?'#79c0ff':fk==='academy'?'#d2a8ff':fk==='stadium'?'#8b949e':'#ffa657'}">
+                  {{facRef(fk,lv)}}
+                  <span v-if="clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv" style="font-size:9px;margin-left:3px;color:#ffa657">▲</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size:10px;color:#6e7681;margin-top:5px">
+          Current level highlighted green · ▲ = upgrade in progress · Training = XP cap · Scouting = slots / rating boost / speed · Academy = big-jump chance · Medical = injury chance / rehab speed · Analytics = formations unlocked · Stadium = capacity
+        </div>
+      </div>
+
+    </div>
+      </div>
+

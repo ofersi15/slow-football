@@ -1,0 +1,300 @@
+  <!-- ── TRANSFERS TAB ── -->
+      <div v-if="activeTab==='espionage'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+    <div v-if="espionageLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">💰</div>
+      <div class="c-gray" style="margin-bottom:12px">{{espionageMsg||'Loading…'}}</div>
+      <div style="width:260px;margin:0 auto">
+        <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+          <div :style="{width:espionageProgress+'%',height:'100%',background:'linear-gradient(90deg,#1f6feb,#8957e5)',borderRadius:'4px',transition:'width .3s'}"></div>
+        </div>
+      </div>
+    </div>
+    <div v-else-if="!espionageLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">💰</div>
+      <div class="c-gray">Loading transfer data…</div>
+    </div>
+    <template v-if="espionageLoaded">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:700;color:#e6edf3">Transfer Negotiations</span>
+          <span v-if="negosPollingInterval" style="background:#1a4a2e;color:#7ee787;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px">● LIVE</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span v-if="negosLastPull" class="c-gray" style="font-size:10px">
+            updated {{new Date(negosLastPull).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}}
+          </span>
+          <!-- Budget display + manual override -->
+          <template v-if="!budgetEditing">
+            <span v-if="effectiveBudget!=null" @click="budgetEditing=true;budgetEditVal=''" style="font-size:11px;font-weight:700;color:#7ee787;cursor:pointer" title="Click to edit">💰 {{fmtVal(effectiveBudget)}}</span>
+            <button v-else class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=true;budgetEditVal=''">💰 Set budget</button>
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="pullBudgetNow()" :disabled="pullingBudget">{{pullingBudget?'⟳ Pulling…':'⟳ Pull budget'}}</button>
+          </template>
+          <template v-else>
+            <input v-model="budgetEditVal" type="number" placeholder="49280574" style="width:110px;font-size:11px;padding:2px 6px" @keyup.enter="saveBudget()" @keyup.escape="budgetEditing=false">
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="saveBudget()">Save</button>
+            <button class="btn" style="font-size:10px;padding:1px 7px" @click="budgetEditing=false">✕</button>
+          </template>
+          <button class="btn" style="font-size:11px" @click="loadWorkerLog()">📋 Log</button>
+          <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
+        </div>
+      </div>
+      <!-- ── Auction Board — only shown when there are active (pending) auctions ── -->
+      <div v-if="auctionsByPlayer.active.length" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;color:#d2a8ff">🏛 Auctions</span>
+          <span class="c-gray" style="font-size:10px">closes {{nextAuctionClose.toLocaleString('en-GB',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Europe/London'})}} BST · {{auctionCountdown}}</span>
+          <span v-if="effectiveBudget!=null" style="font-size:11px;font-weight:700;color:#7ee787">💰 {{fmtVal(effectiveBudget)}}</span>
+          <span style="font-size:10px;color:#586069">silent sealed · falls to next if winner can't pay</span>
+        </div>
+        <!-- Active auctions — one card per player -->
+        <div v-if="!auctionsByPlayer.active.length" class="c-gray" style="font-size:11px;margin-bottom:8px;padding:6px 0">No active auctions</div>
+        <div v-for="entry in auctionsByPlayer.active" :key="'ac-'+entry.playerName"
+             class="card" style="margin-bottom:8px;padding:10px 14px">
+          <!-- Player header -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+            <span @click="openPlayerByName(entry.playerName)" style="cursor:pointer;color:#79c0ff;font-weight:700;font-size:13px;border-bottom:1px dotted #79c0ff40">{{entry.playerName}}</span>
+            <span v-if="playerByName(entry.playerName)?.Position" style="font-size:10px;color:#c9d1d9;background:#21262d;padding:1px 6px;border-radius:4px">{{playerByName(entry.playerName).Position}}</span>
+            <span v-if="playerByName(entry.playerName)?.Age" class="c-gray" style="font-size:10px">{{playerByName(entry.playerName).Age}}y</span>
+            <span v-if="playerByName(entry.playerName)?._gameRating" :style="{fontSize:'10px',fontWeight:700,color:playerByName(entry.playerName)._gameRating>=80?'#7ee787':playerByName(entry.playerName)._gameRating>=70?'#ffa657':'#e6edf3'}">★{{playerByName(entry.playerName)._gameRating.toFixed(1)}}</span>
+            <span class="c-gray" style="font-size:10px">from <span @click.stop="openClubDetail(entry.seller)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)">{{entry.seller}}</span></span>
+          </div>
+          <!-- Top bid — only shown when at least one bid exists -->
+          <div v-if="entry.bids.length" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(110,84,148,0.2);border-radius:6px;flex-wrap:wrap">
+            <span style="font-size:9px;color:#d2a8ff;font-weight:700">👑 TOP BID</span>
+            <span @click.stop="openClubDetail(entry.bids[0].buyer)" :style="{cursor:'pointer',fontWeight:entry.bids[0].buyer===myClub?700:400,color:entry.bids[0].buyer===myClub?'#7ee787':'#e6edf3',fontSize:'12px'}">
+              {{entry.bids[0].buyer||'?'}}
+            </span>
+            <span style="font-weight:700;font-size:14px;color:#e6edf3">{{entry.bids[0].amount&&entry.bids[0].amount>1?fmtVal(entry.bids[0].amount):'—'}}</span>
+            <!-- Budget indicator for top bidder -->
+            <span v-if="entry.bids[0].buyer===myClub && effectiveBudget!=null"
+                  :style="{fontSize:'10px',fontWeight:700,color:effectiveBudget>=entry.bids[0].amount?'#7ee787':'#ffa657'}">
+              💰 {{effectiveBudget>=entry.bids[0].amount?'can pay':'short'}} ({{fmtVal(effectiveBudget)}})
+            </span>
+            <span v-else-if="entry.bids[0].buyer!==myClub && clubBudgetFor(entry.bids[0].buyer)!=null"
+                  :style="{fontSize:'10px',fontWeight:700,color:clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'#7ee787':'#ff7b72'}">
+              💰 {{clubBudgetFor(entry.bids[0].buyer)>=entry.bids[0].amount?'can pay':'short'}} ({{fmtVal(clubBudgetFor(entry.bids[0].buyer))}})
+            </span>
+            <span v-if="entry.bids.find(b=>b.buyer===myClub) && entry.bids[0].buyer!==myClub" class="c-gray" style="font-size:10px">
+              our bid: {{fmtVal(entry.bids.find(b=>b.buyer===myClub).amount)}}
+            </span>
+            <span :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 7px',fontSize:'9px',fontWeight:700,marginLeft:'auto'}">
+              {{negoStatusInfo(entry.bids[0]).label}}
+            </span>
+          </div>
+          <div v-else style="padding:8px 10px;background:rgba(110,84,148,0.1);border-radius:6px;font-size:11px;color:#8b949e">
+            No bids yet
+          </div>
+          <!-- Effective winner: shown when top bidder is known to be short -->
+          <div v-if="entry.bids.length && entry.effectiveWinner && entry.effectiveWinner!==entry.bids[0].buyer"
+               style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(255,123,114,0.1);border-radius:6px;margin-top:4px;flex-wrap:wrap">
+            <span style="font-size:9px;color:#ff7b72;font-weight:700">⚠ TOP BIDDER SHORT — falls to</span>
+            <span @click.stop="openClubDetail(entry.effectiveWinner)" style="cursor:pointer;font-size:11px;font-weight:700;color:#ffa657">{{entry.effectiveWinner}}</span>
+            <span v-if="entry.bids.find(b=>b.buyer===entry.effectiveWinner)" style="font-size:11px;font-weight:700;color:#ffa657">
+              {{fmtVal(entry.bids.find(b=>b.buyer===entry.effectiveWinner).amount)}}
+            </span>
+            <span v-if="clubBudgetFor(entry.effectiveWinner)!=null" style="font-size:9px;color:#7ee787">
+              💰 {{fmtVal(clubBudgetFor(entry.effectiveWinner))}}
+            </span>
+          </div>
+          <!-- Remaining bids (collapsible) -->
+          <div v-if="entry.bids.length > 1" style="margin-top:6px">
+            <button class="btn" style="font-size:9px;padding:1px 8px"
+                    @click="auctionExpandedPlayers[entry.playerName]=!auctionExpandedPlayers[entry.playerName]">
+              {{auctionExpandedPlayers[entry.playerName]?'▲':'▼'}} {{entry.bids.length-1}} more bid{{entry.bids.length>2?'s':''}}
+            </button>
+            <template v-if="auctionExpandedPlayers[entry.playerName]">
+              <div v-for="(bid, bi) in entry.bids.slice(1)" :key="bid.id"
+                   style="display:flex;align-items:center;gap:10px;padding:4px 10px;margin-top:2px;border-radius:4px"
+                   :style="{background:bid.buyer===myClub?'rgba(31,111,235,0.1)':'transparent'}">
+                <span style="font-size:9px;color:#8b949e;min-width:16px">#{{bi+2}}</span>
+                <span @click.stop="openClubDetail(bid.buyer)" :style="{cursor:'pointer',fontWeight:bid.buyer===myClub?700:400,color:bid.buyer===myClub?'#7ee787':'#c9d1d9',fontSize:'11px'}">{{bid.buyer||'?'}}</span>
+                <span style="font-weight:700;font-size:11px">{{bid.amount&&bid.amount>1?fmtVal(bid.amount):'—'}}</span>
+                <span v-if="bid.buyer===myClub && effectiveBudget!=null"
+                      :style="{fontSize:'9px',fontWeight:700,color:effectiveBudget>=bid.amount?'#7ee787':'#ffa657'}">
+                  💰{{effectiveBudget>=bid.amount?'✓':'!'}}
+                </span>
+                <span v-else-if="bid.buyer!==myClub && clubBudgetFor(bid.buyer)!=null"
+                      :style="{fontSize:'9px',fontWeight:700,color:clubBudgetFor(bid.buyer)>=bid.amount?'#7ee787':'#ff7b72'}">
+                  💰{{clubBudgetFor(bid.buyer)>=bid.amount?'✓':'✗'}}
+                </span>
+                <span :style="{background:negoStatusInfo(bid).bg,color:negoStatusInfo(bid).color,borderRadius:'8px',padding:'1px 6px',fontSize:'9px',fontWeight:700}">{{negoStatusInfo(bid).label}}</span>
+              </div>
+            </template>
+          </div>
+        </div>
+        <!-- Past auctions (collapsible) -->
+        <div v-if="auctionsByPlayer.past.length">
+          <button class="btn" style="font-size:10px;padding:2px 10px;margin-bottom:8px" @click="pastAuctionsOpen=!pastAuctionsOpen">
+            {{pastAuctionsOpen?'▲':'▼'}} Past Auctions ({{auctionsByPlayer.past.length}})
+          </button>
+          <template v-if="pastAuctionsOpen">
+            <div v-for="entry in auctionsByPlayer.past" :key="'ap-'+entry.playerName"
+                 class="card" style="margin-bottom:6px;padding:8px 14px;opacity:0.8">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                <span @click="openPlayerByName(entry.playerName)" style="cursor:pointer;color:#79c0ff;font-weight:600;font-size:12px">{{entry.playerName}}</span>
+                <span v-if="playerByName(entry.playerName)?.Position" style="font-size:10px;color:#c9d1d9;background:#21262d;padding:1px 5px;border-radius:4px">{{playerByName(entry.playerName).Position}}</span>
+                <span v-if="playerByName(entry.playerName)?.Age" class="c-gray" style="font-size:10px">{{playerByName(entry.playerName).Age}}y</span>
+                <span class="c-gray" style="font-size:10px">from {{entry.seller}}</span>
+              </div>
+              <!-- Top bid always shown (guard against 0-bid entries) -->
+              <div v-if="entry.bids.length" style="display:flex;align-items:center;gap:10px;padding:5px 10px;background:rgba(110,84,148,0.1);border-radius:6px;margin-bottom:4px">
+                <span style="font-size:9px;color:#8b949e">👑 #1</span>
+                <span @click.stop="openClubDetail(entry.bids[0].buyer)" :style="{cursor:'pointer',fontWeight:entry.bids[0].buyer===myClub?700:400,color:entry.bids[0].buyer===myClub?'#7ee787':'#c9d1d9',fontSize:'11px'}">{{entry.bids[0].buyer||'?'}}</span>
+                <span style="font-weight:700;color:#8b949e">{{entry.bids[0].amount&&entry.bids[0].amount>1?fmtVal(entry.bids[0].amount):'—'}}</span>
+                <span :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 6px',fontSize:'9px',fontWeight:700,marginLeft:'auto'}">{{negoStatusInfo(entry.bids[0]).label}}</span>
+              </div>
+              <div v-if="entry.bids.length > 1">
+                <button class="btn" style="font-size:9px;padding:1px 8px"
+                        @click="auctionExpandedPlayers[entry.playerName]=!auctionExpandedPlayers[entry.playerName]">
+                  {{auctionExpandedPlayers[entry.playerName]?'▲':'▼'}} {{entry.bids.length-1}} more
+                </button>
+                <template v-if="auctionExpandedPlayers[entry.playerName]">
+                  <div v-for="(bid, bi) in entry.bids.slice(1)" :key="bid.id"
+                       style="display:flex;align-items:center;gap:10px;padding:3px 10px;margin-top:2px;border-radius:4px"
+                       :style="{background:bid.buyer===myClub?'rgba(31,111,235,0.1)':'transparent'}">
+                    <span style="font-size:9px;color:#8b949e">#{{bi+2}}</span>
+                    <span @click.stop="openClubDetail(bid.buyer)" :style="{cursor:'pointer',color:bid.buyer===myClub?'#7ee787':'#8b949e',fontSize:'11px'}">{{bid.buyer||'?'}}</span>
+                    <span style="font-weight:700;color:#8b949e;font-size:11px">{{bid.amount&&bid.amount>1?fmtVal(bid.amount):'—'}}</span>
+                    <span :style="{background:negoStatusInfo(bid).bg,color:negoStatusInfo(bid).color,borderRadius:'8px',padding:'1px 6px',fontSize:'9px',fontWeight:700}">{{negoStatusInfo(bid).label}}</span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <!-- Past auctions accessible even when no active ones -->
+      <div v-if="!auctionsByPlayer.active.length && auctionsByPlayer.past.length" style="margin-bottom:12px">
+        <button class="btn" style="font-size:10px;padding:2px 10px" @click="pastAuctionsOpen=!pastAuctionsOpen">
+          {{pastAuctionsOpen?'▲':'▼'}} Past Auctions ({{auctionsByPlayer.past.length}})
+        </button>
+        <template v-if="pastAuctionsOpen">
+          <div v-for="entry in auctionsByPlayer.past" :key="'ap2-'+entry.playerName"
+               class="card" style="margin-top:6px;margin-bottom:6px;padding:8px 14px;opacity:0.8">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span @click="openPlayerByName(entry.playerName)" style="cursor:pointer;color:#79c0ff;font-weight:600;font-size:12px">{{entry.playerName}}</span>
+              <span v-if="playerByName(entry.playerName)?.Position" style="font-size:10px;color:#c9d1d9;background:#21262d;padding:1px 5px;border-radius:4px">{{playerByName(entry.playerName).Position}}</span>
+              <span class="c-gray" style="font-size:10px">from {{entry.seller}}</span>
+              <span v-if="entry.bids.length" class="c-gray" style="font-size:10px">· top bid: {{entry.bids[0]?.buyer}} {{entry.bids[0]?.amount?fmtVal(entry.bids[0].amount):''}}</span>
+              <span v-if="entry.bids.length" :style="{background:negoStatusInfo(entry.bids[0]).bg,color:negoStatusInfo(entry.bids[0]).color,borderRadius:'8px',padding:'1px 6px',fontSize:'9px',fontWeight:700}">{{negoStatusInfo(entry.bids[0]).label}}</span>
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- ── Nego Table ── -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <input type="text" v-model="espionageNegoSearch" placeholder="Search player, club…" style="width:200px">
+        <span class="c-gray" style="font-size:11px">{{espionageNegoFiltered.length}} shown · {{espionageNegos.filter(n=>n.via!=='auction').length}} non-auction total</span>
+        <button v-if="!negoShowAll && espionageNegos.filter(n=>n.via!=='auction').length > espionageNegoFiltered.length" class="btn" style="font-size:10px;padding:2px 8px" @click="negoShowAll=true">Show all</button>
+        <button v-if="negoShowAll" class="btn" style="font-size:10px;padding:2px 8px" @click="negoShowAll=false">Last 2 weeks only</button>
+      </div>
+      <div v-if="espionageNegos.length" class="card" style="padding:0;overflow:hidden">
+        <div @scroll="onNegoScroll" style="overflow:auto;max-height:70vh">
+        <table style="font-size:11px">
+          <thead style="position:sticky;top:0;z-index:2;background:#161b22">
+            <tr style="cursor:pointer">
+              <th style="min-width:110px" @click="negoSortBy('player')">Player{{negoSortIcon('player')}}</th>
+              <th style="min-width:35px">Pos</th>
+              <th style="min-width:30px">Age</th>
+              <th style="min-width:45px">Rating</th>
+              <th @click="negoSortBy('parties')">Seller → Buyer{{negoSortIcon('parties')}}</th>
+              <th @click="negoSortBy('fee')">Amount</th>
+              <th @click="negoSortBy('status')" style="min-width:160px">Status{{negoSortIcon('status')}}</th>
+              <th @click="negoSortBy('date')">Updated{{negoSortIcon('date')}}</th>
+              <th style="width:28px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="n in espionageNegoPage" :key="n.id">
+              <tr :style="{cursor:n.history&&n.history.length>1?'pointer':'default',background:negoExpandedId===n.id?'#161b22':'transparent'}"
+                  @click="n.history&&n.history.length>1 && (negoExpandedId = negoExpandedId===n.id ? null : n.id)">
+                <td style="font-weight:600">
+                  <span @click.stop="openPlayerByName(n.playerName)" style="cursor:pointer;color:#79c0ff;border-bottom:1px dotted #79c0ff40">{{n.playerName||'?'}}</span>
+                </td>
+                <td style="font-size:10px;color:#8b949e">{{playerByName(n.playerName)?.Position||'—'}}</td>
+                <td style="font-size:10px;color:#8b949e">{{playerByName(n.playerName)?.Age||'—'}}</td>
+                <td>
+                  <span v-if="playerByName(n.playerName)?._gameRating"
+                    :style="{fontWeight:700,color:playerByName(n.playerName)._gameRating>=80?'#7ee787':playerByName(n.playerName)._gameRating>=70?'#ffa657':'#e6edf3',fontSize:'11px'}">
+                    {{playerByName(n.playerName)._gameRating.toFixed(1)}}
+                  </span>
+                  <span v-else class="c-gray" style="font-size:10px">—</span>
+                </td>
+                <td style="white-space:nowrap">
+                  <span @click.stop="openClubDetail(n.seller)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.seller===myClub?'#ffa657':'#e6edf3'}">{{n.seller||'?'}}</span>
+                  <span class="c-gray"> → </span>
+                  <span @click.stop="openClubDetail(n.buyer)" style="cursor:pointer;border-bottom:1px dotted rgba(255,255,255,0.2)" :style="{color:n.buyer===myClub?'#7ee787':'#e6edf3'}">{{n.buyer||'?'}}</span>
+                </td>
+                <!-- Amount -->
+                <td style="font-weight:700">{{n.amount&&n.amount>1?fmtVal(n.amount):'—'}}</td>
+                <!-- Combined status column -->
+                <td style="white-space:nowrap">
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span :style="{background:negoStatusInfo(n).bg,color:negoStatusInfo(n).color,borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700',display:'inline-block'}">
+                      {{negoStatusInfo(n).icon}} {{negoStatusInfo(n).label}}
+                    </span>
+                    <span v-if="negoStatusInfo(n).detail" style="font-size:9px;color:#8b949e;padding-left:2px">{{negoStatusInfo(n).detail}}</span>
+                  </div>
+                </td>
+                <td class="c-gray" style="font-size:10px;white-space:nowrap">{{fmtNegoDate(n.updatedAt)}}</td>
+                <td style="text-align:center;color:#8b949e;font-size:10px">
+                  <span v-if="n.history&&n.history.length>1" style="cursor:pointer">{{negoExpandedId===n.id?'▲':'▼'}}{{n.history.length}}</span>
+                </td>
+              </tr>
+              <tr v-if="negoExpandedId===n.id&&n.history&&n.history.length>1" :key="'h-'+n.id">
+                <td colspan="9" style="background:#0d1117;padding:8px 14px;border-top:1px solid #21262d">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                    <span style="font-size:10px;font-weight:600;color:#8b949e">
+                      {{n.via==='auction'?'🏛 Auction bid history':'📨 Bid history'}} ({{n.history.length}} rounds)
+                    </span>
+                    <span v-if="n.via==='auction'" style="font-size:9px;color:#8b949e">Silent auction — only your bids visible. Closes Wed 9pm BST. Falls to next bidder if winner can't pay.</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:5px">
+                    <div v-for="(h,hi) in n.history" :key="hi"
+                         style="display:flex;align-items:center;gap:10px;padding:4px 8px;border-radius:4px"
+                         :style="{background:hi===0?'#0f1d2a':'transparent'}">
+                      <span class="c-gray" style="font-size:9px;min-width:70px">{{fmtNegoDate(h.ts)}}</span>
+                      <span :style="{color:h.type==='counter'?'#ffa657':h.type==='offer'||h.type==='auction-bid'?'#79c0ff':'#8b949e',fontSize:'10px',fontWeight:'700',minWidth:'70px'}">
+                        {{h.type==='counter'?'↩ Counter':h.type==='auction-bid'?'🏛 Auction bid':h.type==='offer'?'📨 Offer':h.type||'—'}}
+                      </span>
+                      <span style="font-weight:700;font-size:11px;color:#ffa657">{{h.amount&&h.amount>1?fmtVal(h.amount):'—'}}</span>
+                      <span v-if="h.by" class="c-gray" style="font-size:9px">by {{h.by}}</span>
+                      <span v-if="hi===0" style="font-size:9px;color:#7ee787">← latest</span>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <!-- infinite scroll sentinel -->
+        <div v-if="espionageNegoFiltered.length > negoDisplayCount"
+             style="text-align:center;padding:10px;color:#8b949e;font-size:11px">
+          ↓ {{espionageNegoFiltered.length - negoDisplayCount}} more — keep scrolling
+        </div>
+        </div><!-- end scrollable inner -->
+      </div>
+      <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No negotiations found.</div>
+    </template>
+
+    <!-- Worker Log Modal -->
+    <div v-if="workerLogOpen" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center" @click.self="workerLogOpen=false">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:20px;width:min(600px,95vw);max-height:80vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <span style="font-weight:700;font-size:14px">📋 Worker Log</span>
+          <button class="btn" @click="loadWorkerLog()" style="font-size:11px">↻ Refresh</button>
+          <button @click="workerLogOpen=false" style="background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+        </div>
+        <div v-if="workerLog === null" class="c-gray" style="text-align:center;padding:20px">Loading…</div>
+        <div v-else-if="!workerLog.length" class="c-gray" style="text-align:center;padding:20px">No log entries yet. Worker will write entries after next cron run.</div>
+        <div v-else style="display:flex;flex-direction:column;gap:4px">
+          <div v-for="(e,i) in workerLog" :key="i" style="display:flex;gap:10px;align-items:baseline;font-size:11px;padding:4px 8px;border-radius:5px;background:#0d1117">
+            <span class="c-gray" style="min-width:110px;flex-shrink:0">{{new Date(e.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'})}}</span>
+            <span :style="{minWidth:'52px',fontWeight:700,color:e.type==='error'?'#ff7b72':e.type==='negos'?'#79c0ff':'#7ee787',flexShrink:0}">{{e.type}}</span>
+            <span style="color:#e6edf3">{{e.msg}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+

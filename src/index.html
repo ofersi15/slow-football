@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ SLOW Football Analytics</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- LOADING -->
+  <div v-if="!loaded && !corsError" class="loading">
+    <div style="font-size:20px;font-weight:700">⚽ SLOW Football Analytics</div>
+    <div class="progress-bar"><div class="progress-fill" :style="{width:progress+'%'}"></div></div>
+    <div class="c-gray" style="font-size:12px">{{loadMsg}}</div>
+  </div>
+
+  <!-- CORS ERROR -->
+  <div v-if="corsError" class="loading">
+    <div class="cors-warning">
+      <div style="font-size:16px;font-weight:700;color:#ff7b72;margin-bottom:10px">⚠ Cannot reach SLOW Football API</div>
+      <div class="c-gray" style="margin-bottom:12px;line-height:1.6">
+        Open the file via a local server instead of directly from disk.<br><br>
+        <strong style="color:#e6edf3">Double-click <code>start-server.bat</code> in this folder</strong><br>
+        or drag the button below to your bookmarks bar and click it on slowfootball.club
+      </div>
+      <a :href="bookmarkletHref" class="bookmarklet-link" title="Drag to bookmarks bar">📊 SLOW Analytics</a>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div v-if="loaded" class="layout">
+
+    <!-- MAIN AREA -->
+    <div class="main">
+      <!-- TABS -->
+      <div class="header">
+        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</button>
+        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+      </div>
+      <div style="display:flex;flex:1;overflow:hidden">
+<!-- include:sidebar -->
+<!-- include:tab-scout -->
+<!-- include:tab-squad -->
+<!-- include:tab-moneyball -->
+<!-- include:tab-analysis -->
+<!-- include:tab-youth -->
+<!-- include:tab-club -->
+<!-- include:tab-clubs -->
+<!-- include:tab-espionage -->
+<!-- include:tab-matches -->
+<!-- include:modal -->
+
+</div><!-- end #app -->
+<script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,374 @@
+  <!-- PLAYER PROFILE MODAL -->
+  <div v-if="selectedPlayer" class="modal-overlay" @click.self="closeModal()">
+    <div class="modal">
+      <button class="modal-close" @click="closeModal()">✕</button>
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span :class="'pos pos-'+selectedPlayer.Position" style="font-size:12px">{{selectedPlayer.Position}}</span>
+            <span style="font-size:20px;font-weight:700;color:#e6edf3">{{selectedPlayer.Player}}</span>
+            <span v-if="selectedPlayer._transferListed" style="background:#238636;color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">FOR SALE <span v-if="selectedPlayer._listingAsk" style="opacity:.85">· ask {{fmtVal(selectedPlayer._listingAsk)}}</span><span v-if="selectedPlayer._listingBids" style="opacity:.7"> · {{selectedPlayer._listingBids}} bid{{selectedPlayer._listingBids!==1?'s':''}}</span></span>
+            <span v-if="selectedPlayer.notForSale" style="background:#6e3a0b;color:#ffa657;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">NOT FOR SALE</span>
+            <span v-if="selectedPlayer.retiring" style="background:#3a0f0f;color:#ff7b72;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700">🚨 RETIRING</span>
+            <span v-if="selectedPlayer.homegrown" style="background:#1a3a1a;color:#7ee787;font-size:10px;padding:1px 6px;border-radius:10px">🏠 Homegrown</span>
+            <span v-if="selectedPlayer.slowIcon||selectedPlayer.isSlowIcon||selectedPlayer.icon" style="background:#2d2a0e;color:#e3b341;font-size:10px;padding:1px 6px;border-radius:10px">⭐ SLOW Icon</span>
+            <span v-if="selectedPlayer.inAcademy" style="background:#1f2d3d;color:#79c0ff;font-size:10px;padding:1px 6px;border-radius:10px">🎓 Academy</span>
+          </div>
+          <div class="c-gray" style="font-size:12px">
+            <span :class="'league-tag lg-'+(selectedPlayer._league||'other')" style="cursor:default;font-size:10px">{{selectedPlayer._league||'?'}}</span>
+            {{selectedPlayer.Club}}
+            <span v-if="!selectedPlayer._managed" class="c-red"> · No manager 🔴</span>
+            <span v-if="selectedPlayer.Club===myClub" class="c-orange"> · My team ★</span>
+          </div>
+          <div class="c-gray" style="font-size:11px;margin-top:4px">
+            {{selectedPlayer.Nationality}} · Age {{selectedPlayer.Age}} · {{selectedPlayer.PreferredFoot||'?'}} footed · DOB {{selectedPlayer.DOB||'?'}}
+          </div>
+        </div>
+        <!-- Overall rating -->
+        <div style="text-align:center;min-width:64px">
+          <div :class="['pos-rating-num',ratingClass(selectedPlayer._gameRating||selectedPlayer.Rating)]">{{(selectedPlayer._gameRating||selectedPlayer.Rating)?(selectedPlayer._gameRating||selectedPlayer.Rating).toFixed(1):'—'}}</div>
+          <div class="c-gray" style="font-size:10px">Overall</div>
+        </div>
+      </div>
+
+      <!-- Incomplete stats banner (always visible) -->
+      <div v-if="selectedPlayer._incompleteStats" style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:16px">🌱</span>
+        <span style="color:#79c0ff">Partial attribute data — only primary position attributes loaded; others populate over time.</span>
+      </div>
+
+      <!-- Scout job context (always visible) -->
+      <div v-if="selectedJobCtx" style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px">
+        <div style="font-size:10px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
+          🔭 Scouting Job Info
+          <span v-if="selectedJobCtx._club" style="background:#1f2d3d;color:#79c0ff;border:1px solid #388bfd40;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:600;text-transform:none;margin-left:8px">{{selectedJobCtx._club}}</span>
+          <span v-if="selectedJobCtx._club && youthClubInfoMap[selectedJobCtx._club]" style="font-size:10px;color:#8b949e;font-weight:400;text-transform:none;margin-left:4px">Scout Lv {{youthClubInfoMap[selectedJobCtx._club].facilities?.levels?.scouting||'?'}} · Bump +{{youthClubInfoMap[selectedJobCtx._club].staff?.scouting?.qualityBump||0}}</span>
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+          <div>
+            <span class="c-gray">Stage: </span>
+            <span style="display:inline-flex;gap:3px;margin-left:4px;vertical-align:middle">
+              <span v-for="i in 7" :key="i" :style="{width:'8px',height:'8px',borderRadius:'50%',display:'inline-block',background:i<=selectedJobCtx.stage?(selectedJobCtx.stage>=7?'#7ee787':'#ffa657'):'#21262d'}"></span>
+            </span>
+            <span v-if="selectedJobCtx.stage>=7" style="font-size:10px;color:#7ee787;font-weight:700;margin-left:5px">✓ FULLY REVEALED</span>
+            <span v-else class="c-gray" style="font-size:10px;margin-left:4px">{{selectedJobCtx.stage}}/7</span>
+          </div>
+          <div>
+            <span class="c-gray">Game hint: </span>
+            <span style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:12px;padding:2px 9px;font-size:11px;color:#79c0ff;font-weight:600">{{selectedJobCtx.hints?.ratingBand?.min}}–{{selectedJobCtx.hints?.ratingBand?.max}}</span>
+          </div>
+          <div>
+            <span class="c-gray">Strength hint: </span>
+            <span class="c-orange">{{selectedJobCtx.hints?.strength?.key}} {{selectedJobCtx.hints?.strength?.value}}</span>
+          </div>
+          <div v-if="selectedJobCtx.buyNow">
+            <span class="c-gray">Buy now: </span>
+            <span class="c-orange" style="font-weight:700">{{fmtVal(selectedJobCtx.buyNow)}}</span>
+          </div>
+          <div v-if="selectedJobCtx.status==='rejected'" style="font-size:11px;color:#8b949e">
+            ⚠ Stats from scouting date — may be outdated
+            <button class="btn" style="font-size:10px;padding:2px 7px;margin-left:8px" @click="refreshYouthJob(selectedJobCtx)">
+              {{selectedJobCtx._refreshing?'…':selectedJobCtx._refreshed?'✓ Refreshed':selectedJobCtx._refreshFailed?'✗ Not found':'↻ Refresh Stats'}}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal tab nav -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #21262d;margin-bottom:12px">
+        <button v-for="t in [{id:'overview',label:'Overview'},{id:'chemistry',label:'🤝 Chemistry'},{id:'history',label:'History'},{id:'stats',label:'Stats'}]" :key="t.id"
+          @click="playerModalTab=t.id"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:500;margin-bottom:-1px"
+          :style="playerModalTab===t.id?{borderBottomColor:'#79c0ff',color:'#e6edf3',fontWeight:'700'}:{color:'#8b949e'}">
+          {{t.label}}
+        </button>
+      </div>
+
+      <!-- ── OVERVIEW TAB ── -->
+      <div v-if="playerModalTab==='overview'">
+
+        <!-- Traits + chemistry summary row -->
+        <div v-if="selectedPlayerTraits.length || selectedPlayerBondSummary" style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <div v-if="selectedPlayerTraits.length" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+            <span style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin-right:2px">Traits</span>
+            <span v-for="tr in selectedPlayerTraits" :key="tr.n" :title="tr.d"
+                  style="background:#1e1b2e;border:1px solid #3d2a6e;border-radius:3px;padding:2px 6px;font-size:10px;font-weight:700;color:#c9b1ff;cursor:help">
+              {{tr.n}}
+            </span>
+          </div>
+          <div v-if="selectedPlayerBondSummary" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            <span style="font-size:9px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px">Chemistry</span>
+            <span v-for="s in selectedPlayerBondSummary" :key="s.label" :style="{color:s.color,fontSize:'11px',fontWeight:'600'}">{{s.label}}</span>
+            <button @click="playerModalTab='chemistry'" style="background:none;border:none;color:#79c0ff;font-size:10px;cursor:pointer;padding:0;text-decoration:underline">details →</button>
+          </div>
+        </div>
+
+        <!-- Position ratings -->
+        <div style="margin-bottom:14px">
+          <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">
+            Position Ratings
+            <span class="c-gray" style="font-size:10px;font-weight:400;text-transform:none">GmRtg = avg of 4 key attrs · WRtg = +{{mentalWeightPct}}% mental · click row to highlight attrs</span>
+          </div>
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead>
+              <tr style="background:#0d1117">
+                <th style="text-align:left;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">Pos</th>
+                <th style="text-align:left;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">Key Attributes</th>
+                <th style="text-align:right;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">GmRtg</th>
+                <th style="text-align:right;padding:3px 6px;color:#8b949e;font-size:10px;text-transform:uppercase">WRtg</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in allPosRatings(selectedPlayer)" :key="row.pos"
+                  :style="{background: row.pos===highlightedPos?'#1a2f5a':row.isNative?'#1f3a1f':'transparent', borderBottom:'1px solid #21262d', cursor:'pointer'}"
+                  :title="row.pos===highlightedPos?'Click to clear highlight':'Click to highlight '+row.pos+' key attrs'"
+                  @click="highlightedPos = highlightedPos===row.pos ? null : row.pos">
+                <td style="padding:4px 6px">
+                  <span :class="'pos pos-'+row.pos" style="font-size:10px">{{row.pos}}</span>
+                  <span v-if="row.isNative" style="font-size:9px;color:#7ee787;margin-left:4px">★</span>
+                  <span v-if="row.pos===highlightedPos" style="font-size:9px;color:#79c0ff;margin-left:3px">◀</span>
+                </td>
+                <td style="padding:4px 6px;color:#8b949e;font-size:10px">{{row.attrs}}</td>
+                <td style="padding:4px 6px;text-align:right;font-weight:700" :class="ratingClass(row.game)">{{row.game?row.game.toFixed(1):'—'}}</td>
+                <td style="padding:4px 6px;text-align:right" :class="ratingClass(row.weighted)">
+                  <span style="font-weight:700">{{row.weighted?row.weighted.toFixed(1):'—'}}</span>
+                  <span v-if="row.weighted&&row.game&&row.weighted!==row.game" style="font-size:9px;margin-left:2px" :class="row.weighted>row.game?'c-green':'c-red'">{{row.weighted>row.game?'▲':'▼'}}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Value + contract -->
+        <div style="margin-bottom:14px">
+          <div class="pos-rating-block" style="flex-direction:column;align-items:flex-start;gap:4px">
+            <div style="display:flex;justify-content:space-between;width:100%">
+              <span class="c-gray" style="font-size:11px">In-game value</span>
+              <span style="font-weight:700">{{fmtVal(selectedPlayer.Value)}}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;width:100%">
+              <span class="c-gray" style="font-size:11px" :title="'Source: '+trueValSrc(selectedPlayer)">
+                True value <span style="font-size:9px">({{trueValSrc(selectedPlayer)}})</span>
+              </span>
+              <span style="font-weight:700;color:#ffa657">{{fmtVal(trueVal(selectedPlayer))||'—'}}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;width:100%">
+              <span class="c-gray" style="font-size:11px">Weekly wage</span>
+              <span>{{fmtWage(selectedPlayer.weeklyWage)}}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;width:100%">
+              <span class="c-gray" style="font-size:11px">Contract</span>
+              <span>{{selectedPlayer.contractWeeks}} wks</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Physical + Mental -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+          <div>
+            <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Physical & Technical</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div v-for="attr in physicalAttrs" :key="attr.k"
+                   :style="{background:isKeyAttr(attr.k,selectedPlayer.Position)?'#0f2a14':'#0d1117',borderRadius:'5px',padding:'5px 8px',outline:isKeyAttr(attr.k,selectedPlayer.Position)?'1px solid #238636':'none'}">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span style="font-size:11px;color:#8b949e">
+                    {{attr.l}}<span v-if="isKeyAttr(attr.k,selectedPlayer.Position)" style="color:#7ee787;font-size:9px;margin-left:3px">★</span>
+                  </span>
+                  <span :style="{color:attrBarColor(selectedPlayer[attr.k]),fontWeight:'700',fontSize:'13px'}">
+                    {{selectedPlayer[attr.k]!=null?Math.round(selectedPlayer[attr.k]):'—'}}
+                  </span>
+                </div>
+                <div style="height:5px;background:#21262d;border-radius:3px;overflow:hidden">
+                  <div :style="{width:Math.min(100,selectedPlayer[attr.k]||0)+'%',height:'100%',background:attrBarColor(selectedPlayer[attr.k]),borderRadius:'3px',transition:'width .3s'}"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-weight:700;margin-bottom:8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Mental & Set Pieces</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div v-for="attr in mentalAttrs" :key="attr.k"
+                   style="background:#0d1117;border-radius:5px;padding:5px 8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span style="font-size:11px;color:#8b949e">{{attr.l}}</span>
+                  <span :style="{color:attrBarColor(selectedPlayer[attr.k]),fontWeight:'700',fontSize:'13px'}">
+                    {{selectedPlayer[attr.k]!=null?Math.round(selectedPlayer[attr.k]):'—'}}
+                  </span>
+                </div>
+                <div style="height:5px;background:#21262d;border-radius:3px;overflow:hidden">
+                  <div :style="{width:Math.min(100,selectedPlayer[attr.k]||0)+'%',height:'100%',background:attrBarColor(selectedPlayer[attr.k]),borderRadius:'3px',transition:'width .3s'}"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fitness/form -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px">
+          <div class="attr-row"><span class="c-gray">Fitness</span><span :class="selectedPlayer.fitnessPct<70?'c-red':selectedPlayer.fitnessPct<85?'c-orange':'c-green'" style="font-weight:700">{{selectedPlayer.fitnessPct!=null?selectedPlayer.fitnessPct+'%':'—'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Form</span><span :class="ratingClass(selectedPlayer.Form)" style="font-weight:700">{{selectedPlayer.Form?selectedPlayer.Form.toFixed(1):'—'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Confidence</span><span :style="{color:attrBarColor(selectedPlayer.Confidence),fontWeight:'700'}">{{selectedPlayer.Confidence!=null?Math.round(selectedPlayer.Confidence):'—'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Morale</span><span>{{selectedPlayer.moraleOverrideLabel||selectedPlayer.moraleLabel||'—'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Inj. Risk</span><span :class="selectedPlayer.injuryRiskLabel==='High'?'c-red':selectedPlayer.injuryRiskLabel==='Moderate'?'c-orange':'c-green'">{{selectedPlayer.injuryRiskLabel||'—'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Injured</span><span>{{selectedPlayer.injured?'🤕 Yes':'No'}}</span></div>
+          <div class="attr-row"><span class="c-gray">Suspended</span><span>{{selectedPlayer.suspended?'🚫 Yes':'No'}}</span></div>
+        </div>
+
+      </div><!-- end overview tab -->
+
+      <!-- ── CHEMISTRY TAB ── -->
+      <div v-if="playerModalTab==='chemistry'">
+        <div v-if="selectedPlayerBonds.length" style="display:flex;flex-direction:column;gap:3px">
+          <div v-for="b in selectedPlayerBonds" :key="b.name"
+               style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0d1117;border-radius:4px;font-size:11px">
+            <span :class="'pos pos-'+b.pos" style="font-size:9px;flex-shrink:0">{{b.pos}}</span>
+            <span style="flex:1;color:#e6edf3">{{b.name}}</span>
+            <span class="c-gray" style="font-size:10px">{{b.weeks}}w</span>
+            <span v-if="b.sameNat" style="font-size:10px">🤝</span>
+            <span :style="{fontSize:'10px',fontWeight:'700',color:b.category==='great'?'#3fb950':'#d29922'}">{{b.label}}</span>
+          </div>
+        </div>
+        <div v-else class="c-gray" style="font-size:12px;padding:24px 0;text-align:center">No chemistry bonds yet</div>
+      </div><!-- end chemistry tab -->
+
+      <!-- ── HISTORY TAB ── -->
+      <div v-if="playerModalTab==='history'">
+
+        <!-- Transfer history -->
+        <template v-if="selectedPlayer._transferHistory && selectedPlayer._transferHistory.length">
+          <div style="font-weight:700;margin-bottom:6px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Transfer History <span class="c-gray" style="font-size:10px;font-weight:400;text-transform:none">(dimmed = Saudi/Tamaguchi)</span></div>
+          <div style="margin-bottom:14px">
+            <div v-for="(tx,i) in selectedPlayer._transferHistory" :key="i" class="attr-row" style="margin-bottom:4px;padding:5px 8px"
+                 :style="tx.isReal?{}:{opacity:'0.55'}">
+              <div style="display:flex;justify-content:space-between;width:100%;gap:8px;align-items:center">
+                <span :style="{fontWeight:700,color:tx.isReal?'#ffa657':'#8b949e',minWidth:'72px'}">{{fmtVal(tx.amount)}}</span>
+                <span class="c-gray" style="flex:1;font-size:11px">{{tx.seller||'?'}} → {{tx.buyer||'?'}}</span>
+                <span style="font-size:10px;text-transform:capitalize" :class="tx.isReal?'c-gray':'c-red'">{{tx.via}}</span>
+                <span class="c-gray" style="font-size:10px;min-width:60px;text-align:right">{{tx.date?new Date(tx.date).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):''}}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Negotiations history -->
+        <template v-if="selectedPlayerNegos.length">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <div style="font-weight:700;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.4px">Negotiations</div>
+            <span class="c-gray" style="font-size:10px">{{selectedPlayerNegosVisible.length}} / {{selectedPlayerNegos.length}}</span>
+            <button v-if="selectedPlayerNegos.length > selectedPlayerNegosVisible.length && !negoShowAllModal" class="btn" style="font-size:10px;padding:1px 6px;margin-left:auto" @click="negoShowAllModal=true">Show all</button>
+            <button v-if="negoShowAllModal" class="btn" style="font-size:10px;padding:1px 6px;margin-left:auto" @click="negoShowAllModal=false">Recent only</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div v-for="n in selectedPlayerNegosVisible" :key="n.id" style="background:#0d1117;border-radius:6px;padding:7px 10px;border:1px solid #21262d">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span v-if="n.status==='pending'" :style="{background:'#1f3a5a',color:'#79c0ff',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">📨 Offer out</span>
+                  <span v-else-if="n.status==='counter'||n.status==='countered'" :style="{background:'#4a3a10',color:'#ffa657',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">🔄 Counter</span>
+                  <span v-else-if="n.status==='accepted'" :style="{background:'#1a4a2e',color:'#7ee787',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✓ Accepted</span>
+                  <span v-else-if="n.status==='rejected'" :style="{background:'#3a1212',color:'#ff7b72',borderRadius:'8px',padding:'1px 7px',fontSize:'10px',fontWeight:'700'}">✗ Rejected</span>
+                  <span v-else class="c-gray" style="font-size:10px">{{n.status||'—'}}</span>
+                  <span class="c-gray" style="font-size:10px">{{n.seller||'?'}} → {{n.buyer||'?'}}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span v-if="n.amount&&n.amount>1" style="font-weight:700;color:#ffa657">{{fmtVal(n.amount)}}</span>
+                  <span class="c-gray" style="font-size:10px">{{fmtNegoDate(n.updatedAt)}}</span>
+                </div>
+              </div>
+              <div v-if="n.history&&n.history.length>1" style="margin-top:6px;border-top:1px solid #21262d;padding-top:5px;display:flex;flex-direction:column;gap:3px">
+                <div v-for="(h,hi) in n.history" :key="hi" style="display:flex;align-items:center;gap:8px;font-size:10px">
+                  <span class="c-gray" style="min-width:50px">{{fmtNegoDate(h.ts)}}</span>
+                  <span :style="{color:h.type==='counter'?'#ffa657':h.type==='offer'?'#79c0ff':'#8b949e',fontWeight:'700',minWidth:'65px'}">{{h.type==='counter'?'↩ Counter':h.type==='offer'?'📨 Offer':h.type||'—'}}</span>
+                  <span style="font-weight:700">{{h.amount&&h.amount>1?fmtVal(h.amount):'—'}}</span>
+                  <span v-if="h.by" class="c-gray" style="font-size:9px">by {{h.by}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div v-if="!(selectedPlayer._transferHistory&&selectedPlayer._transferHistory.length) && !selectedPlayerNegos.length"
+             class="c-gray" style="font-size:12px;padding:24px 0;text-align:center">No transfer or negotiation history</div>
+
+      </div><!-- end history tab -->
+
+      <!-- ── STATS TAB ── -->
+      <div v-if="playerModalTab==='stats'">
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:10px;border-bottom:1px solid #21262d">
+          <button v-for="t in [{id:'career',label:'All time'},{id:'season',label:'This season'},{id:'form',label:'Form'}]" :key="t.id"
+            @click="selectedPlayerStatsTab=t.id"
+            style="background:none;border:none;border-bottom:2px solid transparent;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:500;margin-bottom:-1px"
+            :style="selectedPlayerStatsTab===t.id?{borderBottomColor:'#79c0ff',color:'#e6edf3',fontWeight:'700'}:{color:'#8b949e'}">
+            {{t.label}}
+          </button>
+          <span v-if="selectedPlayerStatsLoading" style="margin-left:8px;font-size:10px;color:#8b949e">⟳ loading…</span>
+        </div>
+
+        <template v-if="selectedPlayerStatsTab!=='form'">
+          <div v-if="activeModalStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px">
+            <div class="attr-row"><span class="c-gray">Games</span><span style="font-weight:700">{{activeModalStats.games||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">Minutes</span><span style="font-weight:700">{{activeModalStats.minutes||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">Avg Rtg</span><span :class="ratingClass(activeModalStats.averageRating)">{{activeModalStats.averageRating?activeModalStats.averageRating.toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Goals</span><span class="c-green" style="font-weight:700">{{activeModalStats.goals||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">xG</span><span class="c-orange">{{activeModalStats.xG!=null?activeModalStats.xG.toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Assists</span><span class="c-blue" style="font-weight:700">{{activeModalStats.assists||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">xA</span><span>{{activeModalStats.xA!=null?activeModalStats.xA.toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">G/90</span><span class="c-green">{{activeModalStats.minutes>=30?(activeModalStats.goals/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">A/90</span><span class="c-blue">{{activeModalStats.minutes>=30?(activeModalStats.assists/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">xG/90</span><span class="c-orange">{{activeModalStats.minutes>=30&&activeModalStats.xG!=null?(activeModalStats.xG/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">xA/90</span><span>{{activeModalStats.minutes>=30&&activeModalStats.xA!=null?(activeModalStats.xA/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Yellow</span><span :class="(activeModalStats.yellow||0)>=2?'c-orange':''">{{activeModalStats.yellow||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">Red</span><span :class="(activeModalStats.red||0)>=1?'c-red':''">{{activeModalStats.red||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">Tackle%</span><span>{{activeModalStats.tacklePct!=null?activeModalStats.tacklePct.toFixed(0)+'%':'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Pass%</span><span>{{activeModalStats.passPct!=null?activeModalStats.passPct.toFixed(0)+'%':'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Steals</span><span>{{activeModalStats.steals||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">Errors</span><span :class="(activeModalStats.mistakes||0)>2?'c-red':''">{{activeModalStats.mistakes||0}}</span></div>
+            <div class="attr-row"><span class="c-gray">POTM</span><span class="c-orange">{{activeModalStats.potm||0}}</span></div>
+          </div>
+          <template v-else-if="!selectedPlayerStatsLoading">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px">
+              <div class="attr-row"><span class="c-gray">Games</span><span style="font-weight:700">{{selectedPlayer.Games||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">Minutes</span><span style="font-weight:700">{{selectedPlayer.Minutes||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">Avg Rtg</span><span :class="ratingClass(selectedPlayer['Average Rating'])">{{selectedPlayer['Average Rating']?selectedPlayer['Average Rating'].toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Goals</span><span class="c-green" style="font-weight:700">{{selectedPlayer.Goals||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">xG</span><span class="c-orange">{{selectedPlayer.xG!=null?selectedPlayer.xG.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Assists</span><span class="c-blue" style="font-weight:700">{{selectedPlayer.Assists||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">xA</span><span>{{selectedPlayer.xA!=null?selectedPlayer.xA.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">G/90</span><span class="c-green">{{selectedPlayer._g90!=null?selectedPlayer._g90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">A/90</span><span class="c-blue">{{selectedPlayer._a90!=null?selectedPlayer._a90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">xG/90</span><span class="c-orange">{{selectedPlayer._xG90!=null?selectedPlayer._xG90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">xA/90</span><span>{{selectedPlayer._xA90!=null?selectedPlayer._xA90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Yellow</span><span :class="(selectedPlayer.Yellow||0)>=2?'c-orange':''">{{selectedPlayer.Yellow||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">Red</span><span :class="(selectedPlayer.Red||0)>=1?'c-red':''">{{selectedPlayer.Red||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">Tackle%</span><span>{{selectedPlayer['Tackle %']!=null?selectedPlayer['Tackle %'].toFixed(0)+'%':'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Pass%</span><span>{{selectedPlayer['Pass %']!=null?selectedPlayer['Pass %'].toFixed(0)+'%':'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Steals</span><span>{{selectedPlayer.Steals||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">Errors</span><span :class="(selectedPlayer.Mistakes||0)>2?'c-red':''">{{selectedPlayer.Mistakes||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">POTM</span><span class="c-orange">{{selectedPlayer.POTM||0}}</span></div>
+            </div>
+          </template>
+        </template>
+
+        <template v-if="selectedPlayerStatsTab==='form'">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:10px">
+            <div class="attr-row" style="grid-column:1/-1">
+              <span class="c-gray" style="font-size:10px">Form rating is the game's rolling average over recent matches</span>
+            </div>
+            <div class="attr-row" style="background:#1a2f5a;border:1px solid #388bfd40">
+              <span class="c-gray">Form</span>
+              <span :class="ratingClass(selectedPlayer.Form)" style="font-weight:700;font-size:18px">{{selectedPlayer.Form?selectedPlayer.Form.toFixed(1):'—'}}</span>
+            </div>
+            <div class="attr-row"><span class="c-gray">Avg Rtg</span><span :class="ratingClass(selectedPlayer['Average Rating'])">{{selectedPlayer['Average Rating']?selectedPlayer['Average Rating'].toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Confidence</span><span :class="(selectedPlayer.Confidence||0)>=70?'c-green':(selectedPlayer.Confidence||0)>=50?'c-orange':'c-red'">{{selectedPlayer.Confidence!=null?selectedPlayer.Confidence.toFixed(0):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Morale</span><span :class="(selectedPlayer.moraleScore||0)>=70?'c-green':(selectedPlayer.moraleScore||0)>=50?'c-orange':'c-red'">{{selectedPlayer.moraleOverrideLabel||selectedPlayer.moraleScore!=null?selectedPlayer.moraleOverrideLabel||(selectedPlayer.moraleScore.toFixed(0)):'—'}}</span></div>
+          </div>
+          <div style="font-size:10px;color:#6e7681;border-top:1px solid #21262d;padding-top:8px;margin-top:4px">
+            Full last-10-games breakdown coming soon (requires match archive update)
+          </div>
+        </template>
+
+      </div><!-- end stats tab -->
+      </div><!-- end flex wrapper -->
+    </div><!-- end .main -->
+  </div><!-- end .layout -->

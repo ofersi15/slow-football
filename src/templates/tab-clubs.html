@@ -1,0 +1,669 @@
+  <!-- ── CLUBS TAB ── -->
+      <div v-if="activeTab==='clubs'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading -->
+    <div v-if="espionageLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray" style="margin-bottom:12px">{{espionageMsg||'Loading all clubs…'}}</div>
+      <div style="width:260px;margin:0 auto">
+        <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+          <div :style="{width:espionageProgress+'%',height:'100%',background:'linear-gradient(90deg,#1f6feb,#8957e5)',borderRadius:'4px',transition:'width .3s'}"></div>
+        </div>
+      </div>
+      <div class="c-gray" style="font-size:11px;margin-top:8px">{{espionageProgress}}% · first load ~30 seconds · cached 30 min</div>
+    </div>
+    <div v-else-if="!espionageLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🏟</div>
+      <div class="c-gray">Loading clubs data…</div>
+    </div>
+
+    <!-- Loaded -->
+    <template v-if="espionageLoaded">
+
+      <!-- Club detail overlay -->
+      <div v-if="selectedClubName" style="display:flex;flex-direction:column;gap:12px">
+        <!-- Header card -->
+        <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button class="btn" @click="selectedClubName=null" style="font-size:12px">← Back</button>
+          <button class="btn" @click="openClubDetail(selectedClubName)" style="font-size:12px" title="Reload latest submission">↺ Reload</button>
+          <button class="btn" @click="showRawSub=!showRawSub" style="font-size:12px" :style="{color:showRawSub?'#ffa657':''}">{ } Raw</button>
+          <div style="flex:1;min-width:120px">
+            <div style="font-size:20px;font-weight:800;color:#e6edf3;letter-spacing:-.3px">
+              {{selectedClubName}}
+              <span v-if="selectedClubName===myClub" style="color:#ffa657;font-size:13px;font-weight:600;margin-left:6px">★ My Club</span>
+            </div>
+            <div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <template v-if="selectedClubSubmissions.length">
+                <span style="color:#79c0ff;font-size:14px;font-weight:700">{{fmtFormation(selectedClubSubmissions[0].formation)}}</span>
+                <span v-if="selectedClubSubmissions[0].gameweek" class="c-gray" style="font-size:11px">GW{{selectedClubSubmissions[0].gameweek}}</span>
+                <span v-else-if="selectedClubSubmissions[0].submittedAt" class="c-gray" style="font-size:11px">{{new Date(selectedClubSubmissions[0].submittedAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}</span>
+                <template v-for="(val,key) in selectedClubSubmissions[0].instructions||{}" :key="key">
+                  <span v-if="key!=='training_focus'" style="background:#21262d;border-radius:10px;padding:2px 8px;font-size:10px">
+                    <span style="color:#6e7681">{{({mentality:'Mentality',style:'Style',structure:'Structure',defensive_line:'Def. Line',pressing_intensity:'Press',attacking_focus:'Attack',transition_speed:'Trans.'})[key]||key}}</span>
+                    <span style="color:#e6edf3;margin-left:4px">{{val}}</span>
+                  </span>
+                </template>
+                <template v-if="selectedClubSubmissions[0].setPieces">
+                  <span v-if="selectedClubSubmissions[0].setPieces.attackingCorner?.delivery"
+                        :title="setPieceDesc('delivery', selectedClubSubmissions[0].setPieces.attackingCorner.delivery)"
+                        style="background:#1e1535;border:1px solid #3d2a6e;border-radius:10px;padding:2px 8px;font-size:10px;cursor:default">
+                    <span style="color:#8b6cc8">⚑ Atk</span>
+                    <span style="color:#d2a8ff;margin-left:4px">{{selectedClubSubmissions[0].setPieces.attackingCorner.delivery}}</span>
+                  </span>
+                  <span v-if="selectedClubSubmissions[0].setPieces.defensiveCorner?.scheme"
+                        :title="setPieceDesc('scheme', selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)"
+                        style="background:#1e1535;border:1px solid #3d2a6e;border-radius:10px;padding:2px 8px;font-size:10px;cursor:default">
+                    <span style="color:#8b6cc8">⛨ Def</span>
+                    <span style="color:#d2a8ff;margin-left:4px">{{selectedClubSubmissions[0].setPieces.defensiveCorner.scheme}}</span>
+                    <span v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.press" style="color:#6e7681;margin-left:3px">· {{selectedClubSubmissions[0].setPieces.defensiveCorner.press}}</span>
+                  </span>
+                </template>
+              </template>
+              <span v-if="clubBudgetFor(selectedClubName)!=null"
+                    style="background:#0d2a13;border:1px solid #1a4a2a;border-radius:10px;padding:2px 10px;font-size:11px;font-weight:700;color:#3fb950;white-space:nowrap">
+                💰 £{{(clubBudgetFor(selectedClubName)/1e6).toFixed(1)}}m
+              </span>
+              <span v-if="clubChemScore(selectedClubName)!=null"
+                    :style="{background:'#111',border:'1px solid '+chemColor(clubChemScore(selectedClubName))+'44',borderRadius:'10px',padding:'2px 10px',fontSize:'11px',fontWeight:'700',color:chemColor(clubChemScore(selectedClubName)),whiteSpace:'nowrap'}"
+                    title="Team chemistry (0–100 based on squad stability)">
+                🤝 {{clubChemScore(selectedClubName)}}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-tabs -->
+        <div style="display:flex;gap:0;border-bottom:1px solid #21262d">
+          <button v-for="t in [{id:'xi',label:'Latest XI'},{id:'academy',label:'Academy'},{id:'history',label:'History'},{id:'transfers',label:'Transfers'}]" :key="t.id"
+            @click="selectedClubSubTab=t.id; t.id==='academy' && _fetchClubInfo(selectedClubName)"
+            style="background:none;border:none;border-bottom:2px solid transparent;padding:8px 16px;cursor:pointer;font-size:12px;font-weight:500;margin-bottom:-1px"
+            :style="selectedClubSubTab===t.id?{borderBottomColor:'#79c0ff',color:'#e6edf3',fontWeight:'700'}:{color:'#8b949e'}">
+            {{t.label}}
+          </button>
+        </div>
+
+        <!-- Latest XI tab -->
+        <div v-if="selectedClubSubTab==='xi'" style="display:flex;flex-direction:column;gap:12px">
+          <template v-if="selectedClubSubmissions.length">
+            <!-- Pitch + Subs side by side -->
+            <div style="display:flex;gap:12px;align-items:flex-start">
+
+              <!-- Big interactive pitch -->
+              <div style="flex:1;min-width:260px;max-width:480px;position:relative">
+                <svg viewBox="-3 -3 74 111" style="width:100%;max-height:78vh;border-radius:8px;border:1px solid #2d3748;display:block" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <marker id="arr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                      <path d="M0,0 L5,2.5 L0,5 Z" fill="rgba(255,255,255,0.85)"/>
+                    </marker>
+                    <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#1a4726"/>
+                      <stop offset="50%" stop-color="#1f5730"/>
+                      <stop offset="100%" stop-color="#1a4726"/>
+                    </linearGradient>
+                  </defs>
+                  <rect x="-3" y="-3" width="74" height="111" fill="url(#grass)"/>
+                  <rect x="0" y="0" width="68" height="105" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.7"/>
+                  <line x1="0" y1="52.5" x2="68" y2="52.5" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
+                  <circle cx="34" cy="52.5" r="9.15" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
+                  <circle cx="34" cy="52.5" r="0.7" fill="rgba(255,255,255,0.5)"/>
+                  <rect x="13.84" y="0" width="40.32" height="16.5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
+                  <rect x="13.84" y="88.5" width="40.32" height="16.5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.6"/>
+                  <rect x="24.84" y="0" width="18.32" height="5.5" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+                  <rect x="24.84" y="99.5" width="18.32" height="5.5" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+                  <circle cx="34" cy="11" r="0.7" fill="rgba(255,255,255,0.5)"/>
+                  <circle cx="34" cy="94" r="0.7" fill="rgba(255,255,255,0.5)"/>
+
+                  <!-- Run arrows (behind players) -->
+                  <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'run'+i">
+                    <line v-if="pl.runX!==null"
+                      :x1="pl.x" :y1="pl.y" :x2="pl.runX" :y2="pl.runY"
+                      stroke="rgba(255,255,255,0.55)" stroke-width="0.9" stroke-dasharray="2.5,1.5"
+                      marker-end="url(#arr)"/>
+                  </template>
+
+                  <!-- Interactive player nodes -->
+                  <template v-for="(pl,i) in pitchLayout(selectedClubSubmissions[0])" :key="'pl'+i">
+                    <g @mouseenter="hoveredPitchPlayer=pl" @mouseleave="hoveredPitchPlayer=null"
+                       @click="xiPlayerInfo(pl.name)&&openModal(xiPlayerInfo(pl.name))"
+                       style="cursor:pointer">
+                      <circle :cx="pl.x" :cy="pl.y" r="3.0" :fill="pl.stroke" opacity="0.1"/>
+                      <circle :cx="pl.x" :cy="pl.y" r="2.5" :fill="pl.fill" :stroke="pl.stroke" stroke-width="0.5"/>
+                      <text :x="pl.x" :y="pl.y+0.9" text-anchor="middle" font-size="2.2" fill="white" font-weight="800" font-family="system-ui,sans-serif">{{pl.bp}}</text>
+                      <text :x="pl.x" :y="pl.y-4" text-anchor="middle" font-size="2.1" fill="rgba(255,255,255,0.9)" font-weight="700" font-family="system-ui,sans-serif">{{xiPlayerInfo(pl.name) ? (xiPlayerInfo(pl.name)._gameRating||xiPlayerInfo(pl.name).Rating||'') : ''}}</text>
+                      <text :x="pl.x" :y="pl.y+5.8" text-anchor="middle" font-size="2.0" :fill="pl.textColor" font-weight="600" font-family="system-ui,sans-serif">{{pl.name.split(' ').pop().slice(0,11)}}</text>
+                    </g>
+                  </template>
+                </svg>
+
+                <!-- Hover tooltip -->
+                <div v-if="hoveredPitchPlayer && xiPlayerInfo(hoveredPitchPlayer.name)"
+                  :style="{
+                    position:'absolute',
+                    left: (hoveredPitchPlayer.x+3)/74 < 0.55 ? (((hoveredPitchPlayer.x+3)/74*100+8)+'%') : 'auto',
+                    right: (hoveredPitchPlayer.x+3)/74 >= 0.55 ? (((1-(hoveredPitchPlayer.x+3)/74)*100+8)+'%') : 'auto',
+                    top: Math.max(2, (hoveredPitchPlayer.y+3)/111*100-20)+'%',
+                    zIndex: '20',
+                    pointerEvents: 'none',
+                    background: 'rgba(13,17,23,0.97)',
+                    border: '1px solid #30363d',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    minWidth: '175px',
+                    maxWidth: '215px',
+                    fontSize: '11px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.6)'
+                  }">
+                  <div style="font-weight:700;color:#e6edf3;font-size:13px;margin-bottom:3px">{{xiPlayerInfo(hoveredPitchPlayer.name).Player}}</div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:7px">
+                    <span :class="'pos-badge pos-'+hoveredPitchPlayer.bp" style="font-size:9px">{{hoveredPitchPlayer.position}}</span>
+                    <span style="color:#ffa657;font-weight:700;font-size:14px">{{xiPlayerInfo(hoveredPitchPlayer.name)._gameRating||xiPlayerInfo(hoveredPitchPlayer.name).Rating}}</span>
+                    <span style="color:#6e7681;font-size:11px">Age {{xiPlayerInfo(hoveredPitchPlayer.name).Age}}</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 14px">
+                    <template v-for="attr in ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']" :key="attr">
+                      <div style="display:flex;justify-content:space-between;align-items:center">
+                        <span :style="{color: attr===({GK:'Reflexes',FB:'Speed',CB:'Marking',DM:'Tackling',CM:'Passing',WM:'Dribbling',AM:'Vision',WF:'Dribbling',CF:'Shooting'})[hoveredPitchPlayer.bp] ? '#ffa657' : '#6e7681', fontSize:'10px'}">{{attr.slice(0,3)}}</span>
+                        <span style="color:#e6edf3;font-weight:600;font-size:11px">{{xiPlayerInfo(hoveredPitchPlayer.name)[attr]||'—'}}</span>
+                      </div>
+                    </template>
+                  </div>
+                  <template v-if="xiPlayerInfo(hoveredPitchPlayer.name).Fitness||xiPlayerInfo(hoveredPitchPlayer.name).Form||xiPlayerInfo(hoveredPitchPlayer.name).Morale">
+                    <div style="margin-top:7px;border-top:1px solid #21262d;padding-top:6px;display:flex;gap:12px">
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Fitness" style="color:#8b949e;font-size:10px">Fit <span style="color:#3fb950;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Fitness}}</span></span>
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Form" style="color:#8b949e;font-size:10px">Form <span style="color:#79c0ff;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Form}}</span></span>
+                      <span v-if="xiPlayerInfo(hoveredPitchPlayer.name).Morale" style="color:#8b949e;font-size:10px">Mor <span style="color:#d2a8ff;font-weight:700">{{xiPlayerInfo(hoveredPitchPlayer.name).Morale}}</span></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Subs + Roles panel (right side) -->
+              <div style="flex:0 0 190px;display:flex;flex-direction:column;gap:8px">
+                <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
+                  <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
+                  <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <span style="font-size:12px;color:#e6edf3;font-weight:600">{{p.name||'—'}}</span>
+                      <span v-if="playerFitPct(p.name)!=null" style="font-size:10px;font-weight:700" :style="{color:fitColor(playerFitPct(p.name))}">{{playerFitPct(p.name)}}%</span>
+                    </div>
+                    <div v-if="p.off||p.plan||p.time" style="display:flex;gap:5px;margin-top:2px;flex-wrap:wrap;align-items:center">
+                      <span v-if="p.off" style="font-size:10px;color:#8b949e">↔ {{p.off}}</span>
+                      <span v-if="p.plan" style="background:#21262d;border-radius:3px;padding:1px 5px;font-size:9px;color:#ffa657">{{p.plan}}</span>
+                      <span v-if="p.time" style="font-size:9px;color:#6e7681">{{p.time}}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="selectedClubSubmissions[0].roles" class="card" style="padding:10px">
+                  <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Roles</div>
+                  <template v-for="(name,role) in selectedClubSubmissions[0].roles" :key="role">
+                    <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #161b22;gap:6px">
+                      <span style="color:#6e7681;text-transform:capitalize;font-size:11px;white-space:nowrap">{{role}}</span>
+                      <span style="color:#e6edf3;font-size:11px;text-align:right">{{name}}</span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Set Pieces panel (third column) -->
+              <div v-if="selectedClubSubmissions[0].setPieces" style="flex:0 0 250px;display:flex;flex-direction:column;gap:8px">
+                <div class="card" style="padding:10px">
+                  <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:10px">Set Pieces</div>
+
+                  <!-- ── Attacking Corner ── -->
+                  <div style="font-size:9px;color:#d2a8ff;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-bottom:6px">⚑ Attacking Corner</div>
+                  <template v-if="selectedClubSubmissions[0].setPieces.attackingCorner">
+
+                    <!-- Taker (from roles.corner) — same row layout as zone rows -->
+                    <div v-if="selectedClubSubmissions[0].roles?.corner"
+                         style="display:flex;align-items:center;gap:4px;padding:3px 0;border-bottom:1px solid #21262d">
+                      <span style="flex:0 0 64px;color:#6e7681;font-size:10px;white-space:nowrap">Taker</span>
+                      <span @click.stop="xiPlayerInfo(selectedClubSubmissions[0].roles.corner)&&openModal(xiPlayerInfo(selectedClubSubmissions[0].roles.corner))"
+                            style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#ffa657;font-size:10px;cursor:pointer;border-bottom:1px dotted rgba(255,166,87,0.4)">
+                        {{selectedClubSubmissions[0].roles.corner||'—'}}
+                      </span>
+                      <template v-for="attr in ['Passing','Vision']" :key="'tk-'+attr">
+                        <span style="flex:0 0 30px;text-align:right;font-size:9px;color:#6e7681;white-space:nowrap">
+                          {{attr.slice(0,3)}} <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(selectedClubSubmissions[0].roles.corner)?.[attr])}">{{xiPlayerInfo(selectedClubSubmissions[0].roles.corner)?.[attr]||'—'}}</span>
+                        </span>
+                      </template>
+                    </div>
+
+                    <!-- Delivery + description -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.delivery" style="padding:4px 0;border-bottom:1px solid #21262d">
+                      <div style="display:flex;justify-content:space-between;align-items:baseline">
+                        <span style="color:#6e7681;font-size:10px">Delivery</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.attackingCorner.delivery}}</span>
+                      </div>
+                      <div v-if="setPieceDesc('delivery',selectedClubSubmissions[0].setPieces.attackingCorner.delivery)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('delivery',selectedClubSubmissions[0].setPieces.attackingCorner.delivery)}}
+                      </div>
+                    </div>
+
+                    <!-- Stay Back -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.attackingCorner.stayBack!=null" style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #21262d">
+                      <span style="color:#6e7681;font-size:10px">Stay Back</span>
+                      <span style="color:#e6edf3;font-size:11px">
+                        {{selectedClubSubmissions[0].setPieces.attackingCorner.stayBack==0?'None':selectedClubSubmissions[0].setPieces.attackingCorner.stayBack+' player'+(selectedClubSubmissions[0].setPieces.attackingCorner.stayBack==1?'':'s')}}
+                      </span>
+                    </div>
+
+                    <!-- Attacking zone assignments — attrs always visible on same row -->
+                    <template v-if="Object.keys(selectedClubSubmissions[0].setPieces.attackingCorner.zones||{}).length">
+                      <div style="margin-top:4px">
+                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.attackingCorner.zones" :key="'az-'+zoneKey"
+                             style="display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:4px;margin-bottom:1px"
+                             :style="{
+                               background: spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery, zoneKey) ? 'rgba(63,185,80,0.07)' : 'transparent',
+                               outline: spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery, zoneKey) ? '1px solid rgba(63,185,80,0.25)' : 'none',
+                             }">
+                          <span style="flex:0 0 64px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                                :title="setPieceDesc('atkZone',zoneKey)"
+                                :style="{color:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'#3fb950':'#6e7681'}">
+                            {{spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'▶ ':''}}{{setPieceZoneLabel('atk',zoneKey)}}
+                          </span>
+                          <span @click.stop="xiPlayerInfo(player)&&openModal(xiPlayerInfo(player))"
+                                style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;cursor:pointer;border-bottom:1px dotted"
+                                :style="{color:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'#7ee787':'#79c0ff',borderColor:spDeliveryHighlight(selectedClubSubmissions[0].setPieces.attackingCorner.delivery,zoneKey)?'rgba(126,231,135,0.35)':'rgba(121,192,255,0.35)'}">
+                            {{player}}
+                          </span>
+                          <template v-for="attr in spZoneAttrs('atk',zoneKey)" :key="'as-'+zoneKey+attr">
+                            <span style="flex:0 0 30px;text-align:right;font-size:9px;color:#6e7681;white-space:nowrap">
+                              {{attr.slice(0,3)}} <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(player)?.[attr])}">{{xiPlayerInfo(player)?.[attr]||'—'}}</span>
+                            </span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
+
+                  <!-- ── Defensive Corner ── -->
+                  <div style="font-size:9px;color:#79c0ff;text-transform:uppercase;letter-spacing:.07em;font-weight:700;margin-top:12px;margin-bottom:6px">⛨ Defensive Corner</div>
+                  <template v-if="selectedClubSubmissions[0].setPieces.defensiveCorner">
+
+                    <!-- Scheme + description -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.scheme" style="padding:4px 0;border-bottom:1px solid #21262d">
+                      <div style="display:flex;justify-content:space-between;align-items:baseline">
+                        <span style="color:#6e7681;font-size:10px">Scheme</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.scheme}}</span>
+                      </div>
+                      <div v-if="setPieceDesc('scheme',selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('scheme',selectedClubSubmissions[0].setPieces.defensiveCorner.scheme)}}
+                      </div>
+                    </div>
+
+                    <!-- Press + description -->
+                    <div v-if="selectedClubSubmissions[0].setPieces.defensiveCorner.press" style="padding:4px 0;border-bottom:1px solid #21262d">
+                      <div style="display:flex;justify-content:space-between;align-items:baseline">
+                        <span style="color:#6e7681;font-size:10px">Press</span>
+                        <span style="color:#e6edf3;font-size:11px;font-weight:600">{{selectedClubSubmissions[0].setPieces.defensiveCorner.press}}</span>
+                      </div>
+                      <div v-if="setPieceDesc('press',selectedClubSubmissions[0].setPieces.defensiveCorner.press)" style="color:#8b949e;font-size:9px;font-style:italic;margin-top:1px">
+                        {{setPieceDesc('press',selectedClubSubmissions[0].setPieces.defensiveCorner.press)}}
+                      </div>
+                    </div>
+
+                    <!-- Defensive zone assignments — attrs always visible on same row -->
+                    <template v-if="Object.keys(selectedClubSubmissions[0].setPieces.defensiveCorner.zones||{}).length">
+                      <div style="margin-top:4px">
+                        <div v-for="(player, zoneKey) in selectedClubSubmissions[0].setPieces.defensiveCorner.zones" :key="'dz-'+zoneKey"
+                             style="display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:4px;margin-bottom:1px">
+                          <span style="flex:0 0 64px;color:#6e7681;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                                :title="setPieceDesc('defZone',zoneKey)">
+                            {{setPieceZoneLabel('def',zoneKey)}}
+                          </span>
+                          <span @click.stop="xiPlayerInfo(player)&&openModal(xiPlayerInfo(player))"
+                                style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#79c0ff;font-size:10px;cursor:pointer;border-bottom:1px dotted rgba(121,192,255,0.35)">
+                            {{player}}
+                          </span>
+                          <template v-for="attr in spZoneAttrs('def',zoneKey)" :key="'ds-'+zoneKey+attr">
+                            <span style="flex:0 0 30px;text-align:right;font-size:9px;color:#6e7681;white-space:nowrap">
+                              {{attr.slice(0,3)}} <span :style="{fontWeight:'700',color:spAttrColor(xiPlayerInfo(player)?.[attr])}">{{xiPlayerInfo(player)?.[attr]||'—'}}</span>
+                            </span>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- Full Squad (merged into XI tab) -->
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="padding:10px 14px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:12px;font-weight:700;color:#e6edf3">Full Squad</span>
+                <span class="c-gray" style="font-size:11px">{{selectedClubPlayers.length}} players</span>
+                <div style="margin-left:auto;display:flex;gap:4px">
+                  <button v-for="s in [{k:'pos',l:'Pos'},{k:'rating',l:'Rtg'},{k:'value',l:'Val'},{k:'age',l:'Age'}]" :key="s.k"
+                    @click="clubSquadSort=s.k"
+                    style="border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer"
+                    :style="clubSquadSort===s.k?{background:'#1f6feb',color:'#fff'}:{background:'#21262d',color:'#8b949e'}">
+                    {{s.l}}
+                  </button>
+                </div>
+              </div>
+              <table style="font-size:11px;margin-top:6px">
+                <thead>
+                  <tr>
+                    <th style="min-width:130px;cursor:pointer" @click="clubSquadSort='name'">Player</th>
+                    <th style="cursor:pointer" @click="clubSquadSort='pos'">Pos</th>
+                    <th style="cursor:pointer" @click="clubSquadSort='age'">Age</th>
+                    <th style="cursor:pointer" @click="clubSquadSort='rating'">Rtg</th>
+                    <th style="cursor:pointer" @click="clubSquadSort='value'">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in selectedClubPlayers" :key="p.Player||p.id"
+                      @click="openModal(p)" style="cursor:pointer">
+                    <td style="font-weight:500">{{p.Player}}</td>
+                    <td><span :class="'pos-badge pos-'+basePos(p.Position)" style="font-size:10px;min-width:26px;display:inline-block;text-align:center">{{p.Position}}</span></td>
+                    <td class="c-gray">{{p.Age}}</td>
+                    <td style="font-weight:700;color:#e6edf3">{{p._gameRating||p.Rating||'—'}}</td>
+                    <td class="c-gray">{{p.Value ? '£'+(p.Value/1e6).toFixed(1)+'m' : '—'}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          <div v-if="showRawSub && selectedClubSubmissions.length" class="card" style="padding:10px">
+            <pre style="font-size:10px;color:#8b949e;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto;margin:0">{{JSON.stringify(selectedClubSubmissions[0],null,2)}}</pre>
+          </div>
+          </template>
+          <div v-else class="card c-gray" style="text-align:center;padding:30px">No submission data available</div>
+        </div>
+
+        <!-- Academy tab -->
+        <div v-if="selectedClubSubTab==='academy'" style="display:flex;flex-direction:column;gap:10px">
+          <!-- Loading -->
+          <div v-if="clubInfoCache[selectedClubName]?.loading && !clubInfoCache[selectedClubName]?.loaded"
+               class="card" style="text-align:center;padding:30px;color:#8b949e">
+            Loading club data…
+          </div>
+          <div v-else-if="clubInfoCache[selectedClubName]?.error"
+               class="card" style="text-align:center;padding:30px;color:#ff7b72">
+            Failed to load club data
+          </div>
+          <template v-else-if="clubInfoCache[selectedClubName]?.loaded">
+
+            <!-- Overview row: Budget + Facilities + Staff -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
+
+              <!-- Budget -->
+              <div class="card" style="padding:10px 14px;flex:0 0 auto;min-width:120px">
+                <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:6px">Budget</div>
+                <div v-if="clubBudgetFor(selectedClubName)!=null" style="font-size:18px;font-weight:800;color:#3fb950">
+                  £{{(clubBudgetFor(selectedClubName)/1e6).toFixed(1)}}m
+                </div>
+                <div v-else class="c-gray" style="font-size:12px">—</div>
+              </div>
+
+              <!-- Facilities -->
+              <div v-if="Object.keys(clubInfoCache[selectedClubName].facilities||{}).length"
+                   class="card" style="padding:10px 14px;flex:1;min-width:160px">
+                <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:6px">Facilities</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <span v-for="(lvl,name) in clubInfoCache[selectedClubName].facilities" :key="name"
+                        style="background:#21262d;border-radius:6px;padding:3px 8px;font-size:11px;display:flex;gap:4px;align-items:center">
+                    <span style="color:#8b949e;text-transform:capitalize">{{name.replace(/_/g,' ')}}</span>
+                    <span style="font-weight:700"
+                          :style="{color:lvl>=4?'#3fb950':lvl>=3?'#79c0ff':lvl>=2?'#ffa657':'#8b949e'}">{{lvl}}</span>
+                  </span>
+                </div>
+                <div v-if="clubInfoCache[selectedClubName].facilityProject"
+                     style="margin-top:5px;font-size:10px;color:#ffa657">
+                  🏗 {{clubInfoCache[selectedClubName].facilityProject.type||'Project'}} in progress
+                  <span v-if="clubInfoCache[selectedClubName].facilityProject.completesAt" class="c-gray">
+                    · done {{new Date(clubInfoCache[selectedClubName].facilityProject.completesAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Staff effects -->
+              <div v-if="Object.keys(clubInfoCache[selectedClubName].staff||{}).length"
+                   class="card" style="padding:10px 14px;flex:1;min-width:160px">
+                <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:6px">Staff Effects</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <span v-for="(val,effect) in clubInfoCache[selectedClubName].staff" :key="effect"
+                        style="background:#21262d;border-radius:6px;padding:3px 8px;font-size:11px;display:flex;gap:4px;align-items:center">
+                    <span style="color:#8b949e;text-transform:capitalize">{{String(effect).replace(/([A-Z])/g,' $1').trim()}}</span>
+                    <span style="color:#d2a8ff;font-weight:700">{{val}}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Academy players -->
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="padding:10px 14px;display:flex;align-items:center;gap:8px">
+                <span style="font-size:12px;font-weight:700;color:#e6edf3">Youth Academy</span>
+                <span class="c-gray" style="font-size:11px">{{(clubInfoCache[selectedClubName].academy||[]).length}} players</span>
+              </div>
+              <div v-if="!(clubInfoCache[selectedClubName].academy||[]).length" class="c-gray" style="padding:14px;font-size:12px">No academy players</div>
+              <table v-else style="font-size:11px">
+                <thead>
+                  <tr>
+                    <th style="min-width:130px">Player</th>
+                    <th>Pos</th>
+                    <th>Age</th>
+                    <th>Rtg</th>
+                    <th title="Speed">Spd</th>
+                    <th title="Passing">Pas</th>
+                    <th title="Marking">Mar</th>
+                    <th title="Heading">Hea</th>
+                    <th title="Tackling">Tck</th>
+                    <th title="Stamina">Sta</th>
+                    <th title="Dribbling">Dri</th>
+                    <th title="Shooting">Sho</th>
+                    <th title="Handling">Han</th>
+                    <th title="Reflexes">Ref</th>
+                    <th title="Strength">Str</th>
+                    <th title="Vision">Vis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in (clubInfoCache[selectedClubName].academy||[])" :key="p.id||p.name||p.Player"
+                      @click="openModal(p)" style="cursor:pointer">
+                    <td style="font-weight:500">{{p.name||p.Player}}</td>
+                    <td><span :class="'pos-badge pos-'+basePos(p.position||p.Position)" style="font-size:10px">{{p.position||p.Position||'—'}}</span></td>
+                    <td class="c-gray">{{p.age||p.Age||'—'}}</td>
+                    <td style="font-weight:700;color:#e6edf3">{{p.rating||p.Rating||'—'}}</td>
+                    <td v-for="attr in ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']" :key="attr"
+                        :style="{color:p[attr]!=null?(p[attr]>=80?'#3fb950':p[attr]>=70?'#e6edf3':'#8b949e'):'#3a3f47',fontWeight:p[attr]>=80?'700':'400'}">
+                      {{p[attr]!=null?p[attr]:'·'}}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Active scouting jobs -->
+            <div class="card" style="padding:10px 14px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <span style="font-size:12px;font-weight:700;color:#e6edf3">Scouting Jobs</span>
+                <span class="c-gray" style="font-size:11px">{{(clubInfoCache[selectedClubName].scouts||[]).length}} active</span>
+                <span v-if="clubInfoCache[selectedClubName].scoutCap?.used!=null" class="c-gray" style="font-size:11px">
+                  · {{clubInfoCache[selectedClubName].scoutCap.used}}/{{clubInfoCache[selectedClubName].scoutCap.max||'?'}} slots used
+                </span>
+              </div>
+              <div v-if="!(clubInfoCache[selectedClubName].scouts||[]).length" class="c-gray" style="font-size:12px">No active scouting jobs</div>
+              <div v-else style="display:flex;flex-direction:column;gap:5px">
+                <div v-for="job in (clubInfoCache[selectedClubName].scouts||[])" :key="job.id||job.player?.name"
+                     style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #161b22;flex-wrap:wrap">
+                  <span style="font-weight:600;color:#e6edf3;font-size:12px">{{job.player?.name||job.player?.Player||job.playerName||'Unknown'}}</span>
+                  <span v-if="job.player?.position||job.player?.Position"
+                        :class="'pos-badge pos-'+basePos(job.player?.position||job.player?.Position)"
+                        style="font-size:9px">{{job.player?.position||job.player?.Position}}</span>
+                  <span v-if="job.player?.club||job.fromClub" class="c-gray" style="font-size:11px">{{job.player?.club||job.fromClub}}</span>
+                  <span v-if="job.status" style="background:#21262d;border-radius:4px;padding:1px 6px;font-size:10px;color:#ffa657">{{job.status}}</span>
+                  <span v-if="job.createdAt" class="c-gray" style="font-size:10px;margin-left:auto">
+                    {{new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </template>
+          <div v-else class="card c-gray" style="text-align:center;padding:30px">Click to load club data</div>
+        </div>
+
+        <!-- History tab -->
+        <div v-if="selectedClubSubTab==='history'" style="display:flex;flex-direction:column;gap:8px">
+          <template v-if="selectedClubSubmissions.length">
+            <div v-for="sub in selectedClubSubmissions" :key="sub._gw" class="card" style="padding:10px">
+              <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+                <span class="c-gray" style="font-size:11px;min-width:30px">GW{{sub._gw}}</span>
+                <span style="color:#79c0ff;font-weight:600">{{fmtFormation(sub.formation)}}</span>
+                <template v-for="(val,key) in sub.instructions||{}" :key="key">
+                  <span v-if="key!=='training_focus'" style="color:#8b949e;font-size:11px">{{val}}</span>
+                </template>
+              </div>
+              <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:3px">
+                <template v-for="(p,i) in (sub.xi||[])" :key="i">
+                  <span style="font-size:11px;color:#c9d1d9;background:#161b22;border-radius:3px;padding:1px 5px">{{p.name}}</span>
+                </template>
+              </div>
+            </div>
+          </template>
+          <div v-else class="card c-gray" style="text-align:center;padding:30px">No history available</div>
+        </div>
+
+        <!-- Transfers tab -->
+        <div v-if="selectedClubSubTab==='transfers'">
+          <div v-if="selectedClubTransfers.length" class="card" style="padding:0;overflow:hidden">
+            <table style="font-size:11px">
+              <thead>
+                <tr>
+                  <th style="min-width:130px">Player</th>
+                  <th>Dir</th>
+                  <th>Amount</th>
+                  <th>Counterpart</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(t,i) in selectedClubTransfers" :key="i">
+                  <td style="font-weight:500">{{t.player}}</td>
+                  <td>
+                    <span v-if="t.buyer===selectedClubName" style="color:#3fb950;font-size:10px">▲ IN</span>
+                    <span v-else style="color:#f85149;font-size:10px">▼ OUT</span>
+                  </td>
+                  <td style="font-weight:600">£{{(t.amount/1e6).toFixed(1)}}m</td>
+                  <td class="c-gray">{{t.buyer===selectedClubName ? t.seller : t.buyer}}</td>
+                  <td class="c-gray" style="white-space:nowrap">{{t.date ? new Date(t.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—'}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="card c-gray" style="text-align:center;padding:30px">No transfer data available</div>
+        </div>
+      </div>
+
+      <!-- All Clubs browser -->
+      <div v-else>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <input type="text" v-model="espionageSearch" placeholder="Search club…" style="width:180px">
+          <select v-model="espionageSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+            <option value="club">Club A→Z</option>
+            <option value="mgr_a">Vacant first</option>
+            <option value="mgr_d">Manager A→Z</option>
+            <option value="ceo_d">CEO rating ↓</option>
+            <option value="td_d">TD rating ↓</option>
+            <option value="asst_d">Assistant ↓</option>
+            <option value="physio_d">Physio ↓</option>
+            <option value="training_d">Training Lv ↓</option>
+            <option value="scouting_d">Scouting Lv ↓</option>
+            <option value="academy_d">Academy Lv ↓</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" v-model="espShowVacantOnly"> 🔴 Vacant only
+          </label>
+          <span class="c-gray" style="font-size:11px">{{espionageFiltered.length}} clubs · click a row to view</span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            <span v-if="espionageCacheDate" class="c-gray" style="font-size:10px">cached {{espionageCacheDate}}</span>
+            <button class="btn red" style="font-size:11px" @click="loadEspionage(true)">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table style="font-size:11px">
+            <thead>
+              <tr style="cursor:pointer">
+                <th style="min-width:120px" @click="espSortBy('club')">Club{{espSortIcon('club')}}</th>
+                <th style="min-width:90px" title="Manager username" @click="espSortBy('mgr')">Manager{{espSortIcon('mgr')}}</th>
+                <th title="CEO rating" @click="espSortBy('ceo')">CEO{{espSortIcon('ceo')}}</th>
+                <th title="Technical Director rating" @click="espSortBy('td')">TD{{espSortIcon('td')}}</th>
+                <th title="Assistant rating" @click="espSortBy('asst')">Asst{{espSortIcon('asst')}}</th>
+                <th title="Physio rating" @click="espSortBy('physio')">Physio{{espSortIcon('physio')}}</th>
+                <th title="Training facility level" @click="espSortBy('training')">Trn{{espSortIcon('training')}}</th>
+                <th title="Scouting facility level" @click="espSortBy('scouting')">Sct{{espSortIcon('scouting')}}</th>
+                <th title="Academy facility level" @click="espSortBy('academy')">Aca{{espSortIcon('academy')}}</th>
+                <th title="Medical facility level" @click="espSortBy('medical')">Med{{espSortIcon('medical')}}</th>
+                <th title="Analytics facility level" @click="espSortBy('analytics')">Ana{{espSortIcon('analytics')}}</th>
+                <th title="Stadium facility level" @click="espSortBy('stadium')">Std{{espSortIcon('stadium')}}</th>
+                <th title="Active open job ads" @click="espSortBy('ads')">Ads{{espSortIcon('ads')}}</th>
+                <th title="Latest submitted formation, tactics & set pieces">Tactics</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in espionageFiltered" :key="c.club"
+                  @click="openClubDetail(c.club)" style="cursor:pointer"
+                  :style="{background:c.club===myClub?'#1f3a1f':'transparent'}">
+                <td style="font-weight:600">
+                  {{c.club}}
+                  <span v-if="c.club===myClub" style="color:#ffa657;font-size:10px"> ★</span>
+                  <span v-if="c.project" class="c-orange" style="font-size:10px" :title="'Upgrading '+c.project.key+' Lv'+c.project.from+'→'+c.project.to"> 🔨</span>
+                </td>
+                <td style="font-size:10px">
+                  <span v-if="managedSet.has(c.club)" style="color:#79c0ff">{{managerMap[c.club]||'?'}}</span>
+                  <span v-else style="color:#ff7b72;font-weight:700">🔴 Vacant</span>
+                </td>
+                <td :class="espRatingClass(c.current?.CEO?.rating)">{{c.current?.CEO?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.['Technical Director']?.rating)">{{c.current?.['Technical Director']?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Assistant?.rating)">{{c.current?.Assistant?.rating||'—'}}</td>
+                <td :class="espRatingClass(c.current?.Physio?.rating)">{{c.current?.Physio?.rating||'—'}}</td>
+                <td :class="espFacClass(c.levels?.training)" style="text-align:center">{{c.levels?.training||'—'}}</td>
+                <td :class="espFacClass(c.levels?.scouting)" style="text-align:center">{{c.levels?.scouting||'—'}}</td>
+                <td :class="espFacClass(c.levels?.academy)" style="text-align:center">{{c.levels?.academy||'—'}}</td>
+                <td :class="espFacClass(c.levels?.medical)" style="text-align:center">{{c.levels?.medical||'—'}}</td>
+                <td :class="espFacClass(c.levels?.analytics)" style="text-align:center">{{c.levels?.analytics||'—'}}</td>
+                <td :class="espFacClass(c.levels?.stadium)" style="text-align:center">{{c.levels?.stadium||'—'}}</td>
+                <td style="text-align:center">
+                  <span v-if="c.ads && c.ads.length" class="c-orange" style="font-size:10px;font-weight:700">{{c.ads.length}}</span>
+                  <span v-else class="c-gray">—</span>
+                </td>
+                <td style="min-width:110px">
+                  <template v-if="espionageSubmissions[c.club]">
+                    <span style="color:#79c0ff;font-weight:600;font-size:11px">{{fmtFormation(espionageSubmissions[c.club].formation)}}</span>
+                    <span class="c-gray" style="font-size:9px"> GW{{espionageSubmissions[c.club]._gw}}</span>
+                    <div style="font-size:9px;color:#8b949e;margin-top:1px;line-height:1.4">
+                      <span v-if="espionageSubmissions[c.club].instructions?.mentality">{{espionageSubmissions[c.club].instructions.mentality}}</span>
+                      <span v-if="espionageSubmissions[c.club].instructions?.style"> · {{espionageSubmissions[c.club].instructions.style}}</span>
+                    </div>
+                    <div v-if="espionageSubmissions[c.club].setPieces" style="font-size:9px;margin-top:3px;line-height:1.6">
+                      <div v-if="espionageSubmissions[c.club].setPieces.attackingCorner?.delivery"
+                           :title="setPieceDesc('delivery', espionageSubmissions[c.club].setPieces.attackingCorner.delivery)">
+                        <span style="color:#8b6cc8">⚑</span>
+                        <span style="color:#d2a8ff;margin-left:3px">{{espionageSubmissions[c.club].setPieces.attackingCorner.delivery}}</span>
+                        <span v-if="espionageSubmissions[c.club].setPieces.attackingCorner.stayBack" style="color:#6e7681;margin-left:3px">· {{espionageSubmissions[c.club].setPieces.attackingCorner.stayBack}}↩</span>
+                      </div>
+                      <div v-if="espionageSubmissions[c.club].setPieces.defensiveCorner?.scheme"
+                           :title="setPieceDesc('scheme', espionageSubmissions[c.club].setPieces.defensiveCorner.scheme)">
+                        <span style="color:#79c0ff">⛨</span>
+                        <span style="color:#8b949e;margin-left:3px">{{espionageSubmissions[c.club].setPieces.defensiveCorner.scheme}}</span>
+                        <span v-if="espionageSubmissions[c.club].setPieces.defensiveCorner.press"
+                              :title="setPieceDesc('press', espionageSubmissions[c.club].setPieces.defensiveCorner.press)"
+                              style="color:#6e7681;margin-left:3px">· {{espionageSubmissions[c.club].setPieces.defensiveCorner.press}}</span>
+                      </div>
+                    </div>
+                  </template>
+                  <span v-else class="c-gray">—</span>
+                </td>
+                <td><button @click.stop="openClubDetail(c.club)" style="border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;background:#21262d;color:#79c0ff">View XI</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+      </div>
+

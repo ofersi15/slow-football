@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FORMATIONS, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY } from '../constants.js'
+import { API, MY_CLUB, FORMATIONS, FORMATION_SLOT_POS, POS_COLORS, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync, stringifyAsync } from '../cache.js'
 
 export const clubsMethods = {

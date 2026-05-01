@@ -1135,7 +1135,12 @@ createApp({
     // Restore last viewed club only if the active tab is clubs
     try {
       const lastClub = localStorage.getItem('sf_last_club');
-      if (lastClub && this.activeTab === 'clubs') setTimeout(() => this.openClubDetail(lastClub), 800);
+      if (lastClub && this.activeTab === 'clubs') {
+        setTimeout(() => this.openClubDetail(lastClub).catch(() => {
+          this.selectedClubName = null;
+          try { localStorage.removeItem('sf_last_club'); } catch(e) {}
+        }), 800);
+      }
     } catch(e) {}
     // Background auto-refresh: check every 8 min (9am–11pm EST), incremental
     this.youthBgInterval = setInterval(() => { this.bgAutoRefresh(); }, 8 * 60 * 1000);

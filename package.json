@@ -1,5 +1,8 @@
 {
   "scripts": {
+    "assemble": "node scripts/assemble.js",
+    "predev": "npm run assemble",
+    "prebuild": "npm run assemble",
     "dev": "vite",
     "build": "vite build"
   },

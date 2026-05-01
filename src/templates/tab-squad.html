@@ -1,0 +1,238 @@
+      <!-- ── MY SQUAD TAB ── -->
+      <div v-if="activeTab==='squad'" class="content" style="padding:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-weight:700;font-size:14px">My Squad</span>
+          <span v-if="mySquadChem!=null"
+                :style="{border:'1px solid '+chemColor(mySquadChem)+'44',borderRadius:'10px',padding:'2px 10px',fontSize:'11px',fontWeight:'700',color:chemColor(mySquadChem),whiteSpace:'nowrap'}"
+                title="Team chemistry (0–100)">
+            🤝 {{mySquadChem}}
+          </span>
+          <span v-if="playersCacheDate" class="c-gray" style="font-size:11px">cached {{playersCacheDate}}</span>
+          <button v-if="!playersRefreshing" class="btn" style="font-size:11px;margin-left:auto" @click="clearPlayersCache()">⟳ Refresh</button>
+          <span v-if="playersRefreshing" style="margin-left:auto;font-size:11px;color:#ffa657">⟳ refreshing…</span>
+        </div>
+
+        <!-- ── SAVED LINEUP ── -->
+        <div v-if="lineupWithStats" class="card" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">📋 Saved Lineup</span>
+            <span style="background:#1f2d3d;color:#79c0ff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:700">{{lineupWithStats.formation}}</span>
+            <span :style="{background:lineupWithStats.runs==='on'?'#1a4a2e':'#2d2d2d',color:lineupWithStats.runs==='on'?'#7ee787':'#8b949e',borderRadius:'10px',padding:'2px 10px',fontSize:'11px',fontWeight:'700'}">
+              RUNS {{(lineupWithStats.runs||'on').toUpperCase()}}
+            </span>
+            <span class="c-gray" style="font-size:11px;margin-left:auto">
+              {{lineupWithStats.createdAt ? new Date(lineupWithStats.createdAt).toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : ''}}
+            </span>
+            <button class="btn" style="font-size:10px;padding:2px 7px" @click="loadSavedLineup()">↻</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <!-- Starting XI -->
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px">Starting XI</div>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div v-for="slot in lineupWithStats.xi" :key="slot.order"
+                     style="display:flex;align-items:center;gap:7px;padding:4px 7px;border-radius:5px;background:#0d1117;cursor:pointer"
+                     :style="{borderLeft:'2px solid '+(slot.player?.injured?'#da3633':slot.player?.suspended?'#d29922':'#21262d')}"
+                     @click="slot.player && openModal(slot.player)">
+                  <span :class="'pos pos-'+slot.slot" style="font-size:9px;min-width:26px;text-align:center">{{slot.slot}}</span>
+                  <span style="flex:1;font-size:12px;font-weight:500;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{slot.name}}</span>
+                  <span v-if="slot.player?.injured" title="Injured" style="font-size:10px">🤕</span>
+                  <span v-if="slot.player?.suspended" title="Suspended" style="font-size:10px">🚫</span>
+                  <span v-if="slot.player" :class="ratingClass(slot.player._gameRating)" style="font-size:11px;font-weight:700;min-width:28px;text-align:right">
+                    {{slot.player._gameRating ? slot.player._gameRating.toFixed(1) : '—'}}
+                  </span>
+                  <span v-if="slot.player?.fitnessPct!=null" :class="slot.player.fitnessPct<70?'c-red':slot.player.fitnessPct<85?'c-orange':'c-green'" style="font-size:10px;min-width:32px;text-align:right">
+                    {{slot.player.fitnessPct}}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            <!-- Subs -->
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px">Substitutions</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div v-for="sub in lineupWithStats.subs" :key="sub.order"
+                     style="background:#0d1117;border-radius:5px;padding:6px 9px">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                    <span style="font-size:10px;font-weight:700;color:#7ee787">IN</span>
+                    <span style="font-weight:600;font-size:12px;color:#e6edf3;cursor:pointer" @click="sub.player && openModal(sub.player)">{{sub.name}}</span>
+                    <span v-if="sub.player" :class="ratingClass(sub.player._gameRating)" style="font-size:10px;font-weight:700">
+                      {{sub.player._gameRating ? sub.player._gameRating.toFixed(1) : ''}}
+                    </span>
+                  </div>
+                  <div style="font-size:10px;color:#8b949e">
+                    <span style="color:#ff7b72;font-weight:700">OUT</span> {{sub.off}}
+                    <span style="margin-left:8px;background:#1f2d3d;color:#79c0ff;border-radius:8px;padding:1px 6px">{{sub.plan}}</span>
+                    <span style="margin-left:6px">{{sub.time}}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="!lineupWithStats.subs || !lineupWithStats.subs.length" class="c-gray" style="font-size:11px;font-style:italic">No subs configured</div>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="activeTab==='squad'" class="card" style="margin-bottom:20px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">📋</span>
+          <div>
+            <div style="font-weight:600;font-size:13px">No saved lineup found</div>
+            <div class="c-gray" style="font-size:11px">Submit a lineup at <a href="https://slowfootball.club/submit-team-v2" target="_blank" style="color:#79c0ff">slowfootball.club/submit-team-v2</a> to see it here.</div>
+          </div>
+        </div>
+
+        <!-- Squad Summary -->
+        <!-- Best XI per Formation -->
+        <div v-if="mySquadPlayers.length" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:14px">⭐ Best XI</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button v-for="f in formationKeys" :key="f"
+                      :class="['btn',{active:mySquadFormation===f}]"
+                      @click="mySquadFormation=f"
+                      style="font-size:11px;padding:3px 9px">{{f}}</button>
+            </div>
+            <span v-if="bestXIPlayers.some(s=>s.player)" class="c-gray" style="font-size:11px">
+              avg slot rtg <b style="color:#e6edf3">{{(bestXIPlayers.filter(s=>s.slotRating).reduce((sum,s)=>sum+(s.slotRating||0),0)/Math.max(1,bestXIPlayers.filter(s=>s.slotRating).length)).toFixed(1)}}</b>
+            </span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px">
+            <div v-for="slot in bestXIPlayers" :key="slot.idx"
+                 class="card"
+                 :style="{padding:'8px 10px',display:'flex',alignItems:'center',gap:'8px',cursor:slot.player?'pointer':'default',opacity:slot.player?1:.6}"
+                 @click="slot.player && openModal(slot.player)">
+              <span :class="'pos pos-'+slot.slot" style="font-size:10px;min-width:28px;text-align:center;flex-shrink:0">{{slot.slot}}</span>
+              <div style="flex:1;min-width:0">
+                <div v-if="slot.player">
+                  <div style="font-size:12px;font-weight:600;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{slot.player.Player}}</div>
+                  <div style="font-size:10px;color:#8b949e;display:flex;gap:4px;align-items:center">
+                    <span :class="'pos pos-'+slot.player.Position" style="font-size:9px">{{slot.player.Position}}</span>
+                    <span>Age {{slot.player.Age}}</span>
+                    <span v-if="slot.player.Position!==slot.slot" style="color:#ffa657" :title="'Playing '+slot.slot+' out of position'">⚠ OOP</span>
+                  </div>
+                </div>
+                <div v-else class="c-gray" style="font-size:11px;font-style:italic">— no player —</div>
+              </div>
+              <div v-if="slot.player" style="text-align:center;flex-shrink:0">
+                <div :class="ratingClass(slot.slotRating)" style="font-size:16px;font-weight:700;line-height:1">{{slot.slotRating?slot.slotRating.toFixed(1):'—'}}</div>
+                <div class="c-gray" style="font-size:9px" :title="'Natural position rating: '+( slot.player._gameRating?slot.player._gameRating.toFixed(1):'—')">slot rtg</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Captain Candidates -->
+        <div v-if="mySquadCaptainList.length" style="margin-bottom:20px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px">🎖 Captain Candidates <span class="c-gray" style="font-size:11px;font-weight:400">sorted by Leadership</span></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">
+            <div v-for="(p,i) in mySquadCaptainList" :key="p.Player"
+                 class="card" style="padding:8px 10px;display:flex;align-items:center;gap:8px;cursor:pointer"
+                 @click="openModal(p)">
+              <span style="font-size:13px;font-weight:700;color:#8b949e;min-width:18px;text-align:center">{{i===0?'🏅':i+1}}</span>
+              <span :class="'pos pos-'+p.Position" style="font-size:9px;flex-shrink:0">{{p.Position}}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:12px;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.Player}}</div>
+                <div style="font-size:10px;color:#8b949e">Age {{p.Age}} · Exp <b style="color:#79c0ff">{{p.Experience!=null?p.Experience.toFixed(0):'—'}}</b></div>
+              </div>
+              <div style="text-align:center;flex-shrink:0">
+                <div style="font-size:18px;font-weight:700;color:#ffa657;line-height:1">{{p.Leadership!=null?p.Leadership.toFixed(0):'—'}}</div>
+                <div class="c-gray" style="font-size:9px">Leader</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Set Pieces -->
+        <div v-if="mySquadPlayers.length && mySquadSetPieces.some(sp=>sp.players.length>0)" style="margin-bottom:20px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px">🔵 Set Pieces</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+            <div v-for="sp in mySquadSetPieces" :key="sp.title" class="card">
+              <div style="font-weight:700;margin-bottom:8px;font-size:12px">{{sp.title}}</div>
+              <div v-if="sp.players.length===0" class="c-gray" style="font-size:11px;font-style:italic">No data loaded — open squad view</div>
+              <div v-for="(p,i) in sp.players" :key="i" class="mb-list-item" @click="openModal(p)">
+                <span class="c-gray" style="font-size:10px;width:16px">{{i+1}}</span>
+                <span :class="'pos pos-'+p.Position" style="font-size:9px">{{p.Position}}</span>
+                <span style="flex:1;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px">{{p.Player}}</span>
+                <span style="font-weight:700;font-size:13px;color:#ffa657">{{(p[sp.key]||0).toFixed(0)}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="mySquadPlayers.length" style="margin-bottom:16px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#e6edf3">{{mySquadPlayers.length}}</div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Players</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div :class="['pos-rating-num',ratingClass(mySquadPlayers.reduce((s,p)=>s+(p._gameRating||0),0)/mySquadPlayers.filter(p=>p._gameRating).length)]"
+                   style="font-size:22px">
+                {{(mySquadPlayers.reduce((s,p)=>s+(p._gameRating||0),0)/mySquadPlayers.filter(p=>p._gameRating).length).toFixed(1)}}
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Avg Rating</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#ffa657">
+                {{(mySquadPlayers.reduce((s,p)=>s+(p.Age||0),0)/mySquadPlayers.filter(p=>p.Age).length).toFixed(1)}}
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Avg Age</div>
+            </div>
+            <div class="card" style="flex:1;min-width:130px;text-align:center">
+              <div style="font-size:22px;font-weight:700;color:#79c0ff">
+                {{fmtVal(mySquadPlayers.reduce((s,p)=>s+(p.weeklyWage||0),0))}}/w
+              </div>
+              <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px">Wage Bill</div>
+            </div>
+          </div>
+
+          <!-- Squad by Position -->
+          <div v-for="group in mySquadByPosition" :key="group.pos" style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span :class="'pos pos-'+group.pos" style="font-size:11px">{{group.pos}}</span>
+              <span style="font-size:11px;color:#8b949e;font-weight:700;text-transform:uppercase;letter-spacing:.5px">
+                {{{GK:'Goalkeeper',FB:'Full Back',CB:'Centre Back',DM:'Defensive Mid',CM:'Central Mid',AM:'Attacking Mid',WF:'Wide Forward',CF:'Centre Forward'}[group.pos]||group.pos}}
+              </span>
+              <span class="c-gray" style="font-size:10px">({{group.players.length}})</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:6px">
+              <div v-for="p in group.players" :key="p.Player"
+                   class="card" style="padding:8px 10px;cursor:pointer;display:flex;align-items:center;gap:8px"
+                   @click="openModal(p)"
+                   :style="{borderColor:p.injured||p.suspended?'#da3633':p.contractWeeks<20?'#d29922':'#21262d'}">
+                <!-- Name + flags -->
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+                    <span style="font-weight:600;color:#e6edf3;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.Player}}</span>
+                    <span v-if="p.injured" title="Injured" style="font-size:11px">🤕</span>
+                    <span v-if="p.suspended" title="Suspended" style="font-size:11px">🚫</span>
+                    <span v-if="p._transferListed" title="Transfer listed" style="font-size:10px;background:#238636;color:#fff;padding:0 4px;border-radius:8px">FOR SALE</span>
+                    <span v-if="p.contractWeeks<20" :title="p.contractWeeks+' wks left'" style="font-size:10px;background:#6e3a0b;color:#ffa657;padding:0 4px;border-radius:8px">⚠ {{p.contractWeeks}}w</span>
+                    <span v-if="p._incompleteStats" title="Only partial attribute data available — likely a newly promoted youth player" style="font-size:10px;background:#1f2d3d;color:#79c0ff;padding:0 4px;border-radius:8px">🌱 youth</span>
+                  </div>
+                  <div style="display:flex;gap:8px;font-size:10px;color:#8b949e">
+                    <span>Age {{p.Age||'?'}}</span>
+                    <span>{{fmtWage(p.weeklyWage)}}</span>
+                    <span v-if="p.Games>0">{{p.Games}}G · {{p.Goals||0}} gls</span>
+                  </div>
+                </div>
+                <!-- Ratings -->
+                <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+                  <div style="text-align:center">
+                    <div :class="ratingClass(p._gameRating)" style="font-size:16px;font-weight:700">{{p._gameRating?p._gameRating.toFixed(1):'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">GmRtg</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div :class="p.fitnessPct<70?'c-red':p.fitnessPct<85?'c-orange':'c-green'" style="font-size:13px;font-weight:600">{{p.fitnessPct!=null?p.fitnessPct+'%':'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">Fit</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div :class="ratingClass(p.Form)" style="font-size:13px;font-weight:600">{{p.Form?p.Form.toFixed(1):'—'}}</div>
+                    <div class="c-gray" style="font-size:9px">Form</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="c-gray" style="padding:40px;text-align:center">No squad data for {{myClub}} — ensure data is loaded.</div>
+      </div>
+

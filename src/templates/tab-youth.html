@@ -1,0 +1,352 @@
+  <!-- ── YOUTH TAB ── -->
+      <div v-if="activeTab==='youth'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:14px">
+
+    <!-- Loading state -->
+    <div v-if="youthLoading" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🌱</div>
+      <div class="c-gray">{{youthMsg||'Loading youth data…'}}</div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="youthMsg && !youthLoaded" class="card" style="text-align:center;padding:30px;color:#ff7b72">⚠ {{youthMsg}}</div>
+
+    <!-- Initial state (watcher fires next tick — show spinner immediately) -->
+    <div v-else-if="!youthLoaded" class="card" style="text-align:center;padding:40px">
+      <div style="font-size:30px;margin-bottom:10px">🌱</div>
+      <div class="c-gray">Initializing youth data…</div>
+    </div>
+
+    <!-- Loaded -->
+    <div v-if="youthLoaded">
+
+      <!-- Sub-tab bar -->
+      <div style="display:flex;gap:0;border-bottom:1px solid #21262d;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+        <button v-for="t in [{id:'scouts',label:'🔭 Active Scouts',count:youthScouts.length},{id:'academy',label:'🏟 Academy',count:youthAcademy.length},{id:'history',label:'📋 League History',count:youthHistLoaded?youthAllHistoryJobs.length:(youthHistLoading?null:youthRejected.length)}]"
+          :key="t.id" @click="youthSubTab=t.id"
+          style="background:none;border:none;border-bottom:2px solid transparent;padding:9px 16px;cursor:pointer;font-size:13px;margin-bottom:-1px;transition:all .1s"
+          :style="youthSubTab===t.id?{borderBottomColor:'#f78166',color:'#e6edf3',fontWeight:'600'}:{color:'#8b949e'}">
+          {{t.label}}<span v-if="t.count!==null" style="margin-left:5px;background:#21262d;border-radius:8px;padding:1px 6px;font-size:11px">{{t.count}}</span>
+          <span v-if="t.id==='history'&&youthHistLoading" style="margin-left:4px;font-size:10px;color:#ffa657">⟳</span>
+        </button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <span v-if="youthBgLastRefresh" class="c-gray" style="font-size:10px" title="Last background scout refresh">⟳ {{youthBgLastRefresh}}</span>
+          <button class="btn" style="font-size:11px" @click="loadYouth(true)">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <!-- ─── SCOUTS ─── -->
+      <div v-if="youthSubTab==='scouts'">
+        <!-- Capacity bar -->
+        <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 14px;margin-bottom:14px">
+          <div>
+            <span style="font-weight:700">Scouting Level {{youthCap.scoutingLevel||'?'}}</span>
+            <span class="c-gray" style="font-size:11px;margin-left:8px">{{youthCap.activeCount||0}}/{{youthCap.maxActive||'?'}} active slots used</span>
+          </div>
+          <div style="display:flex;gap:5px">
+            <div v-for="i in (youthCap.maxActive||4)" :key="i"
+              :style="{width:'20px',height:'20px',borderRadius:'4px',background:i<=(youthCap.activeCount||0)?'#238636':'#21262d',border:'1px solid #30363d'}"></div>
+          </div>
+          <div class="c-gray" style="font-size:11px">
+            Staff: <span class="c-orange">+{{youthStaff.scouting?.qualityBump||0}} rating bump</span>
+            · <span class="c-blue">{{youthStaff.scouting?.weeklyProspects||0}} prospects/week</span>
+          </div>
+        </div>
+
+        <div v-if="!youthScouts.length" class="card" style="text-align:center;padding:40px;color:#8b949e">
+          <div style="font-size:28px;margin-bottom:8px">🔭</div>
+          <div>No active scouting jobs. Start a scout in-game to see players here with full stats.</div>
+        </div>
+
+        <div v-for="job in youthScouts" :key="job.id" class="card" style="cursor:pointer;margin-bottom:10px"
+          @click="openModal({...job.player,...(job.player.stats||{})}, job)">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+                <span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span>
+                <span style="font-size:16px;font-weight:700">{{job.player.name||job.player.Player}}</span>
+                <span class="c-gray" style="font-size:11px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</span>
+                <span v-if="job.player.Archetype||job.player.archetype" style="background:#1f2937;border-radius:10px;padding:1px 8px;font-size:10px;color:#d2a8ff">{{job.player.Archetype||job.player.archetype}}</span>
+              </div>
+              <div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px;flex-wrap:wrap">
+                <span>Age <b>{{job.player.age||job.player.Age}}</b></span>
+                <span v-if="job.player.DOB||job.player.dob">DOB <b>{{job.player.DOB||job.player.dob}}</b></span>
+                <span>Best: <span class="c-orange">{{job.player.bestKey}}</span></span>
+              </div>
+              <!-- Key position attrs -->
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <div v-for="attr in gameAttrsFor(job.player.position||job.player.Position)" :key="attr"
+                  style="background:#0d1117;border:1px solid #ffa65760;border-radius:5px;padding:3px 8px;font-size:11px">
+                  <span class="c-gray">{{attr}}</span>
+                  <span class="c-orange" style="font-weight:700;margin-left:4px">{{getYouthAttr(job.player, attr)||'—'}}</span>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:right;min-width:120px">
+              <div :class="ratingClass(job.player.rating||job.player.Rating)" style="font-size:28px">{{(job.player.rating||job.player.Rating||0).toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Actual Rating</div>
+              <div v-if="job.buyNow" style="font-size:11px;margin-top:6px">
+                <span class="c-gray">Buy now: </span><span class="c-orange" style="font-weight:700">{{fmtVal(job.buyNow)}}</span>
+              </div>
+              <div v-else class="c-gray" style="font-size:10px;margin-top:6px">negotiate to buy</div>
+              <div class="c-blue" style="font-size:11px">{{fmtVal(job.player.value||job.player.Value)}}</div>
+            </div>
+          </div>
+          <!-- Stage + insight row -->
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #21262d;padding-top:8px;margin-top:8px">
+            <div>
+              <div class="c-gray" style="font-size:10px;margin-bottom:3px">SCOUT STAGE</div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <div v-for="i in 7" :key="i"
+                  :style="{width:'8px',height:'8px',borderRadius:'50%',background:i<=job.stage?(job.stage>=7?'#7ee787':'#ffa657'):'#21262d'}"></div>
+                <span v-if="job.stage>=7" style="font-size:10px;color:#7ee787;font-weight:700;margin-left:5px">✓ FULLY REVEALED</span>
+                <span v-else class="c-gray" style="font-size:10px;margin-left:4px">{{job.stage}}/7 — {{7-job.stage}} stages left</span>
+              </div>
+            </div>
+            <div>
+              <div class="c-gray" style="font-size:10px;margin-bottom:3px">GAME SHOWS</div>
+              <span style="background:#1f2d3d;border:1px solid #388bfd40;border-radius:12px;padding:2px 9px;font-size:11px;color:#79c0ff;font-weight:600">{{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}} range</span>
+              <span class="c-gray" style="font-size:11px;margin-left:8px">Strength: <span class="c-orange">{{job.hints?.strength?.key}} {{job.hints?.strength?.value}}</span></span>
+            </div>
+            <div style="font-size:10px;background:#0d1117;border-radius:4px;padding:4px 8px;color:#8b949e">
+              💡 Tool sees <span class="c-green" style="font-weight:700">full stats</span> — actual
+              <span :class="ratingClass(job.player.rating||job.player.Rating)" style="font-weight:700">{{job.player.rating||job.player.Rating}}</span>
+              vs hint {{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}}
+            </div>
+            <button class="btn" style="margin-left:auto;font-size:11px" @click.stop="openModal({...job.player,...(job.player.stats||{})},job)">Full Stats →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── ACADEMY ─── -->
+      <div v-if="youthSubTab==='academy'">
+        <div v-if="!youthAcademy.length" class="card" style="text-align:center;padding:40px;color:#8b949e">
+          <div style="font-size:28px;margin-bottom:8px">🏟</div>
+          <div>No youth academy players. Upgrade your academy facility to build your pipeline.</div>
+        </div>
+        <div v-else>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div style="font-size:20px;font-weight:700">{{youthAcademy.length}}</div>
+              <div class="c-gray" style="font-size:10px">Players</div>
+            </div>
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div :class="ratingClass(youthAcademyAvgRating)" style="font-size:20px">{{youthAcademyAvgRating.toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Avg Rating</div>
+            </div>
+            <div class="card" style="padding:8px 12px;text-align:center;min-width:80px">
+              <div :class="ratingClass(youthAcademyTopRating)" style="font-size:20px">{{youthAcademyTopRating.toFixed(1)}}</div>
+              <div class="c-gray" style="font-size:10px">Top Rating</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">
+            <div v-for="p in youthAcademySorted" :key="p.id||p.Player"
+              class="card" style="cursor:pointer;padding:10px"
+              :style="{borderColor:p._partial?'#388bfd40':'#21262d'}"
+              @click="openModal(p, null)">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
+                <div>
+                  <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+                    <span :class="'pos pos-'+(p.Position||p.position)">{{p.Position||p.position}}</span>
+                    <span style="font-weight:600">{{p.Player||p.name}}</span>
+                    <span v-if="p._partial" style="background:#1f2d3d;color:#79c0ff;font-size:9px;padding:0 5px;border-radius:8px">partial data</span>
+                  </div>
+                  <div class="c-gray" style="font-size:10px;margin-top:2px">
+                    {{p.Nationality||p.nationality}} · Age {{p.Age||p.age}}
+                    <span v-if="p.Archetype||p.archetype"> · <span style="color:#d2a8ff">{{p.Archetype||p.archetype}}</span></span>
+                  </div>
+                </div>
+                <div style="text-align:right">
+                  <div :class="ratingClass(p.Rating||p.rating)" style="font-size:18px">{{(p.Rating||p.rating||0).toFixed(1)}}</div>
+                  <div class="c-blue" style="font-size:10px">{{fmtVal(p.Value||p.value)}}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+                <div v-for="attr in gameAttrsFor(p.Position||p.position)" :key="attr"
+                  style="font-size:10px;background:#0d1117;border-radius:4px;padding:2px 5px">
+                  <span class="c-gray">{{attr.substring(0,3)}}</span>
+                  <span class="c-orange" style="font-weight:700;margin-left:2px">{{getYouthAttr(p,attr)||'—'}}</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+                <span v-if="p.contractWeeks!=null" :class="p.contractWeeks<20?'c-red':p.contractWeeks<40?'c-orange':'c-gray'">{{p.contractWeeks}}w contract</span>
+                <span v-if="p.injured" class="c-red">🤕 injured</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── HISTORY (ALL CLUBS) ─── -->
+      <div v-if="youthSubTab==='history'" style="display:flex;flex-direction:column;gap:10px">
+
+        <!-- Loading history -->
+        <div v-if="youthHistLoading" class="card" style="text-align:center;padding:30px">
+          <div style="max-width:360px;margin:0 auto 10px">
+            <div style="background:#21262d;border-radius:4px;height:6px;overflow:hidden">
+              <div :style="{width:youthHistProgress+'%',height:'100%',background:'#238636',borderRadius:'4px',transition:'width .3s'}"></div>
+            </div>
+          </div>
+          <div class="c-gray" style="font-size:12px">{{youthHistMsg||'Scanning all clubs…'}}</div>
+          <div class="c-gray" style="font-size:11px;margin-top:5px">First load takes 1–2 min · cached 24h after that</div>
+        </div>
+
+        <!-- Not yet loaded — show my club's history + load button -->
+        <template v-else-if="!youthHistLoaded">
+          <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 16px">
+            <div>
+              <div style="font-weight:700;margin-bottom:3px">📋 League-wide Scout History</div>
+              <div class="c-gray" style="font-size:12px">Fetches rejected scouts from all managed clubs + their facilities. Cached 24h.</div>
+              <div v-if="youthHistMsg" style="color:#ff7b72;font-size:12px;margin-top:4px">⚠ {{youthHistMsg}}</div>
+            </div>
+            <button class="btn green" style="font-size:12px;padding:7px 18px" @click="loadYouthHistory(false)">Load All History</button>
+          </div>
+          <!-- Show my club's own history while waiting -->
+          <div v-if="youthRejected.length">
+            <div style="font-size:11px;color:#8b949e;margin-bottom:6px">My scouts ({{youthRejected.length}}) — load league history for all clubs</div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <table>
+                <thead><tr style="cursor:pointer">
+                  <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th><th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th @click="youthSortBy('bestattr')">Best Attr{{youthSortIcon('bestattr')}}</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th @click="youthSortBy('status')">Status{{youthSortIcon('status')}}</th><th></th>
+                </tr></thead>
+                <tbody>
+                  <tr v-for="job in youthFilteredHistory" :key="job.id" class="clickable" @click="openModal({...job.player,...(job.player.stats||{})},job)">
+                    <td><div style="font-weight:600">{{job.player.name||job.player.Player}}</div><div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}}</div></td>
+                    <td><span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span></td>
+                    <td>{{job.player.age||job.player.Age}}</td>
+                    <td><span :class="ratingClass(job.player.rating||job.player.Rating)">{{job.player.rating||job.player.Rating}}</span></td>
+                    <td class="c-blue">{{fmtVal(job.player.value||job.player.Value)}}</td>
+                    <td class="c-orange">{{fmtVal(job.buyNow)}}</td>
+                    <td style="font-size:11px"><span class="c-orange">{{job.player.bestKey}}</span></td>
+                    <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}):'—'}}</td>
+                    <td @click.stop><button class="btn" style="font-size:10px;padding:2px 7px" :disabled="job._refreshing" @click="refreshYouthJob(job)">{{job._refreshing?'…':job._refreshed?'✓':job._refreshFailed?'✗':'↻'}}</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div v-else class="card" style="text-align:center;padding:30px;color:#8b949e">No scouting history yet for {{myClub}}.</div>
+        </template>
+
+        <!-- Loaded all-clubs history -->
+        <template v-else>
+          <!-- Filters + cache info -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="text" v-model="youthHistSearch" placeholder="Search player, club…" style="width:190px">
+            <select v-model="youthHistPos" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All positions</option>
+              <option v-for="p in youthHistAllPositions" :key="p" :value="p">{{p}}</option>
+            </select>
+            <select v-model="youthHistClubFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All clubs</option>
+              <option v-for="c in youthHistClubs" :key="c" :value="c">{{c}}</option>
+            </select>
+            <select v-model="youthHistStatusFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="rejected">Rejected</option>
+              <option value="accepted">Accepted</option>
+            </select>
+            <select v-model="youthHistSort" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
+              <option value="date">Latest first</option>
+              <option value="rating_d">Rating ↓</option>
+              <option value="rating_a">Rating ↑</option>
+              <option value="age_a">Age ↑</option>
+              <option value="value_d">Value ↓</option>
+            </select>
+            <span class="c-gray" style="font-size:11px">{{youthHistFiltered.length}} scouts · {{youthHistClubs.length}} clubs</span>
+            <span v-if="youthHistCacheDate" class="c-gray" style="font-size:10px">cached {{youthHistCacheDate}}</span>
+            <button class="btn" style="margin-left:auto;font-size:11px" @click="loadYouthHistory(true)">🔄 Refresh (clears cache)</button>
+          </div>
+
+          <!-- Club summary cards (clickable to filter) -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div v-for="(info, club) in youthClubInfoMap" :key="club"
+              class="card" style="padding:6px 10px;font-size:11px;cursor:pointer;min-width:150px"
+              :style="{borderColor:club===myClub?'#238636':'#21262d',opacity:youthHistClubFilter&&youthHistClubFilter!==club?0.5:1}"
+              @click="youthHistClubFilter=youthHistClubFilter===club?'':club">
+              <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
+              <div class="c-gray">
+                Scout Lv <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span>
+                · Bump <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span>
+                · <span class="c-green">{{youthAllHistoryJobs.filter(j=>j._club===club&&(j._jobStatus||j.status)==='active').length}} active</span>
+                · <span class="c-blue">{{youthAllHistoryJobs.filter(j=>j._club===club).length}} total</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- History table -->
+          <div class="card" style="padding:0;overflow:hidden">
+            <table>
+              <thead><tr style="cursor:pointer">
+                <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th>
+                <th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th @click="youthSortBy('bestattr')">Best Attr{{youthSortIcon('bestattr')}}</th>
+                <th @click="youthSortBy('sclub')">Scouting Club{{youthSortIcon('sclub')}}</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th @click="youthSortBy('status')">Status{{youthSortIcon('status')}}</th><th></th>
+              </tr></thead>
+              <tbody>
+                <tr v-for="job in youthHistFiltered" :key="job.id" class="clickable"
+                  @click="openModal({...job.player,...(job.player.stats||{})},job)">
+                  <td>
+                    <div style="font-weight:600">{{job.player.name||job.player.Player}}</div>
+                    <div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</div>
+                  </td>
+                  <td><span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span></td>
+                  <td>{{job.player.age||job.player.Age}}</td>
+                  <td><span :class="ratingClass(job.player.rating||job.player.Rating)">{{job.player.rating||job.player.Rating}}</span></td>
+                  <td class="c-blue">{{fmtVal(job.player.value||job.player.Value)}}</td>
+                  <td class="c-orange">{{fmtVal(job.buyNow)}}</td>
+                  <td style="font-size:11px">
+                    <span class="c-orange">{{job.player.bestKey}}</span>
+                    <span class="c-gray"> {{job.hints?.strength?.value}}</span>
+                  </td>
+                  <td>
+                    <div style="background:#1f2d3d;color:#79c0ff;border:1px solid #388bfd40;border-radius:10px;display:inline-block;padding:1px 7px;font-size:10px;font-weight:600">{{job._club}}</div>
+                    <div v-if="youthClubInfoMap[job._club]" style="font-size:10px;margin-top:2px;color:#8b949e">
+                      Lv{{youthClubInfoMap[job._club].facilities?.levels?.scouting||'?'}}
+                      +{{youthClubInfoMap[job._club].staff?.scouting?.qualityBump||0}}
+                    </div>
+                  </td>
+                  <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'}}</td>
+                  <td>
+                    <span v-if="(job._jobStatus||job.status)==='rejected'" style="background:#3a1212;color:#ff7b72;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✗ Rejected</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='accepted'" style="background:#1a3a1a;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✓ Signed</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='completed'" style="background:#1a3a1a;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✓ Done</span>
+                    <span v-else-if="((job._jobStatus||job.status)==='active'||(job._jobStatus||job.status)==='scouting')&&job.rawStage>=7" style="background:#2d2a0e;color:#e3b341;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">⏳ Ready</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='active'||(job._jobStatus||job.status)==='scouting'" style="background:#1a4a2e;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">● Active</span>
+                    <span v-else-if="(job._jobStatus||job.status)==='pending'" style="background:#1f3a5a;color:#79c0ff;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">⏳ Pending</span>
+                    <span v-else style="color:#8b949e;font-size:10px">{{job._jobStatus||job.status||'—'}}</span>
+                  </td>
+                  <td @click.stop>
+                    <button class="btn" style="font-size:10px;padding:2px 7px" :disabled="job._refreshing" @click="refreshYouthJob(job)">
+                      {{job._refreshing?'…':job._refreshed?'✓':job._refreshFailed?'✗':'↻'}}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Rating ceiling by club -->
+          <div class="card" style="border-color:#388bfd40">
+            <div style="font-weight:700;margin-bottom:10px">📊 Rating Ceiling by Club</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <div v-for="(info, club) in youthClubInfoMap" :key="club"
+                style="background:#0d1117;border-radius:6px;padding:8px 12px;min-width:150px;font-size:11px;line-height:1.8">
+                <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
+                <div>Scout Lv: <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span></div>
+                <div>Quality bump: <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span></div>
+                <div>Academy Lv: <span class="c-orange">{{info.facilities?.levels?.academy||'?'}}</span></div>
+                <div>Prospects/wk: <span class="c-blue">{{info.staff?.scouting?.weeklyProspects||0}}</span></div>
+                <div style="border-top:1px solid #21262d;margin-top:3px;padding-top:3px">
+                  History: <span :class="ratingClass(youthClubMaxRating(club))" style="font-weight:700">max {{youthClubMaxRating(club)||'—'}}</span>
+                  · avg {{youthClubAvgRating(club).toFixed(1)}}
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+
+    </div>
+      </div>
+
