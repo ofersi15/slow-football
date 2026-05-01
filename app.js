@@ -98,7 +98,6 @@ createApp({
       fmDrillDown: null,
       subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       matchArchiveFmSrc: null,
-      fmDiag: null, fmDiagRunning: false,
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
       submissionsCache: {},  // club → { gw: {formation, ...} }
