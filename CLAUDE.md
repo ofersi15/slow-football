@@ -26,12 +26,34 @@ Built and maintained by Ofer (ofersi15@gmail.com) — non-developer, so keep eve
 ## Full Architecture
 
 ### Frontend
-- **Vue 3 CDN runtime-only** (`https://unpkg.com/vue@3/dist/vue.global.js`) — no build step
-- Template in `index.html` (DOM template), all logic in `app.js`, styles in `style.css`
-- Chart.js via CDN for charts
+- **Vue 3 + Vite build** — `npm run build` → `dist/` served by Cloudflare Pages
+- DOM template in `index.html` (assembled from partials — see below), all logic split across `app.js` + `src/methods/*.js`, styles in `style.css`
+- Chart.js via npm (chart.js/auto)
 - **Never put `</script>` at end of app.js** — breaks the HTML parser
 - **`v-if` on SVG child elements inside `<g>` crashes Vue CDN build** — avoid entirely; use `:opacity` or just omit
 - **`<` operator inside SVG attribute bindings** (e.g. `:fill="x<70?..."`) also crashes — use helper methods
+
+### Template editing workflow — IMPORTANT
+`index.html` is **generated** — do not edit it directly. Edit the source partials:
+
+| Want to change | Edit this file |
+|----------------|----------------|
+| Scout tab | `src/templates/tab-scout.html` |
+| Squad tab | `src/templates/tab-squad.html` |
+| Moneyball tab | `src/templates/tab-moneyball.html` |
+| Analysis tab | `src/templates/tab-analysis.html` |
+| Youth tab | `src/templates/tab-youth.html` |
+| My Club tab | `src/templates/tab-club.html` |
+| Clubs tab | `src/templates/tab-clubs.html` |
+| Transfers tab | `src/templates/tab-espionage.html` |
+| Matches tab | `src/templates/tab-matches.html` |
+| Player modal | `src/templates/modal.html` |
+| Scout sidebar filters | `src/templates/sidebar.html` |
+| Tab bar / loading / layout | `src/index.html` (the shell) |
+
+After editing any template file, run `npm run assemble` to regenerate `index.html`. Then commit both the partial AND `index.html`.
+
+`npm run build` and `npm run dev` run assemble automatically (via prebuild/predev hooks).
 
 ### Hosting: Cloudflare Pages
 - Auto-deploys from `main` branch of GitHub repo within ~60s
@@ -67,12 +89,40 @@ Falls back to `localStorage` then local `/sf-cache` (old server.py) on other hos
 
 ```
 slow-football/
-├── index.html              # All Vue template markup
-├── app.js                  # All Vue logic (~4300 lines)
+├── index.html              # GENERATED — assembled from src/index.html + src/templates/
+├── app.js                  # Vue app shell: data(), computed, watch, mounted (~1150 lines)
 ├── style.css               # Styles
 ├── CLAUDE.md               # This file
 ├── SESSION_CONTEXT.md      # Session context for Claude Chat reviews
-├── wrangler.jsonc          # CF Pages config
+├── wrangler.jsonc          # CF Pages config (assets.directory: "dist")
+├── package.json            # npm scripts: assemble, dev, build
+├── vite.config.js          # Vite lib-mode build
+├── scripts/
+│   └── assemble.js         # Assembles index.html from src/index.html + src/templates/
+├── src/
+│   ├── index.html          # HTML shell with <!-- include:X --> markers
+│   ├── constants.js        # All constants (MY_CLUB, API, FORMATIONS, etc.)
+│   ├── utils.js            # Pure helpers (calcGameRating, fmtVal, computeTraits, etc.)
+│   ├── cache.js            # Cache helpers (serverCacheGet/Set, parseAsync, authHeaders)
+│   ├── templates/          # One file per tab/section — EDIT THESE for template changes
+│   │   ├── sidebar.html    # Scout sidebar filters
+│   │   ├── tab-scout.html
+│   │   ├── tab-squad.html
+│   │   ├── tab-moneyball.html
+│   │   ├── tab-analysis.html
+│   │   ├── tab-youth.html
+│   │   ├── tab-club.html
+│   │   ├── tab-clubs.html
+│   │   ├── tab-espionage.html
+│   │   ├── tab-matches.html
+│   │   └── modal.html      # Player profile modal
+│   └── methods/            # Vue methods split by topic — EDIT THESE for logic changes
+│       ├── data.js         # loadData, fetchFreshData, enrichStats, openModal, charts
+│       ├── youth.js        # loadYouth, loadYouthHistory, bgAutoRefresh
+│       ├── matches.js      # buildMatchArchive, appendLatestGw, loadMatchArchive
+│       ├── espionage.js    # loadEspionage, negotiations, auctions
+│       ├── clubs.js        # pitchLayout, match helpers, submissions fetch
+│       └── helpers.js      # Sort helpers, staff recruitment
 ├── .github/workflows/
 │   ├── auto-merge-claude.yml
 │   └── deploy-cf-worker.yml
@@ -269,10 +319,19 @@ The submissions API sometimes returns malformed `subs` entries:
 
 ## Deployment Checklist
 
-1. Edit `index.html` / `app.js` / `style.css`
-2. `git add <files> && git commit -m "..." && git push origin main`
-3. CF Pages auto-deploys in ~60s
-4. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
+**Template changes** (HTML/UI):
+1. Edit the relevant `src/templates/*.html` file (see table in Frontend section above)
+2. `npm run assemble` — regenerates `index.html` from partials
+3. `git add src/templates/<file>.html index.html && git commit -m "..." && git push origin main`
+
+**Logic changes** (JS):
+1. Edit `src/methods/<file>.js` or `app.js` or `src/constants.js` / `src/utils.js` / `src/cache.js`
+2. `npm run build` — runs assemble + Vite build automatically
+3. `git add <files> && git commit -m "..." && git push origin main`
+
+**Style changes**: edit `style.css`, commit + push.
+
+CF Pages auto-deploys in ~60s after push. If cache worker changed: `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 ---
 
