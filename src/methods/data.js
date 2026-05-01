@@ -1,4 +1,4 @@
-import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS } from '../constants.js'
+import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS } from '../constants.js'
 import { parseAsync, stringifyAsync, serverCacheGet, serverCacheSet, serverCacheDelete } from '../cache.js'
 import { calcGameRating, calcWeightedRating, calcEstValue, fmtVal } from '../utils.js'
 
@@ -121,9 +121,10 @@ export const dataMethods = {
       await this.fetchFreshData(true);
     },
 
-    checkTacticsCache() {
+    async checkTacticsCache() {
       try {
-        const cached=localStorage.getItem(TACTICS_CACHE_KEY);
+        let cached = await serverCacheGet(TACTICS_CACHE_KEY);
+        if (!cached) cached = localStorage.getItem(TACTICS_CACHE_KEY);
         if (cached) { const {ts}=JSON.parse(cached); this.tacticsCacheDate=new Date(ts).toLocaleDateString(); }
       } catch(e){}
     },
@@ -175,7 +176,7 @@ export const dataMethods = {
                 this.statsEnriched = true;
                 // Background refresh if >6h old — but use forceRefresh=true to skip cache
                 const age = Date.now() - ts;
-                if (age > 6*60*60*1000) { setTimeout(() => this.enrichStats(true), 3000); }
+                if (age > STATS_CACHE_TTL) { setTimeout(() => this.enrichStats(true), 3000); }
                 return;
               }
             }
@@ -499,10 +500,11 @@ export const dataMethods = {
     },
 
     async loadTactics(forceRefresh=false) {
-      // Try cache first
+      // Try cache first (KV then localStorage fallback)
       if (!forceRefresh) {
         try {
-          const cached=localStorage.getItem(TACTICS_CACHE_KEY);
+          let cached = await serverCacheGet(TACTICS_CACHE_KEY);
+          if (!cached) cached = localStorage.getItem(TACTICS_CACHE_KEY);
           if (cached) {
             const {data,ts}=JSON.parse(cached);
             if (Date.now()-ts < TACTICS_CACHE_TTL) {
@@ -646,7 +648,9 @@ export const dataMethods = {
       this.tacticsData=data;
       const ts=Date.now();
       this.tacticsCacheDate=new Date(ts).toLocaleDateString();
-      try { localStorage.setItem(TACTICS_CACHE_KEY,JSON.stringify({data,ts})); } catch(e){}
+      const tacticsStr = JSON.stringify({data,ts});
+      serverCacheSet(TACTICS_CACHE_KEY, tacticsStr);
+      try { localStorage.setItem(TACTICS_CACHE_KEY, tacticsStr); } catch(e){}
       this.tacticsMsg='Done!'; this.tacticsProgress=100;
       this.tacticsLoading=false; this.tacticsLoaded=true;
     },

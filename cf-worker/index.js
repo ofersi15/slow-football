@@ -86,12 +86,6 @@ async function refreshSquadsCache(env) {
   const clubCount = Object.keys(squads).length;
   await env.SF_CACHE.put('sf_squads_raw_v1', JSON.stringify({ data: squads, ts: Date.now() }));
 
-  // Tables
-  const tablesRes = await fetch(`${GAME_API}/tables/from-fixtures`, { headers });
-  if (tablesRes.ok) {
-    await env.SF_CACHE.put('sf_tables_raw_v1', JSON.stringify({ data: await tablesRes.json(), ts: Date.now() }));
-  }
-
   // Budget (auth required)
   try {
     const budgetRes = await fetch(`${GAME_API}/budgets?format=full`, { headers });

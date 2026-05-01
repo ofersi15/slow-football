@@ -1,4 +1,4 @@
-import { API } from '../constants.js'
+import { API, ESPIONAGE_CACHE_TTL } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync } from '../cache.js'
 import { fmtSubStatus, fmtNegoDate } from '../utils.js'
 
@@ -368,7 +368,7 @@ export const espionageMethods = {
       this.espionageMsg = 'Loading…';
       this.espionageProgress = 0;
       const CACHE_KEY = 'sf_espionage_v3';
-      const TTL = 30 * 60 * 1000;
+      const TTL = ESPIONAGE_CACHE_TTL;
       if (!forceRefresh) {
         try {
           let rawCached = await serverCacheGet(CACHE_KEY);
