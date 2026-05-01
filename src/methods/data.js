@@ -113,6 +113,9 @@ export const dataMethods = {
               // Enrich stats in background
               setTimeout(() => this.enrichStats(), 500);
             }
+            // Pre-warm other tabs in background so they load instantly when opened
+            setTimeout(() => { if (!this.youthLoaded && !this.youthLoading) this.loadYouth(); }, 3000);
+            setTimeout(() => { if (!this.espionageLoaded && !this.espionageLoading) this.loadEspionage(); }, 7000);
             return;
           }
         }
@@ -433,6 +436,11 @@ export const dataMethods = {
         if (foreground) { this.progress=100; this.loadMsg='Done!'; this.loaded=true; this.buildBookmarklet(); this.checkTacticsCache(); }
         // Kick off stats enrichment after squads loaded
         setTimeout(() => this.enrichStats(), 800);
+        // Pre-warm other tabs in background so they load instantly when opened
+        if (foreground) {
+          setTimeout(() => { if (!this.youthLoaded && !this.youthLoading) this.loadYouth(); }, 3000);
+          setTimeout(() => { if (!this.espionageLoaded && !this.espionageLoading) this.loadEspionage(); }, 7000);
+        }
 
       } catch(e) {
         console.error(e);
