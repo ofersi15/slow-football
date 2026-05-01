@@ -7,7 +7,7 @@ export default defineConfig({
   // SFCs added in Phase C will use the runtime-only build via @vitejs/plugin-vue.
   resolve: {
     alias: {
-      vue: 'vue/dist/vue.esm-bundler.js',
+      vue: 'vue/dist/vue.esm-browser.prod.js',
     },
   },
   define: {
