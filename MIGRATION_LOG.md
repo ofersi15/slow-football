@@ -11,21 +11,17 @@ See /home/codespace/.claude/plans/breezy-juggling-pine.md for full plan.
 - [DONE] A-4: Created src/cache.js, removed from app.js
 - [DONE] A-5: Verified app.js line count (4089, was 4461), pushed, verified live
 
-## Phase B — Introduce Vite + migrate 3 simple tabs
+## Phase B — Introduce Vite + method-file splitting (pivot from Vue SFCs)
 - [DONE] B-1: Add Vite + vue + chart.js to package.json, create vite.config.js
 - [DONE] B-2: ES module imports in app.js, vite.config.js (lib mode), wrangler.jsonc → dist, fixed index.html (closed root div). CF Pages dashboard update is a manual user step.
-- [TODO] B-3: Extract TabScout.vue
-- [TODO] B-4: Extract TabSquad.vue
-- [TODO] B-5: Extract TabMoneyball.vue
-- [TODO] B-6: Verify npm run dev, npm run build, live deployment
+- [DONE] B-3: Pivot decision — Vue SFCs too risky (30+ cross-tab dependencies in computed). Split methods into per-topic JS files instead. Same token savings, zero refactor risk.
+- [DONE] B-4: Extract src/methods/youth.js + matches.js — app.js 4092→2902 lines
+- [DONE] B-5: Extract src/methods/espionage.js + clubs.js — app.js 2902→2000 lines
+- [DONE] B-6: Extract src/methods/data.js + helpers.js — app.js 2000→1153 lines
+- [DONE] B-7: Verified npm run build clean on each step, pushed live
 
-## Phase C — Migrate remaining tabs + modal
-- [TODO] C-1: Extract TabClub.vue
-- [TODO] C-2: Extract TabEspionage.vue
-- [TODO] C-3: Extract TabYouth.vue
-- [TODO] C-4: Extract PlayerModal.vue
-- [TODO] C-5: Extract TabAnalysis.vue
-- [TODO] C-6: Extract TabClubs.vue
-- [TODO] C-7: Extract TabMatches.vue
-- [TODO] C-8: Delete app.js (all tabs migrated)
-- [TODO] C-9: Shared state audit — consider src/store.js if App.vue > 400 lines
+## Phase C — Further splitting (if needed)
+- app.js is now 1153 lines (data + computed + watch + small utility methods + mounted)
+- index.html is 3555 lines (templates — unchanged)
+- All method logic now in 6 src/methods/*.js files (117–653 lines each)
+- Further splitting: could extract computed properties or index.html templates, but current state is already a ~4× improvement in per-task context usage
