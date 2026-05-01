@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FULL_ATTR_KEYS } from '../constants.js'
+import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS } from '../constants.js'
 
 export const youthMethods = {
     async loadYouth(forceRefresh = false) {
@@ -99,7 +99,6 @@ export const youthMethods = {
           const pname = (job.player?.name || job.player?.Player || '').toLowerCase();
           if (pname) accMap[pname] = job.player;
         }
-        const ATTR_KEYS_ENR = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision','Mentality','Experience','Leadership','Work rate'];
         for (const p of acItems) {
           const pname = (p.name || p.Player || '').toLowerCase();
           const jobPlayer = accMap[pname];
@@ -135,7 +134,7 @@ export const youthMethods = {
         }
 
         // Enrich active scout job.player objects with missing attributes from club squads
-        const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+        const ATTR_KEYS = FULL_ATTR_KEYS;
         const hasFullAttrs = p => p && (ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5 || (p.stats && ATTR_KEYS.filter(a=>p.stats[a]!=null&&p.stats[a]>0).length >= 5));
         const activeScouts = (sjRes.items||[]).filter(j => j.player && !hasFullAttrs(j.player));
         if (activeScouts.length) {
@@ -147,7 +146,7 @@ export const youthMethods = {
               squadCache[club.toLowerCase()] = d.players||[];
             } catch(e) {}
           }));
-          const MERGE = ['Speed','Stamina','Dribbling','Passing','Shooting','Tackling','Marking','Heading','Vision','Handling','Reflexes','Strength','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
+          const MERGE = PLAYER_MERGE_ATTRS;
           for (const job of activeScouts) {
             const club = (job.player?.club||job.player?.Club||'').toLowerCase();
             const squad = squadCache[club]||[];
@@ -290,7 +289,7 @@ export const youthMethods = {
         }
 
         // Auto-enrich players with incomplete attributes from their club squads
-        const ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+        const ATTR_KEYS = FULL_ATTR_KEYS;
         const hasFullAttrs = p => p && (ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length >= 5 || (p.stats && ATTR_KEYS.filter(a=>p.stats[a]!=null&&p.stats[a]>0).length >= 5));
         const needsEnrich = allJobs.filter(j => j.player && !hasFullAttrs(j.player));
         if (needsEnrich.length) {
@@ -306,7 +305,7 @@ export const youthMethods = {
               } catch(e) {}
             }));
           }
-          const MERGE = ['Speed','Stamina','Dribbling','Passing','Shooting','Tackling','Marking','Heading','Vision','Handling','Reflexes','Strength','Mentality','Experience','Leadership','Work rate','Adaptability','Form','Confidence'];
+          const MERGE = PLAYER_MERGE_ATTRS;
           for (const j of needsEnrich) {
             const club = (j.player?.club||j.player?.Club||'').toLowerCase();
             const squad = squadCache[club]||[];

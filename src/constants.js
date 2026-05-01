@@ -67,6 +67,9 @@ export const SLOT_ATTRS = {
 
 export const DEFAULT_MENTAL_ATTRS = ['Mentality','Experience','Work rate'];
 export const FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision'];
+// Extended attr sets used for player enrichment in youth/scouting logic
+export const ATTR_KEYS_ENR = [...FULL_ATTR_KEYS, 'Mentality','Experience','Leadership','Work rate'];
+export const PLAYER_MERGE_ATTRS = [...ATTR_KEYS_ENR, 'Adaptability','Form','Confidence'];
 
 // ── Formations ────────────────────────────────────────────────────────────────
 export const FORMATIONS = {
