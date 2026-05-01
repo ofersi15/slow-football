@@ -30,6 +30,17 @@ Read this first when resuming a session.
   - src/computed/youth.js (youthAcademySorted, youthFilteredHistory, youthHistFiltered, …)
   - src/computed/clubs.js (selectedClubPlayers, selectedClubSubmissions, …)
 
+## Cache overhaul (2026-05-01) ✅
+
+- Stats TTL: 6h → 7 days (updates weekly on Mondays only)
+- Espionage TTL: 30min → 6h (staff/facilities change weekly at most)
+- Tactics: localStorage-only → also persisted to CF KV (survives browser clears, works across devices)
+- Youth: also persisted to CF KV (read KV first, write KV after full fetch)
+- CF cron squads run now also pre-caches sf_espionage_v3 + sf_youth_idx_v2 server-side (4×/day)
+- Background prefetch: youth (3s) + espionage (7s) after main data loads
+- Removed dead sf_tables_raw_v1 write from CF cron
+- CF worker redeployed: version af71ab20
+
 ## Current state (as of 2026-05-01)
 
 | File | Lines | Notes |
