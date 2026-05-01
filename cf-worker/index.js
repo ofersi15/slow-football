@@ -114,9 +114,73 @@ async function refreshSquadsCache(env) {
     }
   } catch(e) { console.error('[vacancies]', e); }
 
+  // Espionage + youth — run concurrently after squads are ready
+  await Promise.all([
+    refreshEspionageCache(env, squads, token),
+    refreshYouthCache(env, token),
+  ]);
+
   // Single log entry for the whole squads run (1 KV read + 1 KV write)
   await appendLog(env, 'squads', `${clubCount} clubs · ${new Date().toISOString()}`);
   console.log('[squads] done:', clubCount, 'clubs');
+}
+
+async function refreshEspionageCache(env, squads, token) {
+  try {
+    const clubs = Object.keys(squads);
+    const BATCH = 8;
+    const results = [];
+    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+
+    for (let i = 0; i < clubs.length; i += BATCH) {
+      const batch = clubs.slice(i, i + BATCH);
+      const batchRes = await Promise.all(batch.map(async club => {
+        const enc = encodeURIComponent(club);
+        try {
+          const [staffRes, facRes] = await Promise.all([
+            fetch(`${GAME_API}/staff?club=${enc}`, { headers: h }).then(r => r.json()).catch(() => ({})),
+            fetch(`${GAME_API}/facilities?club=${enc}`).then(r => r.json()).catch(() => ({})),
+          ]);
+          return { club, current: staffRes.current || {}, ads: staffRes.openAds || [], levels: facRes.levels || {}, project: facRes.project || null };
+        } catch(e) {
+          return { club, current: {}, ads: [], levels: {}, project: null };
+        }
+      }));
+      results.push(...batchRes);
+    }
+
+    const negosRaw = await env.SF_CACHE.get('sf_negos_history_v1');
+    const negos = negosRaw ? JSON.parse(negosRaw) : [];
+    await env.SF_CACHE.put('sf_espionage_v3', JSON.stringify({ savedAt: Date.now(), clubs: results, negos }));
+    console.log('[espionage]', results.length, 'clubs cached');
+  } catch(e) { console.error('[espionage]', e); }
+}
+
+async function refreshYouthCache(env, token) {
+  try {
+    const enc = encodeURIComponent('Leverkusen');
+    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+
+    const [sjRes, acRes, facRes, staffRes, rejRes] = await Promise.all([
+      fetch(`${GAME_API}/scouting/jobs?club=${enc}`, { headers: h }).then(r => r.json()),
+      fetch(`${GAME_API}/academy?club=${enc}`, { headers: h }).then(r => r.json()),
+      fetch(`${GAME_API}/facilities?club=${enc}`).then(r => r.json()),
+      fetch(`${GAME_API}/staff/effects?club=${enc}`).then(r => r.json()),
+      fetch(`${GAME_API}/scouting/jobs?club=${enc}&status=rejected`, { headers: h }).then(r => r.json()),
+    ]);
+
+    const now = Date.now();
+    await env.SF_CACHE.put('sf_youth_idx_v2', JSON.stringify({
+      savedAt: now, histSavedAt: now, staticSavedAt: now,
+      cap: sjRes.cap || {},
+      scouts: sjRes.items || [],
+      academy: acRes.items || [],
+      facilities: facRes || {},
+      staff: (staffRes.ok ? staffRes.effects : {}) || {},
+      rejected: rejRes.items || [],
+    }));
+    console.log('[youth] scouts:', sjRes.items?.length, 'academy:', acRes.items?.length);
+  } catch(e) { console.error('[youth]', e); }
 }
 
 // Returns true if current time is within 9am–11pm US Eastern

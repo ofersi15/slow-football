@@ -1,4 +1,5 @@
 import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS } from '../constants.js'
+import { serverCacheGet, serverCacheSet } from '../cache.js'
 
 export const youthMethods = {
     async loadYouth(forceRefresh = false) {
@@ -32,7 +33,9 @@ export const youthMethods = {
       // ── Try cache ──────────────────────────────────────────────────────────
       if (!forceRefresh) {
         try {
-          const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+          let _raw = await serverCacheGet(CACHE_KEY);
+          if (!_raw) _raw = localStorage.getItem(CACHE_KEY);
+          const cached = _raw ? JSON.parse(_raw) : null;
           if (cached) {
             const now        = Date.now();
             const liveAge    = now - (cached.savedAt       || 0);
@@ -116,6 +119,7 @@ export const youthMethods = {
           cap: sjRes.cap||{}, scouts: sjRes.items||[], academy,
           facilities: facRes||{}, staff, rejected: rejRes.items||[],
         };
+        serverCacheSet(CACHE_KEY, JSON.stringify(newCache));
         try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
 
         applyCache(newCache, rejRes.items);
@@ -161,6 +165,7 @@ export const youthMethods = {
           }
           // Update the cache with enriched data
           newCache.scouts = sjRes.items||[];
+          serverCacheSet(CACHE_KEY, JSON.stringify(newCache));
           try { localStorage.setItem(CACHE_KEY, JSON.stringify(newCache)); } catch(e) {}
           // Re-apply so youthScouts gets the enriched player objects
           applyCache(newCache, rejRes.items);
