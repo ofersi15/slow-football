@@ -1905,7 +1905,7 @@
       <!-- Club detail overlay -->
       <div v-if="selectedClubName" style="display:flex;flex-direction:column;gap:12px">
         <!-- Header card -->
-        <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:10">
           <button class="btn" @click="selectedClubName=null" style="font-size:12px">← Back</button>
           <button class="btn" @click="openClubDetail(selectedClubName)" style="font-size:12px" title="Reload latest submission">↺ Reload</button>
           <button class="btn" @click="showRawSub=!showRawSub" style="font-size:12px" :style="{color:showRawSub?'#ffa657':''}">{ } Raw</button>
@@ -1969,8 +1969,8 @@
           <template v-if="selectedClubSubmissions.length">
             <!-- Wide-screen 2-col: pitch+setpieces+subs left, squad right -->
             <div class="club-xi-layout">
-            <div style="display:flex;flex-direction:column;gap:8px">
-
+            <!-- Pitch: auto-width column (direct grid child) -->
+              
               <!-- Big interactive pitch -->
               <div style="max-width:600px;width:100%;position:relative">
                 <svg viewBox="-3 -3 74 111" style="width:100%;max-height:78vh;border-radius:8px;border:1px solid #2d3748;display:block" xmlns="http://www.w3.org/2000/svg">
@@ -2060,6 +2060,47 @@
                 </div>
               </div>
 
+            <!-- Squad + Panels: 1fr column, flex row internally -->
+            <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+                            <div class="card" style="flex:1;min-width:0;padding:0;overflow:hidden">
+                <div style="padding:10px 14px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:12px;font-weight:700;color:#e6edf3">Full Squad</span>
+                  <span class="c-gray" style="font-size:11px">{{selectedClubPlayers.length}} players</span>
+                  <div style="margin-left:auto;display:flex;gap:4px">
+                    <button v-for="s in [{k:'pos',l:'Pos'},{k:'rating',l:'Rtg'},{k:'value',l:'Val'},{k:'age',l:'Age'}]" :key="s.k"
+                      @click="clubSquadSort=s.k"
+                      style="border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer"
+                      :style="clubSquadSort===s.k?{background:'#1f6feb',color:'#fff'}:{background:'#21262d',color:'#8b949e'}">
+                      {{s.l}}
+                    </button>
+                  </div>
+                </div>
+                <table style="font-size:11px;margin-top:6px">
+                  <thead>
+                    <tr>
+                      <th style="min-width:130px;cursor:pointer" @click="clubSquadSort='name'">Player</th>
+                      <th style="cursor:pointer" @click="clubSquadSort='pos'">Pos</th>
+                      <th style="cursor:pointer" @click="clubSquadSort='age'">Age</th>
+                      <th style="cursor:pointer" @click="clubSquadSort='rating'">Rtg</th>
+                      <th style="cursor:pointer" @click="clubSquadSort='value'">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="p in selectedClubPlayers" :key="p.Player||p.id"
+                        @click="openModal(p)" style="cursor:pointer">
+                      <td style="font-weight:500">{{p.Player}}</td>
+                      <td><span :class="'pos-badge pos-'+basePos(p.Position)" style="font-size:10px;min-width:26px;display:inline-block;text-align:center">{{p.Position}}</span></td>
+                      <td class="c-gray">{{p.Age}}</td>
+                      <td style="font-weight:700;color:#e6edf3">{{p._gameRating||p.Rating||'—'}}</td>
+                      <td class="c-gray">{{p.Value ? '£'+(p.Value/1e6).toFixed(1)+'m' : '—'}}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- Set Pieces · Subs · Roles panel -->
+              <div v-if="selectedClubSubmissions[0].setPieces || selectedClubSubmissions[0].subs?.length || selectedClubSubmissions[0].roles"
+                   style="display:flex;flex-direction:column;gap:8px;width:220px;flex-shrink:0">
+                  
               <!-- Set Pieces (above subs) -->
               <div v-if="selectedClubSubmissions[0].setPieces" style="display:flex;flex-direction:column;gap:8px">
                 <div class="card" style="padding:10px">
@@ -2183,9 +2224,7 @@
 
                 </div>
               </div>
-
-              <!-- Subs + Roles panel -->
-              <div style="display:flex;flex-direction:column;gap:8px">
+                  
                 <div v-if="selectedClubSubmissions[0].subs?.length" class="card" style="padding:10px">
                   <div style="font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Substitutes</div>
                   <div v-for="(p,i) in selectedClubSubmissions[0].subs" :key="'sub'+i" style="padding:5px 0;border-bottom:1px solid #161b22">
@@ -2210,48 +2249,7 @@
                   </template>
                 </div>
               </div>
-            </div><!-- end left column -->
-
-            <!-- Right column: Squad only -->
-            <div style="min-width:0">
-
-              <!-- Full Squad card (top of right column) -->
-              <div class="card" style="padding:0;overflow:hidden">
-                <div style="padding:10px 14px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <span style="font-size:12px;font-weight:700;color:#e6edf3">Full Squad</span>
-                  <span class="c-gray" style="font-size:11px">{{selectedClubPlayers.length}} players</span>
-                  <div style="margin-left:auto;display:flex;gap:4px">
-                    <button v-for="s in [{k:'pos',l:'Pos'},{k:'rating',l:'Rtg'},{k:'value',l:'Val'},{k:'age',l:'Age'}]" :key="s.k"
-                      @click="clubSquadSort=s.k"
-                      style="border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer"
-                      :style="clubSquadSort===s.k?{background:'#1f6feb',color:'#fff'}:{background:'#21262d',color:'#8b949e'}">
-                      {{s.l}}
-                    </button>
-                  </div>
-                </div>
-                <table style="font-size:11px;margin-top:6px">
-                  <thead>
-                    <tr>
-                      <th style="min-width:130px;cursor:pointer" @click="clubSquadSort='name'">Player</th>
-                      <th style="cursor:pointer" @click="clubSquadSort='pos'">Pos</th>
-                      <th style="cursor:pointer" @click="clubSquadSort='age'">Age</th>
-                      <th style="cursor:pointer" @click="clubSquadSort='rating'">Rtg</th>
-                      <th style="cursor:pointer" @click="clubSquadSort='value'">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="p in selectedClubPlayers" :key="p.Player||p.id"
-                        @click="openModal(p)" style="cursor:pointer">
-                      <td style="font-weight:500">{{p.Player}}</td>
-                      <td><span :class="'pos-badge pos-'+basePos(p.Position)" style="font-size:10px;min-width:26px;display:inline-block;text-align:center">{{p.Position}}</span></td>
-                      <td class="c-gray">{{p.Age}}</td>
-                      <td style="font-weight:700;color:#e6edf3">{{p._gameRating||p.Rating||'—'}}</td>
-                      <td class="c-gray">{{p.Value ? '£'+(p.Value/1e6).toFixed(1)+'m' : '—'}}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div><!-- end right column -->
+            </div><!-- end flex row -->
             </div><!-- end club-xi-layout -->
           <div v-if="showRawSub && selectedClubSubmissions.length" class="card" style="padding:10px">
             <pre style="font-size:10px;color:#8b949e;white-space:pre-wrap;word-break:break-all;max-height:60vh;overflow:auto;margin:0">{{JSON.stringify(selectedClubSubmissions[0],null,2)}}</pre>
