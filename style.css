@@ -6,9 +6,12 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-seri
 .attr-btn:hover{background:#161b22;color:#e6edf3}
 .attr-btn.active{background:#1f6feb;color:#fff;border-color:#388bfd}
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.header{background:#161b22;border-bottom:1px solid #21262d;padding:8px 14px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;overflow-x:auto}
+.header{background:#161b22;border-bottom:1px solid #21262d;padding:0;flex-shrink:0;display:flex;flex-direction:column}
+.tab-bar{display:flex;align-items:center;gap:6px;padding:6px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.tab-bar .btn{flex-shrink:0;white-space:nowrap}
+.header-meta{font-size:11px;color:#8b949e;padding:0 14px 5px;line-height:1}
 .content{flex:1;overflow:auto}
-.btn{padding:4px 10px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#8b949e;transition:all .12s}
+.btn{padding:4px 10px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#8b949e;transition:all .12s;min-height:36px}
 .btn:hover{background:#161b22;color:#e6edf3}
 .btn.active{background:#1f6feb;color:#fff;border-color:#388bfd}
 .btn.green{background:#238636;color:#fff;border:none}
@@ -71,6 +74,30 @@ input[type=checkbox]{accent-color:#1f6feb;cursor:pointer}
 /* Stat bar in MB lists */
 .mb-list-item{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #21262d;cursor:pointer}
 .mb-list-item:hover{background:#1c2128;margin:0 -4px;padding:3px 4px;border-radius:4px}
+/* Scout sticky first column */
+.scout-sticky{position:sticky;left:0;z-index:1;background:#0d1117}
+th.scout-sticky{background:#161b22;z-index:3}
+tr.clickable:hover td.scout-sticky{background:#1c2128}
+/* Mobile filter toggle (hidden on desktop) */
+.mobile-filter-btn{display:none}
+/* Analysis: low-sample rows */
+.low-n-row{opacity:.42}
+/* Club cards grid */
+.clubs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.club-card{cursor:pointer;padding:12px 14px;display:flex;flex-direction:column;gap:7px;transition:border-color .12s}
+/* Inside-club: pitch+subs left column, squad+setpieces right column on wide screens */
+.club-xi-layout{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start}
+@media(max-width:1024px){.club-xi-layout{display:flex;flex-direction:column}}
+.club-card:hover{border-color:#388bfd!important}
+/* Moneyball sub-tabs */
+.mb-sub-bar{background:#0d1117;border-bottom:2px solid #21262d;padding:0 14px;display:flex;gap:0}
+.mb-sub-btn{background:none;border:none;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;font-size:12px;font-weight:600;color:#8b949e;transition:all .1s;margin-bottom:-2px;flex-shrink:0}
+.mb-sub-btn.active{border-bottom-color:#1f6feb;color:#e6edf3}
+.mb-sub-btn:hover{color:#e6edf3}
+/* Modal close button larger hit area */
+.modal-close{position:absolute;top:6px;right:8px;background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;line-height:1;padding:8px}
+/* Pitch + subs: mobile stack */
+.pitch-detail-row{display:flex;gap:12px;align-items:flex-start}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
 @media(max-width:768px){
   .layout{height:auto;min-height:100vh;overflow:auto}
@@ -78,12 +105,16 @@ input[type=checkbox]{accent-color:#1f6feb;cursor:pointer}
   .main{height:auto;overflow:visible}
   .content{overflow:visible}
   .card{padding:10px}
-  .header{padding:6px 10px;flex-wrap:wrap;gap:6px}
-  .tab-bar{gap:3px;flex-wrap:wrap}
+  .tab-bar{gap:4px;padding:5px 8px}
+  .tab-bar .btn{min-height:44px;font-size:12px;padding:4px 10px}
   table{font-size:11px}
   td{padding:3px 5px}
   th{padding:4px 5px}
   .btn{font-size:11px;padding:3px 7px}
   .modal{padding:14px}
   .league-grid,.top-list-grid{padding:8px;gap:8px}
+  .mobile-filter-btn{display:flex;align-items:center;gap:6px;min-height:40px}
+  .pitch-detail-row{flex-direction:column}
+  .clubs-grid{grid-template-columns:1fr}
+  .mb-sub-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
