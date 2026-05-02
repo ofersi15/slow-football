@@ -1,8 +1,20 @@
       <!-- SIDEBAR FILTERS -->
-      <div class="sidebar" v-show="activeTab==='scout'">
+      <div class="sidebar" v-show="activeTab==='scout' && scoutFiltersOpen">
       <div>
         <span class="label">Search</span>
         <input type="text" v-model="search" placeholder="Name, club, nation…">
+      </div>
+      <!-- Column Groups — moved to top for discoverability -->
+      <div style="border-top:1px solid #21262d;padding-top:8px">
+        <span class="label">📋 Columns</span>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">
+          <label v-for="(label, key) in {stats:'Stats',per90:'Per 90',fitness:'Fitness',attrs:'Attributes',mental:'Mental',bio:'Bio'}" :key="key"
+                 style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:3px 7px"
+                 :style="{borderColor:colGroups[key]?'#388bfd':'#21262d',color:colGroups[key]?'#79c0ff':'#8b949e'}">
+            <input type="checkbox" v-model="colGroups[key]" style="accent-color:#1f6feb">
+            {{label}}
+          </label>
+        </div>
       </div>
       <div>
         <span class="label">Position</span>
@@ -138,18 +150,6 @@
               {{attr}}
             </label>
           </div>
-        </div>
-      </div>
-      <!-- Column Groups -->
-      <div style="border-top:1px solid #21262d;padding-top:8px">
-        <span class="label">📋 Columns</span>
-        <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">
-          <label class="check-row"><input type="checkbox" v-model="colGroups.stats" style="accent-color:#1f6feb"> Season Stats</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.per90" style="accent-color:#1f6feb"> Per 90</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.fitness" style="accent-color:#1f6feb"> Fitness</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.attrs" style="accent-color:#1f6feb"> Attributes</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.mental" style="accent-color:#1f6feb"> Mental</label>
-          <label class="check-row"><input type="checkbox" v-model="colGroups.bio" style="accent-color:#1f6feb"> Bio</label>
         </div>
       </div>
       <div style="border-top:1px solid #21262d;padding-top:8px;font-size:11px;color:#8b949e">

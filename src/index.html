@@ -35,8 +35,12 @@
     <div class="main">
       <!-- TABS -->
       <div class="header">
-        <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]" @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</button>
-        <span style="margin-left:auto;font-size:11px;color:#8b949e">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+        <div class="tab-bar">
+          <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]"
+                  :aria-label="t.label" role="tab" :aria-selected="activeTab===t.id"
+                  @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</button>
+          <span class="header-meta" style="margin-left:auto;flex-shrink:0;display:block">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+        </div>
       </div>
       <div style="display:flex;flex:1;overflow:hidden">
 <!-- include:sidebar -->
