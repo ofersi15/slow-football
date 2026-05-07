@@ -259,16 +259,12 @@
 
         <!-- Loaded all-clubs history -->
         <template v-else>
-          <!-- Filters + cache info -->
+          <!-- Filters row -->
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <input type="text" v-model="youthHistSearch" placeholder="Search player, club…" style="width:190px">
+            <input type="text" v-model="youthHistSearch" placeholder="Search player, club…" style="width:180px">
             <select v-model="youthHistPos" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
               <option value="">All positions</option>
               <option v-for="p in youthHistAllPositions" :key="p" :value="p">{{p}}</option>
-            </select>
-            <select v-model="youthHistClubFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
-              <option value="">All clubs</option>
-              <option v-for="c in youthHistClubs" :key="c" :value="c">{{c}}</option>
             </select>
             <select v-model="youthHistStatusFilter" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;padding:5px 8px;border-radius:6px;font-size:12px">
               <option value="">All statuses</option>
@@ -285,55 +281,79 @@
             </select>
             <span class="c-gray" style="font-size:11px">{{youthHistFiltered.length}} scouts · {{youthHistClubs.length}} clubs</span>
             <span v-if="youthHistCacheDate" class="c-gray" style="font-size:10px">cached {{youthHistCacheDate}}</span>
-            <button class="btn" style="margin-left:auto;font-size:11px" @click="loadYouthHistory(true)">🔄 Refresh (clears cache)</button>
+            <button class="btn" style="margin-left:auto;font-size:11px" @click="loadYouthHistory(true)">🔄 Refresh</button>
           </div>
 
-          <!-- Club summary cards (clickable to filter) -->
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <div v-for="(info, club) in youthClubInfoMap" :key="club"
-              class="card" style="padding:6px 10px;font-size:11px;cursor:pointer;min-width:150px"
-              :style="{borderColor:club===myClub?'#238636':'#21262d',opacity:youthHistClubFilter&&youthHistClubFilter!==club?0.5:1}"
-              @click="youthHistClubFilter=youthHistClubFilter===club?'':club">
-              <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
-              <div class="c-gray">
-                Scout Lv <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span>
-                · Bump <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span>
-                · <span class="c-green">{{youthAllHistoryJobs.filter(j=>j._club===club&&(j._jobStatus||j.status)==='active').length}} active</span>
-                · <span class="c-blue">{{youthAllHistoryJobs.filter(j=>j._club===club).length}} total</span>
-              </div>
+          <!-- Club chips strip (horizontal scroll, replaces the card grid) -->
+          <div style="overflow-x:auto;padding-bottom:4px">
+            <div style="display:flex;gap:5px;width:max-content">
+              <span v-for="(info, club) in youthClubInfoMap" :key="club"
+                @click="youthHistClubFilter=youthHistClubFilter===club?'':club"
+                :style="{
+                  display:'inline-flex',alignItems:'center',gap:'5px',padding:'4px 10px',
+                  borderRadius:'16px',cursor:'pointer',whiteSpace:'nowrap',fontSize:'11px',
+                  border:'1px solid '+(youthHistClubFilter===club?'#58a6ff':club===myClub?'#238636':'#30363d'),
+                  background:youthHistClubFilter===club?'#1f2d3d':'#0d1117',
+                  opacity:youthHistClubFilter&&youthHistClubFilter!==club?0.35:1,
+                  transition:'opacity .15s,border-color .15s',
+                }">
+                <span :style="{color:club===myClub?'#7ee787':youthHistClubFilter===club?'#79c0ff':'#e6edf3',fontWeight:club===myClub||youthHistClubFilter===club?'700':'400'}">{{club}}</span>
+                <span style="color:#8b949e">Lv{{info.facilities?.levels?.scouting||'?'}}</span>
+                <span style="color:#7ee787;font-weight:600">{{(youthClubStatsMap[club]||{}).active||0}}●</span>
+                <span style="color:#8b949e">/{{(youthClubStatsMap[club]||{}).total||0}}</span>
+              </span>
             </div>
           </div>
+          <div v-if="youthHistClubFilter" style="font-size:11px;color:#8b949e;margin-top:-4px">
+            Filtered: <span style="color:#79c0ff;font-weight:600">{{youthHistClubFilter}}</span>
+            · Scout Lv {{youthClubInfoMap[youthHistClubFilter]?.facilities?.levels?.scouting||'?'}}
+            · Bump +{{youthClubInfoMap[youthHistClubFilter]?.staff?.scouting?.qualityBump||0}}
+            · Academy Lv {{youthClubInfoMap[youthHistClubFilter]?.facilities?.levels?.academy||'?'}}
+            <button class="btn" style="font-size:10px;padding:1px 7px;margin-left:8px" @click="youthHistClubFilter=''">✕ Clear</button>
+          </div>
 
-          <!-- History table -->
+          <!-- History table (uses pre-computed fields, paginated) -->
           <div class="card" style="padding:0;overflow:hidden">
             <table>
               <thead><tr style="cursor:pointer">
-                <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th><th>Pos Rtg</th><th>Best Pos</th>
-                <th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th>Mentality</th><th>WR</th><th>Potential</th>
-                <th @click="youthSortBy('sclub')">Scouting Club{{youthSortIcon('sclub')}}</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th @click="youthSortBy('status')">Status{{youthSortIcon('status')}}</th><th></th>
+                <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th>
+                <th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th>
+                <th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th>
+                <th @click="youthSortBy('rating')">Rating{{youthSortIcon('rating')}}</th>
+                <th>Pos Rtg</th>
+                <th>Best Pos</th>
+                <th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th>
+                <th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th>
+                <th>Men</th>
+                <th>WR</th>
+                <th>Potential</th>
+                <th @click="youthSortBy('sclub')">Club{{youthSortIcon('sclub')}}</th>
+                <th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th>
+                <th @click="youthSortBy('status')">Status{{youthSortIcon('status')}}</th>
+                <th></th>
               </tr></thead>
               <tbody>
-                <tr v-for="job in youthHistFiltered" :key="job.id" class="clickable"
+                <tr v-for="job in youthHistPaged" :key="job.id" class="clickable"
                   @click="openModal({...job.player,...(job.player.stats||{})},job)">
                   <td>
                     <div style="font-weight:600">{{job.player.name||job.player.Player}}</div>
-                    <div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</div>
+                    <div class="c-gray" style="font-size:10px">{{job.player.nationality||job.player.Nationality}}</div>
                   </td>
                   <td><span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span></td>
                   <td>{{job.player.age||job.player.Age}}</td>
                   <td><span :class="ratingClass(job.player.rating||job.player.Rating)">{{job.player.rating||job.player.Rating}}</span></td>
-                  <td><span :class="ratingClass(scoutPosRating(job.player,job.player.position||job.player.Position))" style="font-weight:700">{{scoutPosRating(job.player,job.player.position||job.player.Position)||'—'}}</span></td>
+                  <td><span :class="ratingClass(job._posRating)" style="font-weight:700">{{job._posRating||'—'}}</span></td>
                   <td style="font-size:11px">
-                    <template v-if="scoutBestPos(job.player) && scoutBestPos(job.player).pos!==(job.player.position||job.player.Position)">
-                      <span :class="'pos pos-'+scoutBestPos(job.player).pos" style="font-size:9px">{{scoutBestPos(job.player).pos}}</span>
-                      <span :class="ratingClass(scoutBestPos(job.player).rating)" style="font-weight:700;margin-left:3px">{{scoutBestPos(job.player).rating}}</span>
+                    <template v-if="job._bestPos && job._bestPos!==(job.player.position||job.player.Position)">
+                      <span :class="'pos pos-'+job._bestPos" style="font-size:9px">{{job._bestPos}}</span>
+                      <span :class="ratingClass(job._bestPosRating)" style="font-weight:700;margin-left:3px">{{job._bestPosRating}}</span>
                     </template>
                     <span v-else class="c-gray">—</span>
                   </td>
                   <td class="c-blue">{{fmtVal(job.player.value||job.player.Value)}}</td>
                   <td class="c-orange">{{fmtVal(job.buyNow)}}</td>
-                  <td style="font-size:11px"><span :class="ratingClass(getYouthAttr(job.player,'Mentality'))">{{getYouthAttr(job.player,'Mentality')||'—'}}</span></td>
-                  <td style="font-size:11px"><span :class="ratingClass(getYouthAttr(job.player,'Work rate'))">{{getYouthAttr(job.player,'Work rate')||'—'}}</span></td>
+                  <td style="font-size:11px"><span :class="ratingClass(job._mentality)">{{job._mentality||'—'}}</span></td>
+                  <td style="font-size:11px"><span :class="ratingClass(job._workRate)">{{job._workRate||'—'}}</span></td>
                   <td style="font-size:11px">
                     <span v-if="job.player.potential" :style="{color:job.player.potential==='high'?'#7ee787':job.player.potential==='medium'?'#ffa657':'#8b949e',fontWeight:'700'}">{{job.player.potential}}</span>
                     <span v-if="job.player.potentialCap" class="c-gray" style="font-size:10px"> ({{job.player.potentialCap}})</span>
@@ -341,14 +361,10 @@
                   </td>
                   <td>
                     <div style="background:#1f2d3d;color:#79c0ff;border:1px solid #388bfd40;border-radius:10px;display:inline-block;padding:1px 7px;font-size:10px;font-weight:600">{{job._club}}</div>
-                    <div v-if="youthClubInfoMap[job._club]" style="font-size:10px;margin-top:2px;color:#8b949e">
-                      Lv{{youthClubInfoMap[job._club].facilities?.levels?.scouting||'?'}}
-                      +{{youthClubInfoMap[job._club].staff?.scouting?.qualityBump||0}}
-                    </div>
                   </td>
-                  <td class="c-gray" style="font-size:10px">{{job.createdAt?new Date(job.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'}}</td>
+                  <td class="c-gray" style="font-size:10px">{{job._dateStr}}</td>
                   <td>
-                    <span v-if="(job._jobStatus||job.status)==='rejected'" style="background:#3a1212;color:#ff7b72;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✗ Rejected</span>
+                    <span v-if="(job._jobStatus||job.status)==='rejected'" style="background:#3a1212;color:#ff7b72;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✗ Rej</span>
                     <span v-else-if="(job._jobStatus||job.status)==='accepted'" style="background:#1a3a1a;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✓ Signed</span>
                     <span v-else-if="(job._jobStatus||job.status)==='completed'" style="background:#1a3a1a;color:#7ee787;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">✓ Done</span>
                     <span v-else-if="((job._jobStatus||job.status)==='active'||(job._jobStatus||job.status)==='scouting')&&job.rawStage>=7" style="background:#2d2a0e;color:#e3b341;border-radius:8px;padding:1px 7px;font-size:10px;font-weight:700">⏳ Ready</span>
@@ -366,23 +382,13 @@
             </table>
           </div>
 
-          <!-- Rating ceiling by club -->
-          <div class="card" style="border-color:#388bfd40">
-            <div style="font-weight:700;margin-bottom:10px">📊 Rating Ceiling by Club</div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <div v-for="(info, club) in youthClubInfoMap" :key="club"
-                style="background:#0d1117;border-radius:6px;padding:8px 12px;min-width:150px;font-size:11px;line-height:1.8">
-                <div style="font-weight:700;margin-bottom:3px">{{club}}</div>
-                <div>Scout Lv: <span class="c-orange">{{info.facilities?.levels?.scouting||'?'}}</span></div>
-                <div>Quality bump: <span class="c-green">+{{info.staff?.scouting?.qualityBump||0}}</span></div>
-                <div>Academy Lv: <span class="c-orange">{{info.facilities?.levels?.academy||'?'}}</span></div>
-                <div>Prospects/wk: <span class="c-blue">{{info.staff?.scouting?.weeklyProspects||0}}</span></div>
-                <div style="border-top:1px solid #21262d;margin-top:3px;padding-top:3px">
-                  History: <span :class="ratingClass(youthClubMaxRating(club))" style="font-weight:700">max {{youthClubMaxRating(club)||'—'}}</span>
-                  · avg {{youthClubAvgRating(club).toFixed(1)}}
-                </div>
-              </div>
-            </div>
+          <!-- Pagination -->
+          <div v-if="youthHistTotalPages>1" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 0">
+            <button class="btn" :disabled="youthHistPage===0" @click="youthHistPage=0" style="font-size:11px;padding:3px 8px">«</button>
+            <button class="btn" :disabled="youthHistPage===0" @click="youthHistPage--" style="font-size:11px;padding:3px 8px">‹ Prev</button>
+            <span class="c-gray" style="font-size:12px">Page {{youthHistPage+1}} / {{youthHistTotalPages}} · {{youthHistFiltered.length}} total</span>
+            <button class="btn" :disabled="youthHistPage>=youthHistTotalPages-1" @click="youthHistPage++" style="font-size:11px;padding:3px 8px">Next ›</button>
+            <button class="btn" :disabled="youthHistPage>=youthHistTotalPages-1" @click="youthHistPage=youthHistTotalPages-1" style="font-size:11px;padding:3px 8px">»</button>
           </div>
         </template>
       </div>

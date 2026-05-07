@@ -73,7 +73,7 @@ createApp({
       // All-clubs history state
       youthHistLoading: false, youthHistLoaded: false, youthHistMsg: '', youthHistProgress: 0,
       youthHistCacheDate: null, youthAllHistoryJobs: [], youthClubInfoMap: {},
-      youthHistSearch: '', youthHistClubFilter: '', youthHistStatusFilter: '',
+      youthHistSearch: '', youthHistClubFilter: '', youthHistStatusFilter: '', youthHistPage: 0,
       // Background refresh state
       youthBgInterval: null, youthBgLastRefresh: null,
       // Club tab state (Facilities + Staff)
@@ -247,6 +247,7 @@ createApp({
 
   watch: {
     filteredPlayers() { this.page = 0; },
+    youthHistFiltered() { this.youthHistPage = 0; },
     espionageNegoFiltered() { this.negoDisplayCount = 50; },
     espionageNegos(v) { if (v.length) this.computeTrueValues(); },
     allPlayers(v) { if (v.length && this.espionageNegos.length) this.computeTrueValues(); },

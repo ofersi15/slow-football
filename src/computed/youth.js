@@ -1,4 +1,41 @@
+const HIST_PAGE_SIZE = 50;
+
 export const youthComputed = {
+  // Pre-compute all expensive per-row derived values once, cached by Vue
+  youthHistJobsEnriched() {
+    return this.youthAllHistoryJobs.map(job => {
+      const p = job.player || {};
+      const pos = p.position || p.Position;
+      const posRtg = this.scoutPosRating(p, pos);
+      const best = this.scoutBestPos(p);
+      const dateStr = job.createdAt
+        ? new Date(job.createdAt).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'2-digit'})
+        : '—';
+      return {
+        ...job,
+        _posRating: posRtg,
+        _bestPos: best?.pos || null,
+        _bestPosRating: best?.rating || null,
+        _dateStr: dateStr,
+        _mentality: this.getYouthAttr(p, 'Mentality'),
+        _workRate: this.getYouthAttr(p, 'Work rate'),
+      };
+    });
+  },
+
+  // Per-club active/total counts, derived from enriched jobs (no template-level .filter calls)
+  youthClubStatsMap() {
+    const map = {};
+    for (const job of this.youthHistJobsEnriched) {
+      const c = job._club;
+      if (!c) continue;
+      if (!map[c]) map[c] = { active: 0, total: 0 };
+      map[c].total++;
+      if ((job._jobStatus || job.status) === 'active') map[c].active++;
+    }
+    return map;
+  },
+
   youthAcademySorted() {
     return [...this.youthAcademy].sort((a,b)=>(b.Rating||b.rating||0)-(a.Rating||a.rating||0));
   },
@@ -53,7 +90,7 @@ export const youthComputed = {
     return [...new Set(this.youthAllHistoryJobs.map(j=>j.player?.position||j.player?.Position))].filter(Boolean).sort();
   },
   youthHistFiltered() {
-    let items = this.youthAllHistoryJobs;
+    let items = this.youthHistJobsEnriched;
     const q = (this.youthHistSearch||'').toLowerCase();
     if (q) items = items.filter(j=>(j.player?.name||'').toLowerCase().includes(q)||(j.player?.club||'').toLowerCase().includes(q)||(j._club||'').toLowerCase().includes(q));
     if (this.youthHistPos) items = items.filter(j=>(j.player?.position||j.player?.Position)===this.youthHistPos);
@@ -81,6 +118,13 @@ export const youthComputed = {
     if (s==='bestattr_a') return [...items].sort((a,b)=>(a.player?.bestKey||'').localeCompare(b.player?.bestKey||''));
     if (s==='bestattr_d') return [...items].sort((a,b)=>(b.player?.bestKey||'').localeCompare(a.player?.bestKey||''));
     return items;
+  },
+  youthHistPaged() {
+    const start = this.youthHistPage * HIST_PAGE_SIZE;
+    return this.youthHistFiltered.slice(start, start + HIST_PAGE_SIZE);
+  },
+  youthHistTotalPages() {
+    return Math.max(1, Math.ceil(this.youthHistFiltered.length / HIST_PAGE_SIZE));
   },
   youthDaysUntilUpgrade() {
     if (!this.youthFacilities.project) return null;
