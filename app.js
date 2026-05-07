@@ -357,6 +357,17 @@ createApp({
       if (score >= 40) return '#d29922';
       return '#f85149';
     },
+    playerBondCount(player) {
+      if (!player?.Player || !player?.Club) return null;
+      const squad = this.allPlayers.filter(p => p.Club === player.Club);
+      return computeBonds(player, squad, this.allDeals).length;
+    },
+    bondColor(count) {
+      if (count == null) return '#6e7681';
+      if (count >= 5) return '#3fb950';
+      if (count >= 2) return '#d29922';
+      return '#8b949e';
+    },
     setAttrFilter(attr, val) {
       const n = parseInt(val) || 0;
       const f = {...this.attrFilters};
