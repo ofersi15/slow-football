@@ -77,8 +77,8 @@ export const youthComputed = {
     if (s==='men_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Mentality')||0)-(this.getYouthAttr(b.player,'Mentality')||0));
     if (s==='wr_d') return [...items].sort((a,b)=>(this.getYouthAttr(b.player,'Work rate')||0)-(this.getYouthAttr(a.player,'Work rate')||0));
     if (s==='wr_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Work rate')||0)-(this.getYouthAttr(b.player,'Work rate')||0));
-    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[b.player?.potential]||0)-(m[a.player?.potential]||0)); }
-    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[a.player?.potential]||0)-(m[b.player?.potential]||0)); }
+    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[b.player?.potential]||0)-(m[a.player?.potential]||0); return pd!==0?pd:(b.player?.potentialCap||0)-(a.player?.potentialCap||0); }); }
+    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[a.player?.potential]||0)-(m[b.player?.potential]||0); return pd!==0?pd:(a.player?.potentialCap||0)-(b.player?.potentialCap||0); }); }
     return items;
   },
   youthHistMaxRating() {
@@ -127,8 +127,8 @@ export const youthComputed = {
     if (s==='men_a') return [...items].sort((a,b)=>(a._mentality||0)-(b._mentality||0));
     if (s==='wr_d') return [...items].sort((a,b)=>(b._workRate||0)-(a._workRate||0));
     if (s==='wr_a') return [...items].sort((a,b)=>(a._workRate||0)-(b._workRate||0));
-    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[b.player?.potential]||0)-(m[a.player?.potential]||0)); }
-    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[a.player?.potential]||0)-(m[b.player?.potential]||0)); }
+    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[b.player?.potential]||0)-(m[a.player?.potential]||0); return pd!==0?pd:(b.player?.potentialCap||0)-(a.player?.potentialCap||0); }); }
+    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[a.player?.potential]||0)-(m[b.player?.potential]||0); return pd!==0?pd:(a.player?.potentialCap||0)-(b.player?.potentialCap||0); }); }
     return items;
   },
   youthHistPaged() {

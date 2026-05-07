@@ -326,11 +326,9 @@ export const youthMethods = {
           }
         }
 
-        try {
-          const payload = JSON.stringify({ data: {jobs: allJobs, clubInfo: clubInfoMap}, ts: Date.now() });
-          localStorage.setItem(HIST_CACHE_KEY, payload);
-          serverCacheSet(HIST_CACHE_KEY, payload).catch(()=>{});
-        } catch(e) {}
+        const payload = JSON.stringify({ data: {jobs: allJobs, clubInfo: clubInfoMap}, ts: Date.now() });
+        try { localStorage.setItem(HIST_CACHE_KEY, payload); } catch(e) {}
+        serverCacheSet(HIST_CACHE_KEY, payload).catch(()=>{});
 
         // Enrich _incompleteStats squad players using accepted scouting job data
         const acceptedJobs = allJobs.filter(j => j._jobStatus === 'accepted' && j.player?.stats && Object.keys(j.player.stats).length >= 11);
