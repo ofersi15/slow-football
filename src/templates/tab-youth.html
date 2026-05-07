@@ -59,26 +59,21 @@
 
         <div v-for="job in youthScouts" :key="job.id" class="card" style="cursor:pointer;margin-bottom:10px"
           @click="openModal({...job.player,...(job.player.stats||{})}, job)">
-          <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
+            <!-- Left: name, meta, attrs -->
             <div>
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
                 <span :class="'pos pos-'+(job.player.position||job.player.Position)">{{job.player.position||job.player.Position}}</span>
                 <span style="font-size:16px;font-weight:700">{{job.player.name||job.player.Player}}</span>
                 <span class="c-gray" style="font-size:11px">{{job.player.nationality||job.player.Nationality}} · {{job.player.club||job.player.Club}}</span>
                 <span v-if="job.player.Archetype||job.player.archetype" style="background:#1f2937;border-radius:10px;padding:1px 8px;font-size:10px;color:#d2a8ff">{{job.player.Archetype||job.player.archetype}}</span>
               </div>
-              <div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-                <span>Age <b>{{job.player.age||job.player.Age}}</b></span>
-                <span v-if="job.player.DOB||job.player.dob">DOB <b>{{job.player.DOB||job.player.dob}}</b></span>
-                <span>Pos rtg: <span :class="ratingClass(scoutPosRating(job.player, job.player.position||job.player.Position))" style="font-weight:700">{{scoutPosRating(job.player, job.player.position||job.player.Position)||'—'}}</span></span>
-                <template v-if="scoutBestPos(job.player) && scoutBestPos(job.player).pos!==(job.player.position||job.player.Position)">
-                  <span class="c-gray">·</span>
-                  <span>Best as <span :class="'pos pos-'+scoutBestPos(job.player).pos" style="font-size:9px">{{scoutBestPos(job.player).pos}}</span> <span :class="ratingClass(scoutBestPos(job.player).rating)" style="font-weight:700">{{scoutBestPos(job.player).rating}}</span></span>
-                </template>
-                <span v-if="getYouthAttr(job.player,'Mentality')">Mentality: <b>{{getYouthAttr(job.player,'Mentality')}}</b></span>
-                <span v-if="getYouthAttr(job.player,'Work rate')">WR: <b>{{getYouthAttr(job.player,'Work rate')}}</b></span>
+              <div style="display:flex;gap:12px;font-size:11px;margin-bottom:10px;flex-wrap:wrap;color:#8b949e">
+                <span>Age <b style="color:#e6edf3">{{job.player.age||job.player.Age}}</b></span>
+                <span v-if="job.player.DOB||job.player.dob">DOB <b style="color:#e6edf3">{{job.player.DOB||job.player.dob}}</b></span>
+                <span v-if="getYouthAttr(job.player,'Mentality')">Mentality <b style="color:#e6edf3">{{getYouthAttr(job.player,'Mentality')}}</b></span>
+                <span v-if="getYouthAttr(job.player,'Work rate')">WR <b style="color:#e6edf3">{{getYouthAttr(job.player,'Work rate')}}</b></span>
               </div>
-              <!-- Key position attrs -->
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <div v-for="attr in gameAttrsFor(job.player.position||job.player.Position)" :key="attr"
                   style="background:#0d1117;border:1px solid #ffa65760;border-radius:5px;padding:3px 8px;font-size:11px">
@@ -87,34 +82,32 @@
                 </div>
               </div>
             </div>
-            <div style="display:flex;gap:14px;align-items:flex-start">
-              <!-- Actual rating -->
-              <div style="text-align:center">
-                <div :class="ratingClass(job.player.rating||job.player.Rating)" style="font-size:28px;line-height:1">{{(job.player.rating||job.player.Rating||0).toFixed(1)}}</div>
-                <div class="c-gray" style="font-size:10px">Actual</div>
+            <!-- Right: ratings + price -->
+            <div style="text-align:right;flex-shrink:0">
+              <div style="display:flex;gap:16px;align-items:flex-end;justify-content:flex-end;margin-bottom:8px">
+                <div style="text-align:center">
+                  <div :class="ratingClass(job.player.rating||job.player.Rating)" style="font-size:28px;font-weight:700;line-height:1">{{(job.player.rating||job.player.Rating||0).toFixed(1)}}</div>
+                  <div class="c-gray" style="font-size:10px;margin-top:2px">Actual</div>
+                </div>
+                <div v-if="scoutBestPos(job.player)" style="text-align:center;padding-left:12px;border-left:1px solid #30363d">
+                  <div :class="ratingClass(scoutBestPos(job.player).rating)" style="font-size:28px;font-weight:700;line-height:1">{{scoutBestPos(job.player).rating}}</div>
+                  <div style="margin-top:4px"><span :class="'pos pos-'+scoutBestPos(job.player).pos" style="font-size:9px">{{scoutBestPos(job.player).pos}}</span></div>
+                </div>
+                <div v-if="job.player.potential" style="text-align:center;padding-left:12px;border-left:1px solid #30363d">
+                  <div :style="{fontSize:'18px',fontWeight:'900',lineHeight:'1',color:job.player.potential==='high'?'#7ee787':job.player.potential==='medium'?'#ffa657':'#8b949e'}">{{job.player.potential==='high'?'HIGH':job.player.potential==='medium'?'MID':'LOW'}}</div>
+                  <div class="c-gray" style="font-size:10px;margin-top:2px">potential</div>
+                  <div v-if="job.player.potentialCap" class="c-gray" style="font-size:9px">cap {{job.player.potentialCap}}</div>
+                </div>
               </div>
-              <!-- Best pos rating -->
-              <div v-if="scoutBestPos(job.player)" style="text-align:center">
-                <div :class="ratingClass(scoutBestPos(job.player).rating)" style="font-size:28px;line-height:1">{{scoutBestPos(job.player).rating}}</div>
-                <div style="margin-top:2px"><span :class="'pos pos-'+scoutBestPos(job.player).pos" style="font-size:9px">{{scoutBestPos(job.player).pos}}</span></div>
-              </div>
-              <!-- Potential -->
-              <div v-if="job.player.potential" style="text-align:center">
-                <div :style="{fontSize:'20px',fontWeight:'900',lineHeight:'1',color:job.player.potential==='high'?'#7ee787':job.player.potential==='medium'?'#ffa657':'#8b949e'}">{{job.player.potential==='high'?'HIGH':job.player.potential==='medium'?'MID':'LOW'}}</div>
-                <div class="c-gray" style="font-size:10px">potential</div>
-                <div v-if="job.player.potentialCap" class="c-gray" style="font-size:10px">cap {{job.player.potentialCap}}</div>
-              </div>
-            </div>
-            <div style="text-align:right;margin-top:6px">
               <div v-if="job.buyNow" style="font-size:11px">
-                <span class="c-gray">Buy now: </span><span class="c-orange" style="font-weight:700">{{fmtVal(job.buyNow)}}</span>
+                <span class="c-gray">Buy now </span><span class="c-orange" style="font-weight:700">{{fmtVal(job.buyNow)}}</span>
               </div>
               <div v-else class="c-gray" style="font-size:10px">negotiate to buy</div>
               <div class="c-blue" style="font-size:11px">{{fmtVal(job.player.value||job.player.Value)}}</div>
             </div>
           </div>
           <!-- Stage + insight row -->
-          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #21262d;padding-top:8px;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-top:1px solid #21262d;padding-top:8px;margin-top:10px">
             <div>
               <div class="c-gray" style="font-size:10px;margin-bottom:3px">SCOUT STAGE</div>
               <div style="display:flex;gap:3px;align-items:center">
@@ -133,11 +126,6 @@
               💡 Tool sees <span class="c-green" style="font-weight:700">full stats</span> — actual
               <span :class="ratingClass(job.player.rating||job.player.Rating)" style="font-weight:700">{{job.player.rating||job.player.Rating}}</span>
               vs hint {{job.hints?.ratingBand?.min}}–{{job.hints?.ratingBand?.max}}
-            </div>
-            <div v-if="job.player.potential">
-              <div class="c-gray" style="font-size:10px;margin-bottom:3px">POTENTIAL</div>
-              <span :style="{background:job.player.potential==='high'?'#1a3a1a':job.player.potential==='medium'?'#2d1f0e':'#1a1a1a',color:job.player.potential==='high'?'#7ee787':job.player.potential==='medium'?'#ffa657':'#8b949e',borderRadius:'10px',padding:'2px 9px',fontSize:'11px',fontWeight:'700'}">{{job.player.potential.toUpperCase()}}</span>
-              <span v-if="job.player.potentialCap" class="c-gray" style="font-size:10px;margin-left:5px">cap {{job.player.potentialCap}}</span>
             </div>
           </div>
         </div>
