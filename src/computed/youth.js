@@ -71,8 +71,14 @@ export const youthComputed = {
     if (s==='buynow_a') return [...items].sort((a,b)=>(a.buyNow||0)-(b.buyNow||0));
     if (s==='status_a') return [...items].sort((a,b)=>(a._jobStatus||a.status||'').localeCompare(b._jobStatus||b.status||''));
     if (s==='status_d') return [...items].sort((a,b)=>(b._jobStatus||b.status||'').localeCompare(a._jobStatus||a.status||''));
-    if (s==='bestattr_a') return [...items].sort((a,b)=>(a.player?.bestKey||'').localeCompare(b.player?.bestKey||''));
-    if (s==='bestattr_d') return [...items].sort((a,b)=>(b.player?.bestKey||'').localeCompare(a.player?.bestKey||''));
+    if (s==='bestpos_d') return [...items].sort((a,b)=>(this.scoutBestPos(b.player)?.rating||0)-(this.scoutBestPos(a.player)?.rating||0));
+    if (s==='bestpos_a') return [...items].sort((a,b)=>(this.scoutBestPos(a.player)?.rating||0)-(this.scoutBestPos(b.player)?.rating||0));
+    if (s==='men_d') return [...items].sort((a,b)=>(this.getYouthAttr(b.player,'Mentality')||0)-(this.getYouthAttr(a.player,'Mentality')||0));
+    if (s==='men_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Mentality')||0)-(this.getYouthAttr(b.player,'Mentality')||0));
+    if (s==='wr_d') return [...items].sort((a,b)=>(this.getYouthAttr(b.player,'Work rate')||0)-(this.getYouthAttr(a.player,'Work rate')||0));
+    if (s==='wr_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Work rate')||0)-(this.getYouthAttr(b.player,'Work rate')||0));
+    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[b.player?.potential]||0)-(m[a.player?.potential]||0)); }
+    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[a.player?.potential]||0)-(m[b.player?.potential]||0)); }
     return items;
   },
   youthHistMaxRating() {
@@ -115,8 +121,14 @@ export const youthComputed = {
     if (s==='status_d') return [...items].sort((a,b)=>(b._jobStatus||b.status||'').localeCompare(a._jobStatus||a.status||''));
     if (s==='sclub_a')  return [...items].sort((a,b)=>(a._club||'').localeCompare(b._club||''));
     if (s==='sclub_d')  return [...items].sort((a,b)=>(b._club||'').localeCompare(a._club||''));
-    if (s==='bestattr_a') return [...items].sort((a,b)=>(a.player?.bestKey||'').localeCompare(b.player?.bestKey||''));
-    if (s==='bestattr_d') return [...items].sort((a,b)=>(b.player?.bestKey||'').localeCompare(a.player?.bestKey||''));
+    if (s==='bestpos_d') return [...items].sort((a,b)=>(b._bestPosRating||0)-(a._bestPosRating||0));
+    if (s==='bestpos_a') return [...items].sort((a,b)=>(a._bestPosRating||0)-(b._bestPosRating||0));
+    if (s==='men_d') return [...items].sort((a,b)=>(b._mentality||0)-(a._mentality||0));
+    if (s==='men_a') return [...items].sort((a,b)=>(a._mentality||0)-(b._mentality||0));
+    if (s==='wr_d') return [...items].sort((a,b)=>(b._workRate||0)-(a._workRate||0));
+    if (s==='wr_a') return [...items].sort((a,b)=>(a._workRate||0)-(b._workRate||0));
+    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[b.player?.potential]||0)-(m[a.player?.potential]||0)); }
+    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>(m[a.player?.potential]||0)-(m[b.player?.potential]||0)); }
     return items;
   },
   youthHistPaged() {

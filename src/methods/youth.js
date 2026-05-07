@@ -222,14 +222,15 @@ export const youthMethods = {
 
     async loadYouthHistory(forceRefresh=false) {
       const HIST_CACHE_KEY = 'sf_youth_hist_v2';
-      const HIST_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+      const HIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-      // Check cache first
+      // Check server cache first, fall back to localStorage
       if (!forceRefresh) {
         try {
-          const cached = localStorage.getItem(HIST_CACHE_KEY);
-          if (cached) {
-            const {data, ts} = JSON.parse(cached);
+          let raw = await serverCacheGet(HIST_CACHE_KEY);
+          if (!raw) raw = localStorage.getItem(HIST_CACHE_KEY);
+          if (raw) {
+            const {data, ts} = JSON.parse(raw);
             if (Date.now()-ts < HIST_CACHE_TTL) {
               this.youthAllHistoryJobs = (data.jobs||[]).map(j=>({...j,_refreshed:false,_refreshing:false,_refreshFailed:false}));
               this.youthClubInfoMap = data.clubInfo||{};
@@ -326,10 +327,9 @@ export const youthMethods = {
         }
 
         try {
-          localStorage.setItem(HIST_CACHE_KEY, JSON.stringify({
-            data: {jobs: allJobs, clubInfo: clubInfoMap},
-            ts: Date.now()
-          }));
+          const payload = JSON.stringify({ data: {jobs: allJobs, clubInfo: clubInfoMap}, ts: Date.now() });
+          localStorage.setItem(HIST_CACHE_KEY, payload);
+          serverCacheSet(HIST_CACHE_KEY, payload).catch(()=>{});
         } catch(e) {}
 
         // Enrich _incompleteStats squad players using accepted scouting job data

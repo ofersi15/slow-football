@@ -65,15 +65,15 @@ export const helperMethods = {
     },
     // ── Youth table sort helpers ──────────────────────────────────────────────
     youthSortBy(col) {
-      const keyMap = { name:'name_a', pos:'pos_a', age:'age_a', rating:'rating_d', value:'value_d', buyNow:'buynow_d', date:'date', status:'status_a', sclub:'sclub_a', bestattr:'bestattr_a' };
-      const togMap = { name_a:'name_d', name_d:'name_a', pos_a:'pos_d', pos_d:'pos_a', age_a:'age_d', age_d:'age_a', rating_d:'rating_a', rating_a:'rating_d', value_d:'value_a', value_a:'value_d', buynow_d:'buynow_a', buynow_a:'buynow_d', date:'date_a', date_a:'date', status_a:'status_d', status_d:'status_a', sclub_a:'sclub_d', sclub_d:'sclub_a', bestattr_a:'bestattr_d', bestattr_d:'bestattr_a' };
+      const keyMap = { name:'name_a', pos:'pos_a', age:'age_a', value:'value_d', buyNow:'buynow_d', date:'date', status:'status_a', sclub:'sclub_a', bestpos:'bestpos_d', men:'men_d', wr:'wr_d', potential:'potential_d' };
+      const togMap = { name_a:'name_d', name_d:'name_a', pos_a:'pos_d', pos_d:'pos_a', age_a:'age_d', age_d:'age_a', value_d:'value_a', value_a:'value_d', buynow_d:'buynow_a', buynow_a:'buynow_d', date:'date_a', date_a:'date', status_a:'status_d', status_d:'status_a', sclub_a:'sclub_d', sclub_d:'sclub_a', bestpos_d:'bestpos_a', bestpos_a:'bestpos_d', men_d:'men_a', men_a:'men_d', wr_d:'wr_a', wr_a:'wr_d', potential_d:'potential_a', potential_a:'potential_d' };
       const target = keyMap[col]; if (!target) return;
       this.youthHistSort = this.youthHistSort === target ? (togMap[target] || target) : target;
     },
     youthSortIcon(col) {
       const s = this.youthHistSort;
-      const asc = { name:'name_a', pos:'pos_a', age:'age_a', rating:'rating_a', value:'value_a', buyNow:'buynow_a', date:'date_a', status:'status_a', sclub:'sclub_a', bestattr:'bestattr_a' };
-      const desc = { name:'name_d', pos:'pos_d', age:'age_d', rating:'rating_d', value:'value_d', buyNow:'buynow_d', date:'date', status:'status_d', sclub:'sclub_d', bestattr:'bestattr_d' };
+      const asc = { name:'name_a', pos:'pos_a', age:'age_a', value:'value_a', buyNow:'buynow_a', date:'date_a', status:'status_a', sclub:'sclub_a', bestpos:'bestpos_a', men:'men_a', wr:'wr_a', potential:'potential_a' };
+      const desc = { name:'name_d', pos:'pos_d', age:'age_d', value:'value_d', buyNow:'buynow_d', date:'date', status:'status_d', sclub:'sclub_d', bestpos:'bestpos_d', men:'men_d', wr:'wr_d', potential:'potential_d' };
       if (s === asc[col]) return ' ▲';
       if (s === desc[col]) return ' ▼';
       return '';
