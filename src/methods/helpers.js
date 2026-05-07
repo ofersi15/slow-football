@@ -1,4 +1,4 @@
-import { API, MY_CLUB } from '../constants.js'
+import { API, MY_CLUB, GAME_ATTRS } from '../constants.js'
 import { SF_WORKER_BASE, getAuthToken } from '../cache.js'
 
 export const helperMethods = {
@@ -6,6 +6,23 @@ export const helperMethods = {
       if (p[attr] != null && p[attr] > 0) return p[attr];
       if (p.stats && p.stats[attr] != null && p.stats[attr] > 0) return p.stats[attr];
       return null;
+    },
+
+    scoutPosRating(player, pos) {
+      const attrs = GAME_ATTRS[pos];
+      if (!attrs) return null;
+      const vals = attrs.map(a => this.getYouthAttr(player, a)).filter(v => v != null);
+      if (!vals.length) return null;
+      return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
+    },
+
+    scoutBestPos(player) {
+      let best = null, bestRtg = -1;
+      for (const pos of Object.keys(GAME_ATTRS)) {
+        const rtg = this.scoutPosRating(player, pos);
+        if (rtg != null && rtg > bestRtg) { bestRtg = rtg; best = pos; }
+      }
+      return best ? { pos: best, rating: bestRtg } : null;
     },
 
     // ── Saved lineup ──────────────────────────────────────────────────────────
