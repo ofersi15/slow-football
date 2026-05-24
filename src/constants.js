@@ -1,6 +1,6 @@
 // ── API & App constants ───────────────────────────────────────────────────────
 export const API = 'https://slowfootball.club/api';
-export const MY_CLUB = 'Leverkusen';
+export const MY_CLUB = 'Arsenal';
 export const PROXY_TOKEN_URL = 'https://sf-game-proxy.ofersi15.workers.dev/token';
 
 export const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];

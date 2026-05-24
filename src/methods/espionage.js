@@ -287,7 +287,7 @@ export const espionageMethods = {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 3000));
           const [budgetRaw, auctionsRaw] = await Promise.all([
-            serverCacheGet('sf_leverkusen_fin_v1', true),
+            serverCacheGet('sf_arsenal_fin_v1', true),
             serverCacheGet('sf_auctions_v1', true),
           ]);
           if (budgetRaw) { const f = JSON.parse(budgetRaw); if (f.budget) this.clubBudget = f.budget; }
@@ -305,7 +305,7 @@ export const espionageMethods = {
         this.budgetOverride = v;
         try { localStorage.setItem('sf_budget_override', String(v)); } catch(e) {}
         // Also write to KV so it persists across devices
-        serverCacheSet('sf_leverkusen_fin_v1', JSON.stringify({ budget: v, ts: Date.now() }));
+        serverCacheSet('sf_arsenal_fin_v1', JSON.stringify({ budget: v, ts: Date.now() }));
       }
       this.budgetEditing = false;
     },
@@ -392,7 +392,7 @@ export const espionageMethods = {
             // Show when negos were last pulled by CF worker
             serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
             // Load club budget if cached
-            serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); if (typeof f.budget==='number') this.clubBudget=f.budget; if (typeof f.wage==='number') this.clubWageBudget=f.wage; } }).catch(()=>{});
+            serverCacheGet('sf_arsenal_fin_v1').then(r => { if (r) { const f=JSON.parse(r); if (typeof f.budget==='number') this.clubBudget=f.budget; if (typeof f.wage==='number') this.clubWageBudget=f.wage; } }).catch(()=>{});
             this.loadAuctionData();
             this.espionageLoaded = true;
             this.espionageLoading = false;
@@ -464,7 +464,7 @@ export const espionageMethods = {
         this.espionageNegos = negos;
         this.espionageCacheDate = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
         serverCacheGet('sf_negos_last_pull').then(t => { if (t) this.negosLastPull = parseInt(t,10); }).catch(()=>{});
-        serverCacheGet('sf_leverkusen_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
+        serverCacheGet('sf_arsenal_fin_v1').then(r => { if (r) { const f=JSON.parse(r); this.clubBudget=f.budget; this.clubWageBudget=f.wage; } }).catch(()=>{});
         this.loadAuctionData();
         const espionageCacheStr = JSON.stringify({ savedAt: Date.now(), clubs: results, negos });
         serverCacheSet(CACHE_KEY, espionageCacheStr);  // server-side persistence

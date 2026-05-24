@@ -30,17 +30,17 @@ async function cacheBudget(env, data) {
   try {
     const allBudgets = data?.budgets || null;
 
-    // Extract Leverkusen's transfer budget from the per-club dict
-    const levEntry = allBudgets?.['Leverkusen'] || allBudgets?.['leverkusen'] || null;
+    // Extract Arsenal's transfer budget from the per-club dict
+    const levEntry = allBudgets?.['Arsenal'] || allBudgets?.['arsenal'] || null;
     const levBudget = levEntry == null ? null
       : typeof levEntry === 'number' ? levEntry
       : (levEntry.transfer ?? levEntry.transferBudget ?? levEntry.budget ?? levEntry.available ?? null);
 
     if (typeof levBudget === 'number') {
-      await env.SF_CACHE.put('sf_leverkusen_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
-      console.log('[budget] Leverkusen:', levBudget);
+      await env.SF_CACHE.put('sf_arsenal_fin_v1', JSON.stringify({ budget: levBudget, ts: Date.now() }));
+      console.log('[budget] Arsenal:', levBudget);
     } else {
-      console.log('[budget] could not parse lev budget; entry:', JSON.stringify(levEntry).slice(0, 200));
+      console.log('[budget] could not parse Arsenal budget; entry:', JSON.stringify(levEntry).slice(0, 200));
     }
     if (allBudgets) {
       await env.SF_CACHE.put('sf_all_budgets_v1', JSON.stringify({ data: allBudgets, ts: Date.now() }));
@@ -76,7 +76,7 @@ async function refreshSquadsCache(env) {
   const token = await gameLogin(env);
   if (!token) { console.error('[squads] login failed'); return; }
 
-  const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+  const headers = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
   // Fetch all squads
 
@@ -130,7 +130,7 @@ async function refreshEspionageCache(env, squads, token) {
     const clubs = Object.keys(squads);
     const BATCH = 8;
     const results = [];
-    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
     for (let i = 0; i < clubs.length; i += BATCH) {
       const batch = clubs.slice(i, i + BATCH);
@@ -158,8 +158,8 @@ async function refreshEspionageCache(env, squads, token) {
 
 async function refreshYouthCache(env, token) {
   try {
-    const enc = encodeURIComponent('Leverkusen');
-    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+    const enc = encodeURIComponent('Arsenal');
+    const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
 
     const [sjRes, acRes, facRes, staffRes, rejRes] = await Promise.all([
       fetch(`${GAME_API}/scouting/jobs?club=${enc}`, { headers: h }).then(r => r.json()),
@@ -249,10 +249,10 @@ export default {
         const { roles } = await request.json();
         const token = await gameLogin(env);
         if (!token) return new Response(JSON.stringify({ error: 'login failed' }), { status: 401, headers: cors });
-        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
         const r = await fetch(`${GAME_API}/staff/ads`, {
           method: 'POST', headers: h,
-          body: JSON.stringify({ club: 'Leverkusen', roles }),
+          body: JSON.stringify({ club: 'Arsenal', roles }),
         });
         const data = await r.json();
         return new Response(JSON.stringify(data), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -265,10 +265,10 @@ export default {
         const { week } = await request.json();
         const token = await gameLogin(env);
         if (!token) return new Response(JSON.stringify({ error: 'login failed' }), { status: 401, headers: cors });
-        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+        const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
         const r = await fetch(`${GAME_API}/staff/generate`, {
           method: 'POST', headers: h,
-          body: JSON.stringify({ club: 'Leverkusen', week }),
+          body: JSON.stringify({ club: 'Arsenal', week }),
         });
         const data = await r.json();
         return new Response(JSON.stringify(data), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -299,7 +299,7 @@ export default {
           });
           if (!loginRes.ok) { console.error('[budget] login failed:', loginRes.status); return; }
           const { token } = await loginRes.json();
-          const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Leverkusen', 'X-Role': 'manager', 'Content-Type': 'application/json' };
+          const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
           const br = await fetch(`${GAME_API}/budgets?format=full`, { headers: h });
           if (br.ok) await cacheBudget(env, await br.json());
           else console.error('[budget] fetch failed:', br.status);

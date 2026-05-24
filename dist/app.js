@@ -14511,7 +14511,7 @@ const Xw = [
   Jw
 ];
 ar.register(...Xw);
-const it = "https://slowfootball.club/api", Jt = "Leverkusen", Zw = "https://sf-game-proxy.ofersi15.workers.dev/token", to = ["north", "south", "europa", "world", "conference", "hipster"], fl = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), ha = ["GK", "FB", "CB", "DM", "CM", "AM", "WF", "CF"], Qw = ["FB", "CB", "DM", "CM", "AM", "WF", "CF"], pl = 100, Hn = "sf_tactics_v4", tC = 7 * 24 * 60 * 60 * 1e3, zn = "sf_players_v6", ua = "sf_stats_v1", eC = 6 * 60 * 60 * 1e3, sC = 7 * 24 * 60 * 60 * 1e3, nC = 6 * 60 * 60 * 1e3, Zd = "sf_submissions_all_v1", da = "sf_subs_ls", gi = {
+const it = "https://slowfootball.club/api", Jt = "Arsenal", Zw = "https://sf-game-proxy.ofersi15.workers.dev/token", to = ["north", "south", "europa", "world", "conference", "hipster"], fl = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), ha = ["GK", "FB", "CB", "DM", "CM", "AM", "WF", "CF"], Qw = ["FB", "CB", "DM", "CM", "AM", "WF", "CF"], pl = 100, Hn = "sf_tactics_v4", tC = 7 * 24 * 60 * 60 * 1e3, zn = "sf_players_v6", ua = "sf_stats_v1", eC = 6 * 60 * 60 * 1e3, sC = 7 * 24 * 60 * 60 * 1e3, nC = 6 * 60 * 60 * 1e3, Zd = "sf_submissions_all_v1", da = "sf_subs_ls", gi = {
   GK: ["Handling", "Reflexes", "Speed", "Passing"],
   FB: ["Passing", "Tackling", "Stamina", "Marking"],
   CB: ["Marking", "Heading", "Tackling", "Speed"],
@@ -15816,7 +15816,7 @@ const dC = {
       for (let e = 0; e < 6; e++) {
         await new Promise((o) => setTimeout(o, 3e3));
         const [s, n] = await Promise.all([
-          kt("sf_leverkusen_fin_v1", !0),
+          kt("sf_arsenal_fin_v1", !0),
           kt("sf_auctions_v1", !0)
         ]);
         if (s) {
@@ -15843,7 +15843,7 @@ const dC = {
         localStorage.setItem("sf_budget_override", String(t));
       } catch {
       }
-      Ke("sf_leverkusen_fin_v1", JSON.stringify({ budget: t, ts: Date.now() }));
+      Ke("sf_arsenal_fin_v1", JSON.stringify({ budget: t, ts: Date.now() }));
     }
     this.budgetEditing = !1;
   },
@@ -15920,7 +15920,7 @@ const dC = {
           this.espionageNegos = o, this.espionageCacheDate = new Date(i.savedAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), kt("sf_negos_last_pull").then((a) => {
             a && (this.negosLastPull = parseInt(a, 10));
           }).catch(() => {
-          }), kt("sf_leverkusen_fin_v1").then((a) => {
+          }), kt("sf_arsenal_fin_v1").then((a) => {
             if (a) {
               const r = JSON.parse(a);
               typeof r.budget == "number" && (this.clubBudget = r.budget), typeof r.wage == "number" && (this.clubWageBudget = r.wage);
@@ -15982,7 +15982,7 @@ const dC = {
       this.espionageClubs = r, this.espionageNegos = a, this.espionageCacheDate = (/* @__PURE__ */ new Date()).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), kt("sf_negos_last_pull").then((h) => {
         h && (this.negosLastPull = parseInt(h, 10));
       }).catch(() => {
-      }), kt("sf_leverkusen_fin_v1").then((h) => {
+      }), kt("sf_arsenal_fin_v1").then((h) => {
         if (h) {
           const u = JSON.parse(h);
           this.clubBudget = u.budget, this.clubWageBudget = u.wage;

@@ -80,8 +80,8 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 ## Game API
 
 - **Base**: `https://slowfootball.club/api`
-- **Auth**: `Authorization: Bearer <token>`, `X-Club: Leverkusen`, `X-Role: manager`
-- **My club**: `MY_CLUB = 'Leverkusen'`
+- **Auth**: `Authorization: Bearer <token>`, `X-Club: Arsenal`, `X-Role: manager`
+- **My club**: `MY_CLUB = 'Arsenal'`
 
 | Endpoint | Returns |
 |----------|---------|
@@ -132,11 +132,11 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | `sf_players_v6` | All players | 6h stale | Browser |
 | `sf_stats_v1` | Player stats | 7 days stale | Browser |
 | `sf_espionage_v3` | Staff + facilities (all clubs) + negos snapshot | 6h stale | CF cron 4×/day + browser |
-| `sf_youth_idx_v2` | Scouts, academy, facilities, staff (Leverkusen) | 10min live / 1h static | CF cron 4×/day + browser |
+| `sf_youth_idx_v2` | Scouts, academy, facilities, staff (Arsenal) | 10min live / 1h static | CF cron 4×/day + browser |
 | `sf_tactics_v4` | Formation/style analysis | 7 days stale | Browser only |
 | `sf_negos_history_v1` | All-time nego history | permanent, never delete | CF cron every 5–15min |
 | `sf_auctions_v1` | Auction items | — | CF cron 4×/day |
-| `sf_leverkusen_fin_v1` | Leverkusen budget | — | CF cron 4×/day |
+| `sf_arsenal_fin_v1` | Arsenal budget | — | CF cron 4×/day |
 | `sf_vacancies_v1` | Vacant clubs | — | CF cron 4×/day |
 | `sf_match_archive_v3` | Archive index | permanent | Browser (manual) |
 | `sf_match_archive_v3_gw_{N}` | Per-GW data | permanent | Browser (manual) |
@@ -164,7 +164,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 ## Competitions
 
 - **Super Duper Cup (SDC)**: cross-league knockout, 12 groups (A–L), 4 teams, Saudi Arabia venue
-- Leverkusen in Group E (Milan, Leeds, Bournemouth)
+- Arsenal in Group E (Milan, Leeds, Bournemouth) — update if group assignment changes
 - SDC fixtures appear in match archive — filter accounts for this competition type
 
 ---
