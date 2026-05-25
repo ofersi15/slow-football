@@ -1,4 +1,4 @@
-import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS } from '../constants.js'
+import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, OUTFIELD_POSITIONS } from '../constants.js'
 import { parseAsync, stringifyAsync, serverCacheGet, serverCacheSet, serverCacheDelete } from '../cache.js'
 import { calcGameRating, calcWeightedRating, calcEstValue, fmtVal } from '../utils.js'
 
@@ -65,6 +65,15 @@ export const dataMethods = {
               p._gameRating = calcGameRating(p, p.Position);
               p._weightedRating = calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
               p._incompleteStats = FULL_ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length < 5;
+              if (p.Position !== 'GK') {
+                let pos2 = null, pos2Rtg = -1;
+                for (const pos of OUTFIELD_POSITIONS) {
+                  if (pos === p.Position) continue;
+                  const rtg = calcGameRating(p, pos);
+                  if (rtg != null && rtg > pos2Rtg) { pos2 = pos; pos2Rtg = rtg; }
+                }
+                if (pos2Rtg > 0) { p._pos2 = pos2; p._pos2Rating = Math.round(pos2Rtg * 10) / 10; }
+              }
               // Recompute per-90 stats in case cache predates this feature
               if (p._g90 === undefined) {
                 const mins=p.Minutes||0;
@@ -315,6 +324,15 @@ export const dataMethods = {
             p._weightedRating=calcWeightedRating(p, p.Position, DEFAULT_MENTAL_ATTRS, 20);
             p._estValue=calcEstValue(p);
             p._incompleteStats = FULL_ATTR_KEYS.filter(a=>p[a]!=null&&p[a]>0).length < 5;
+            if (p.Position !== 'GK') {
+              let pos2 = null, pos2Rtg = -1;
+              for (const pos of OUTFIELD_POSITIONS) {
+                if (pos === p.Position) continue;
+                const rtg = calcGameRating(p, pos);
+                if (rtg != null && rtg > pos2Rtg) { pos2 = pos; pos2Rtg = rtg; }
+              }
+              if (pos2Rtg > 0) { p._pos2 = pos2; p._pos2Rating = Math.round(pos2Rtg * 10) / 10; }
+            }
             const mins=p.Minutes||0;
             p._g90=mins>=30?Math.round((p.Goals||0)/mins*90*100)/100:null;
             p._a90=mins>=30?Math.round((p.Assists||0)/mins*90*100)/100:null;
