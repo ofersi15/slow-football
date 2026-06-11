@@ -112,6 +112,7 @@ createApp({
       espionageSubmissions: {},  // club → latest submission object
       selectedClubName: null,
       selectedClubSubTab: 'xi',  // 'xi' | 'history' | 'transfers'
+      selectedClubMatchXi: null, // fallback last-match XI when no submission
       showRawSub: false,
       clubSquadSort: 'pos',
       hoveredPitchPlayer: null,

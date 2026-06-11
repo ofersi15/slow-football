@@ -16265,7 +16265,7 @@ const dC = {
     });
   },
   async openClubDetail(t) {
-    this.activeTab = "clubs", this.selectedClubName = t, this.selectedClubSubTab = "xi", this.showRawSub = !1;
+    this.activeTab = "clubs", this.selectedClubName = t, this.selectedClubSubTab = "xi", this.showRawSub = !1, this.selectedClubMatchXi = null;
     try {
       localStorage.setItem("sf_last_club", t);
     } catch {
@@ -16276,7 +16276,22 @@ const dC = {
       s.clubs[t] = this.submissionsCache[t] || {}, localStorage.setItem(da, JSON.stringify(s));
     } catch {
     }
-    this._fetchClubInfo(t);
+    Object.keys(this.submissionsCache[t] || {}).length || this._fetchClubLastMatchXi(t), this._fetchClubInfo(t);
+  },
+  async _fetchClubLastMatchXi(t) {
+    try {
+      const s = ((await fetch(`${it}/matches?club=${encodeURIComponent(t)}&limit=1`).then((l) => l.json())).matches || [])[0];
+      if (!s) return;
+      const i = (await fetch(`${it}/matches/${s.fixtureId}`).then((l) => l.json())).match;
+      if (!i) return;
+      const o = i.home.club === t ? "home" : "away", r = ((i.ratings || {})[o] || []).filter((l) => l.subbedOnAt === null && l.minutes > 0);
+      if (!r.length) return;
+      this.selectedClubMatchXi = {
+        _gw: i.gameweek,
+        xi: r.map((l) => ({ name: l.player, pos: this.basePos(l.position) }))
+      };
+    } catch {
+    }
   },
   async _fetchClubInfo(t) {
     var e, s, n;
@@ -17870,6 +17885,8 @@ za({
       selectedClubName: null,
       selectedClubSubTab: "xi",
       // 'xi' | 'history' | 'transfers'
+      selectedClubMatchXi: null,
+      // fallback last-match XI when no submission
       showRawSub: !1,
       clubSquadSort: "pos",
       hoveredPitchPlayer: null,

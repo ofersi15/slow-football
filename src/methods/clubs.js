@@ -300,6 +300,7 @@ export const clubsMethods = {
       this.selectedClubName = clubName;
       this.selectedClubSubTab = 'xi';
       this.showRawSub = false;
+      this.selectedClubMatchXi = null;
       try { localStorage.setItem('sf_last_club', clubName); } catch(e) {}
       delete this.submissionsCache[clubName];
       await this._fetchClubSubmissions(clubName);
@@ -309,8 +310,31 @@ export const clubsMethods = {
         lsData.clubs[clubName] = this.submissionsCache[clubName] || {};
         localStorage.setItem(SUBMISSIONS_LS_KEY, JSON.stringify(lsData));
       } catch(e) {}
+      // If no submission found, load last match XI as fallback
+      if (!Object.keys(this.submissionsCache[clubName] || {}).length) {
+        this._fetchClubLastMatchXi(clubName);
+      }
       // Preload club info (facilities/staff/academy/scouts) in background
       this._fetchClubInfo(clubName);
+    },
+
+    async _fetchClubLastMatchXi(club) {
+      try {
+        const listD = await fetch(`${API}/matches?club=${encodeURIComponent(club)}&limit=1`).then(r => r.json());
+        const match = (listD.matches || [])[0];
+        if (!match) return;
+        const rptD = await fetch(`${API}/matches/${match.fixtureId}`).then(r => r.json());
+        const m = rptD.match;
+        if (!m) return;
+        const side = m.home.club === club ? 'home' : 'away';
+        const ratings = (m.ratings || {})[side] || [];
+        const starters = ratings.filter(p => p.subbedOnAt === null && p.minutes > 0);
+        if (!starters.length) return;
+        this.selectedClubMatchXi = {
+          _gw: m.gameweek,
+          xi: starters.map(p => ({ name: p.player, pos: this.basePos(p.position) })),
+        };
+      } catch(e) {}
     },
 
     async _fetchClubInfo(clubName) {
