@@ -156,6 +156,36 @@ export function computeBonds(player, squadPlayers, deals) {
     .sort((a,b) => b.weeks - a.weeks);
 }
 
+// FNV-1a 32-bit hash of a sorted player-name pair — used to seed dislikes
+function pairDislikeSeed(a, b) {
+  const [s1, s2] = [a, b].sort();
+  const str = s1 + '\x01' + s2;
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h % 100;
+}
+
+// ~7% of player pairs who have shared 13+ weeks dislike each other (deterministic seed)
+export function computeDislikes(player, squadPlayers, deals) {
+  if (!player || !player.Player || !player.Club) return [];
+  const now = gameWeekNow();
+  const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
+  return (squadPlayers || [])
+    .filter(m => m.Player !== player.Player && m.Position)
+    .map(m => {
+      const mWeeks = playerArrivalWeeks(m.Player, player.Club, deals) ?? now;
+      const shared = Math.min(playerWeeks, mWeeks);
+      if (shared < 13) return null;
+      if (pairDislikeSeed(player.Player, m.Player) >= 7) return null;
+      return { name: m.Player, pos: m.Position, weeks: shared };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.weeks - a.weeks);
+}
+
 // Compute overall team chemistry score 0–100
 export function computeClubChem(clubPlayers, deals) {
   if (!clubPlayers || clubPlayers.length < 2) return null;

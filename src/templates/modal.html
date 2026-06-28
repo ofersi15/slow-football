@@ -221,17 +221,36 @@
 
       <!-- ── CHEMISTRY TAB ── -->
       <div v-if="playerModalTab==='chemistry'">
-        <div v-if="selectedPlayerBonds.length" style="display:flex;flex-direction:column;gap:3px">
-          <div v-for="b in selectedPlayerBonds" :key="b.name"
-               style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:#0d1117;border-radius:4px;font-size:11px">
-            <span :class="'pos pos-'+b.pos" style="font-size:9px;flex-shrink:0">{{b.pos}}</span>
-            <span style="flex:1;color:#e6edf3">{{b.name}}</span>
-            <span class="c-gray" style="font-size:10px">{{b.weeks}}w</span>
-            <span v-if="b.sameNat" style="font-size:10px">🤝</span>
-            <span :style="{fontSize:'10px',fontWeight:'700',color:b.category==='great'?'#3fb950':'#d29922'}">{{b.label}}</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <!-- Best chemistry -->
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Best chemistry</div>
+            <div v-if="selectedPlayerBonds.length" style="display:flex;flex-direction:column;gap:3px">
+              <div v-for="b in selectedPlayerBonds" :key="b.name"
+                   style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0d1117;border-left:3px solid #238636;border-radius:0 4px 4px 0;font-size:11px">
+                <span :class="'pos pos-'+b.pos" style="font-size:9px;flex-shrink:0">{{b.pos}}</span>
+                <span style="flex:1;color:#e6edf3">{{b.name}}</span>
+                <span class="c-gray" style="font-size:10px">{{b.weeks}}w</span>
+                <span v-if="b.sameNat" style="font-size:10px">🤝</span>
+              </div>
+            </div>
+            <div v-else class="c-gray" style="font-size:11px;padding:12px 0">No bonds yet</div>
+          </div>
+          <!-- Active dislikes -->
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Active dislikes</div>
+            <div v-if="selectedPlayerDislikes.length" style="display:flex;flex-direction:column;gap:3px">
+              <div v-for="d in selectedPlayerDislikes" :key="d.name"
+                   style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0d1117;border-left:3px solid #da3633;border-radius:0 4px 4px 0;font-size:11px">
+                <span :class="'pos pos-'+d.pos" style="font-size:9px;flex-shrink:0">{{d.pos}}</span>
+                <span style="flex:1;color:#e6edf3">{{d.name}}</span>
+                <span class="c-gray" style="font-size:10px">{{d.weeks}}w</span>
+              </div>
+            </div>
+            <div v-else class="c-gray" style="font-size:11px;padding:12px 0">No active dislikes</div>
+            <div style="font-size:9px;color:#6e7681;margin-top:8px;line-height:1.4">Chemistry deepens the longer two players share a squad. Compatriots tend to connect quickly. Sometimes, two players just don't get on.</div>
           </div>
         </div>
-        <div v-else class="c-gray" style="font-size:12px;padding:24px 0;text-align:center">No chemistry bonds yet</div>
       </div><!-- end chemistry tab -->
 
       <!-- ── HISTORY TAB ── -->

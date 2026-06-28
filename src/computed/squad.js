@@ -1,4 +1,5 @@
 import { MY_CLUB, FORMATIONS, SLOT_ATTRS, SLOT_COMPAT } from '../constants.js'
+import { computeDislikes } from '../utils.js'
 
 export const squadComputed = {
   filterableAttrs() {
@@ -16,6 +17,21 @@ export const squadComputed = {
   },
   mySquadPlayers() {
     return this.allPlayers.filter(p => p.Club === MY_CLUB);
+  },
+  mySquadDislikes() {
+    const squad = this.mySquadPlayers;
+    const pairs = [];
+    const seen = new Set();
+    for (const player of squad) {
+      for (const d of computeDislikes(player, squad, this.allDeals)) {
+        const key = [player.Player, d.name].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const other = squad.find(p => p.Player === d.name);
+        pairs.push({ a: { name: player.Player, pos: player.Position }, b: { name: d.name, pos: d.pos }, weeks: d.weeks, aObj: player, bObj: other });
+      }
+    }
+    return pairs.sort((x, y) => y.weeks - x.weeks);
   },
   lineupPlayerMap() {
     const map = {};

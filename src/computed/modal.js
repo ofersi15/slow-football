@@ -1,5 +1,5 @@
 import { MY_CLUB } from '../constants.js'
-import { computeTraits, computeBonds, computeClubChem } from '../utils.js'
+import { computeTraits, computeBonds, computeClubChem, computeDislikes } from '../utils.js'
 
 export const modalComputed = {
   activeModalStats() {
@@ -16,6 +16,11 @@ export const modalComputed = {
     if (!this.selectedPlayer || !this.selectedPlayer.Club) return [];
     const squad = this.allPlayers.filter(p => p.Club === this.selectedPlayer.Club);
     return computeBonds(this.selectedPlayer, squad, this.allDeals);
+  },
+  selectedPlayerDislikes() {
+    if (!this.selectedPlayer || !this.selectedPlayer.Club) return [];
+    const squad = this.allPlayers.filter(p => p.Club === this.selectedPlayer.Club);
+    return computeDislikes(this.selectedPlayer, squad, this.allDeals);
   },
   mySquadChem() {
     const squad = this.allPlayers.filter(p => p.Club === MY_CLUB);

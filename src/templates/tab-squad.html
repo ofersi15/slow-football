@@ -243,5 +243,26 @@
           </div>
         </div>
         <div v-else class="c-gray" style="padding:40px;text-align:center">No squad data for {{myClub}} — ensure data is loaded.</div>
+
+        <!-- ── SQUAD TENSIONS ── -->
+        <div v-if="mySquadDislikes.length" class="card" style="margin-top:20px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+            😤 Squad Tensions
+            <span style="background:#3a1212;color:#ff7b72;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:600">{{mySquadDislikes.length}} pair{{mySquadDislikes.length===1?'':'s'}}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <div v-for="pair in mySquadDislikes" :key="pair.a.name+'|'+pair.b.name"
+                 style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#0d1117;border-radius:5px;border:1px solid #3a1212;font-size:11px">
+              <span :class="'pos pos-'+pair.a.pos" style="font-size:9px;flex-shrink:0">{{pair.a.pos}}</span>
+              <span @click="openModal(pair.aObj)" style="color:#e6edf3;cursor:pointer;font-weight:600" title="Open player">{{pair.a.name}}</span>
+              <span style="color:#6e7681;margin:0 2px">⚡</span>
+              <span :class="'pos pos-'+pair.b.pos" style="font-size:9px;flex-shrink:0">{{pair.b.pos}}</span>
+              <span @click="openModal(pair.bObj)" style="color:#e6edf3;cursor:pointer;font-weight:600" title="Open player">{{pair.b.name}}</span>
+              <span class="c-gray" style="margin-left:auto;font-size:10px">{{pair.weeks}}w together</span>
+            </div>
+          </div>
+          <div style="font-size:10px;color:#6e7681;margin-top:8px">Players who have shared a squad long enough to develop a dislike. Open their profile → Chemistry tab for details.</div>
+        </div>
+        <div v-else-if="mySquadPlayers.length" style="margin-top:16px;font-size:11px;color:#6e7681;text-align:center">No active tensions in the squad 🕊</div>
       </div>
 
