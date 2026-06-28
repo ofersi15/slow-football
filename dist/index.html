@@ -36,10 +36,9 @@
       <!-- TABS -->
       <div class="header">
         <div class="tab-bar">
-          <button v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]"
-                  :aria-label="t.label" role="tab" :aria-selected="activeTab===t.id"
-                  @click="activeTab=t.id; if(t.id==='clubs') selectedClubName=null"
-                  @mousedown.middle.prevent="window.open(location.origin+location.pathname+'#'+t.id,'_blank')">{{t.label}}</button>
+          <a v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]"
+             :href="'#'+t.id" :aria-label="t.label" role="tab" :aria-selected="activeTab===t.id"
+             @click.prevent="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</a>
           <span class="header-meta" style="margin-left:auto;flex-shrink:0;display:block">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
         </div>
       </div>
