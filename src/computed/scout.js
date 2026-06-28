@@ -1,7 +1,23 @@
 import { MY_CLUB, PAGE_SIZE } from '../constants.js'
-import { calcGameRating, calcWeightedRating, computeTraits } from '../utils.js'
+import { calcGameRating, calcWeightedRating, computeTraits, computeDislikes } from '../utils.js'
 
 export const scoutComputed = {
+  playersWithDislikesSet() {
+    const set = new Set();
+    const byClub = {};
+    for (const p of this.allPlayers) {
+      if (!p.Club) continue;
+      (byClub[p.Club] = byClub[p.Club] || []).push(p);
+    }
+    for (const squad of Object.values(byClub)) {
+      for (const player of squad) {
+        if (!set.has(player.Player) && computeDislikes(player, squad, this.allDeals).length > 0) {
+          set.add(player.Player);
+        }
+      }
+    }
+    return set;
+  },
   filteredPlayers() {
     const q = this.search.toLowerCase();
     return this.allPlayers.filter(p => {
@@ -31,6 +47,7 @@ export const scoutComputed = {
       if (this.forSaleOnly && (!p._managed || p.notForSale)) return false;
       if (this.transferListedOnly && !p._transferListed) return false;
       if (this.injuredOnly && !p.injured && !p.suspended) return false;
+      if (this.dislikesOnly && !this.playersWithDislikesSet.has(p.Player)) return false;
       if (this.hideRetiring && p.retiring) return false;
       if (this.traitFilter) {
         const tNames = computeTraits(p).map(t => t.n);

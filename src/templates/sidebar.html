@@ -98,6 +98,7 @@
         <label class="check-row"><input type="checkbox" v-model="forSaleOnly"> Available to sign (excl. NFS)</label>
         <label class="check-row" title="Players currently on the transfer list (/api/transfer-list)"><input type="checkbox" v-model="transferListedOnly"> Transfer listed</label>
         <label class="check-row"><input type="checkbox" v-model="injuredOnly"> Injured / suspended</label>
+        <label class="check-row" title="Players who have at least one active dislike in their current squad"><input type="checkbox" v-model="dislikesOnly"> 😤 Has active dislikes</label>
       </div>
       <!-- Trait Filter -->
       <div style="border-top:1px solid #21262d;padding-top:8px">

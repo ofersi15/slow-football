@@ -4,7 +4,7 @@
         <div style="padding:6px 10px;border-bottom:1px solid #21262d;display:flex;align-items:center;gap:8px">
           <button class="btn mobile-filter-btn" @click="scoutFiltersOpen=!scoutFiltersOpen">
             🎛 {{scoutFiltersOpen?'Hide Filters':'Show Filters'}}
-            <span v-if="activeAttrFilterCount>0||Object.values(posRatingFilters).some(v=>v>60)" style="background:#1f6feb;color:#fff;border-radius:8px;padding:0 5px;font-size:9px;margin-left:3px">active</span>
+            <span v-if="activeAttrFilterCount>0||Object.values(posRatingFilters).some(v=>v>60)||dislikesOnly" style="background:#1f6feb;color:#fff;border-radius:8px;padding:0 5px;font-size:9px;margin-left:3px">active</span>
           </button>
           <span class="c-gray" style="font-size:11px;margin-left:auto">{{filteredPlayers.length}} players · click a row to open profile</span>
         </div>

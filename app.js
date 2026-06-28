@@ -28,7 +28,7 @@ createApp({
       posFilter: new Set(ALL_POSITIONS),
       maxAge: 40, search: '',
       hideOwn: false, hideVacant: true, managedOnly: false, forSaleOnly: false,
-      transferListedOnly: false, injuredOnly: false, hideRetiring: true, traitFilter: '',
+      transferListedOnly: false, injuredOnly: false, dislikesOnly: false, hideRetiring: true, traitFilter: '',
       allDeals: [],
       ageGroupFilter: 'all', // 'all' | 'u21' | 'u20'
       sortCol: '_gameRating', sortDir: -1, page: 0,
