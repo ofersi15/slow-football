@@ -9,7 +9,7 @@ export const matchesComputed = {
     }
     if (this.matchFilterManager) {
       const mg = this.matchFilterManager.toLowerCase();
-      items = items.filter(m => (m._homeManager||'').toLowerCase().includes(mg) || (m._awayManager||'').toLowerCase().includes(mg));
+      items = items.filter(m => (this.managerMap[m.home?.club]||'').toLowerCase().includes(mg) || (this.managerMap[m.away?.club]||'').toLowerCase().includes(mg));
     }
     const s = this.matchSort;
     if (s === 'gw_d') return [...items].sort((a,b) => (b.gameweek||0)-(a.gameweek||0));
@@ -25,8 +25,9 @@ export const matchesComputed = {
     if (!this.matchArchive) return [];
     const mgrs = new Set();
     this.matchArchive.forEach(m => {
-      if (m._homeManager) mgrs.add(m._homeManager);
-      if (m._awayManager) mgrs.add(m._awayManager);
+      const hm = this.managerMap[m.home?.club], am = this.managerMap[m.away?.club];
+      if (hm) mgrs.add(hm);
+      if (am) mgrs.add(am);
     });
     return Array.from(mgrs).sort();
   },

@@ -91,8 +91,6 @@ export const matchesMethods = {
               const d = await fetch(`${API}/matches/${id}`).then(r=>r.json());
               if (d?.match) {
                 const m = d.match;
-                m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
-                m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
                 fullMatches.push(m);
               } else {
                 fetchErrors++;
@@ -204,7 +202,6 @@ export const matchesMethods = {
             shots: m.stats.shots ? { home: m.stats.shots.home?.total ?? null, away: m.stats.shots.away?.total ?? null } : null,
             possession: m.stats.possession,
           } : null,
-          _homeManager: m._homeManager, _awayManager: m._awayManager,
           _gw: m.gameweek ?? 0,
           }; // close return object
         }); // close fullMatches.map
@@ -314,8 +311,6 @@ export const matchesMethods = {
               const d = await fetch(`${API}/matches/${id}`).then(r => r.json());
               if (d?.match) {
                 const m = d.match;
-                m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
-                m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
                 fullNew.push(m);
               } else { fetchErrors++; }
             } catch(e) { fetchErrors++; log(`ERROR fixture ${id}: ${e.message}`); }
@@ -391,7 +386,6 @@ export const matchesMethods = {
             away: { club: m.away?.club, formation: getFm(m.away?.sub, m.away?.club, m.ratings?.away), mentality: m.away?.sub?.instructions?.mentality || aNarInstr?.mentality || null, style: m.away?.sub?.instructions?.style || aNarInstr?.style || null, sqRtg: computeSquadRatings(m.away?.sub) },
             score: m.score, headline: m.headline,
             stats: m.stats ? { xg: m.stats.xg, shots: m.stats.shots ? { home: m.stats.shots.home?.total ?? null, away: m.stats.shots.away?.total ?? null } : null, possession: m.stats.possession } : null,
-            _homeManager: m._homeManager, _awayManager: m._awayManager,
             _gw: m.gameweek ?? 0,
           };
         });
@@ -471,20 +465,7 @@ export const matchesMethods = {
         const raw = await serverCacheGet(`sf_match_archive_v3_gw_${gw}`);
         if (raw) {
           const matches = (await parseAsync(raw)).matches || [];
-          // Re-extract managers on load so old builds with broken regex are fixed
-          for (const m of matches) {
-            m._homeManager = this.extractManager(m.reportNarrative, m.home?.club || '');
-            m._awayManager = this.extractManager(m.reportNarrative, m.away?.club || '');
-          }
           this.matchChunks[gw] = matches;
-          // Back-fill the compact index so the match list shows correct managers
-          if (this.matchArchive) {
-            const byId = new Map(matches.map(m => [m.fixtureId, m]));
-            for (const e of this.matchArchive) {
-              const full = byId.get(e.fixtureId);
-              if (full) { e._homeManager = full._homeManager; e._awayManager = full._awayManager; }
-            }
-          }
         }
       } catch(e) {}
     },
@@ -598,8 +579,6 @@ export const matchesMethods = {
       const full = this.matchChunks[gw]?.find(m => m.fixtureId === summary.fixtureId);
       if (full) this.matchView = full;
       const mv = this.matchView;
-      mv._homeManager = this.extractManager(mv.reportNarrative, mv.home?.club || '');
-      mv._awayManager = this.extractManager(mv.reportNarrative, mv.away?.club || '');
       // Formations: sub data from chunk first, then on-demand fetch, then narrative/derived fallback
       const homeFmtFromSub = mv.home?.sub?.formation ? this.fmtFormation(mv.home.sub.formation) : null;
       const awayFmtFromSub = mv.away?.sub?.formation ? this.fmtFormation(mv.away.sub.formation) : null;

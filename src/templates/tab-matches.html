@@ -74,17 +74,17 @@
         <div style="text-align:center;margin-bottom:12px">
           <div style="font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap">
             <div style="text-align:right">
-              <div :style="{color: matchView._homeManager?'#e6edf3':'#8b949e'}">{{matchView.home?.club}}</div>
+              <div :style="{color: managerMap[matchView.home?.club]?'#e6edf3':'#8b949e'}">{{matchView.home?.club}}</div>
               <div style="font-size:11px;color:#8b949e;font-weight:400">
-                {{matchView._homeManager||'—'}}
+                {{managerMap[matchView.home?.club]||'—'}}
                 <span v-if="matchView._homeFormation" style="margin-left:6px;background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{matchView._homeFormation}}</span>
               </div>
             </div>
             <span style="font-size:28px;color:#7ee787;font-weight:800;margin:0 10px">{{matchView.score?.home}}–{{matchView.score?.away}}</span>
             <div style="text-align:left">
-              <div :style="{color: matchView._awayManager?'#e6edf3':'#8b949e'}">{{matchView.away?.club}}</div>
+              <div :style="{color: managerMap[matchView.away?.club]?'#e6edf3':'#8b949e'}">{{matchView.away?.club}}</div>
               <div style="font-size:11px;color:#8b949e;font-weight:400">
-                {{matchView._awayManager||'—'}}
+                {{managerMap[matchView.away?.club]||'—'}}
                 <span v-if="matchView._awayFormation" style="margin-left:6px;background:#1f2d3d;color:#79c0ff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">{{matchView._awayFormation}}</span>
               </div>
             </div>
@@ -320,8 +320,8 @@
                   <span :class="m.score?.away>m.score?.home?'c-green':m.score?.away<m.score?.home?'c-red':''">{{m.score?.away}}</span>
                 </td>
                 <td style="padding:6px 6px;font-weight:500" :class="m.away?.club===myClub?'c-green':''">{{m.away?.club}}</td>
-                <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{m._homeManager||'—'}}</td>
-                <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{m._awayManager||'—'}}</td>
+                <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{managerMap[m.home?.club]||'—'}}</td>
+                <td style="padding:6px 6px;color:#8b949e;font-size:11px">{{managerMap[m.away?.club]||'—'}}</td>
               </tr>
             </tbody>
           </table>

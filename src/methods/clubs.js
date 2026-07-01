@@ -154,7 +154,7 @@ export const clubsMethods = {
               const { starters } = this.lineupDisplay(m.ratings[side]);
               lineups[club] = {
                 club, kickoff: m.kickoff, gameweek: m.gameweek,
-                manager: side === 'home' ? m._homeManager : m._awayManager,
+                manager: this.managerMap[club],
                 formation: this.extractFormation(m.reportNarrative, club)
                            || this.deriveFormation(m.ratings[side]),
                 starters,
@@ -383,25 +383,6 @@ export const clubsMethods = {
       const recentGws = Object.keys(byGw).map(Number).sort((a,b)=>b-a).slice(0,3);
       this.mySubmissions = recentGws.map(gw => byGw[gw]);
       this.mySubmissionLoading = false;
-    },
-
-    extractManager(narrativeArr, club) {
-      // Only search Pre-match paragraphs — they're structured and contain manager names
-      const paras = Array.isArray(narrativeArr) ? narrativeArr : [narrativeArr || ''];
-      const text = paras.filter(p => typeof p === 'string' && p.startsWith('Pre-match')).join(' ');
-      if (!text) return null;
-      const esc = club.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const W = `[A-Z\u00C0-\u00D6\u00D8-\u00DD][\\w\u00C0-\u00FF]*`;
-      const name = `(${W}(?:[ -]${W})*)`;
-      // "Name's Club" (possessive, straight or curly apostrophe) — most reliable
-      let m = text.match(new RegExp(`${name}[\u2019']s ${esc}\\b`));
-      if (m) return m[1];
-      // "Name [optional interruption ≤40 chars] Club" within same sentence
-      // Exclude paragraph-starter words (Pre, Half, Full, The, A, From, In, At...)
-      const EXCLUDE = /^(?:Pre|Half|Full|The|An?|From|In|At|By|It|As|But|And|Or)\b/;
-      m = text.match(new RegExp(`${name}[^.]{2,40}?\\b${esc}\\b`));
-      if (m && !EXCLUDE.test(m[1])) return m[1];
-      return null;
     },
 
     matchResultFor(match, club) {

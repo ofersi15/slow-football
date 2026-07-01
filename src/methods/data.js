@@ -190,7 +190,18 @@ export const dataMethods = {
                 const s = statsMap[(p.Player||'').toLowerCase()];
                 if (!s) return p;
                 applied++;
-                return Object.freeze({...p, ...s});
+                const merged = {...p, ...s};
+                // Stats cache may predate goal-contribution fields — recompute from the freshly merged Goals/Assists/xG/xA
+                if (merged._gc === undefined) {
+                  const mins = merged.Minutes||0;
+                  merged._gc = (merged.Goals||0)+(merged.Assists||0);
+                  merged._gc90 = mins>=30 ? Math.round(merged._gc/mins*90*100)/100 : null;
+                  merged._gDiff = merged.xG!=null ? Math.round(((merged.Goals||0)-merged.xG)*100)/100 : null;
+                  merged._aDiff = merged.xA!=null ? Math.round(((merged.Assists||0)-merged.xA)*100)/100 : null;
+                  merged._gDiff90 = mins>=30 && merged.xG!=null ? Math.round(((merged.Goals||0)-merged.xG)/mins*90*100)/100 : null;
+                  merged._aDiff90 = mins>=30 && merged.xA!=null ? Math.round(((merged.Assists||0)-merged.xA)/mins*90*100)/100 : null;
+                }
+                return Object.freeze(merged);
               });
               if (applied > 0) {
                 await new Promise(r => requestAnimationFrame(r));
@@ -293,7 +304,7 @@ export const dataMethods = {
         const activeMgrs = (managersRes.managers||[]).filter(m=>m.club&&!m.username?.includes('~deleted~'));
         const managedClubs = new Set(activeMgrs.map(m=>m.club));
         const managerMap = {};
-        activeMgrs.forEach(m => { managerMap[m.club] = m.username || m.name || '?'; });
+        activeMgrs.forEach(m => { managerMap[m.club] = m.name || m.username || '?'; });
         this.managedSet = managedClubs;
         this.managerMap = managerMap;
 
