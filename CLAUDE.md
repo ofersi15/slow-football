@@ -153,6 +153,14 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 
 ---
 
+## Manager Names
+
+- `managerMap` (club → real manager name) is built in `fetchFreshData()` (`src/methods/data.js`) from `/api/managers`, which returns both `username` (login handle, e.g. `scotty.d`) and `name` (real name, e.g. `Scott Dalziel`) — always prefer `name`, fall back to `username` only if blank
+- Not persisted to localStorage — rebuilt live on every load, so it always reflects the *current* manager per club
+- Match archive used to bake per-match manager names into the permanent cache via a regex narrative parser (`extractManager`) — removed; manager display everywhere now looks up `managerMap[club]` live instead
+
+---
+
 ## Game Rules
 
 - **Veteran degradation**: outfield 33+, GK 36+ — weekly stat decrements; Veterans/Icons don't train
