@@ -334,10 +334,16 @@
             <div class="attr-row"><span class="c-gray">xG</span><span class="c-orange">{{activeModalStats.xG!=null?activeModalStats.xG.toFixed(2):'—'}}</span></div>
             <div class="attr-row"><span class="c-gray">Assists</span><span class="c-blue" style="font-weight:700">{{activeModalStats.assists||0}}</span></div>
             <div class="attr-row"><span class="c-gray">xA</span><span>{{activeModalStats.xA!=null?activeModalStats.xA.toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">Goal Contrib</span><span style="font-weight:700">{{(activeModalStats.goals||0)+(activeModalStats.assists||0)}}</span></div>
+            <div class="attr-row"><span class="c-gray">G-xG</span><span :class="activeModalStats.xG!=null&&(activeModalStats.goals-activeModalStats.xG)>0?'c-green':activeModalStats.xG!=null&&(activeModalStats.goals-activeModalStats.xG)<0?'c-red':''">{{fmtDiff(activeModalStats.xG!=null?(activeModalStats.goals||0)-activeModalStats.xG:null)}}</span></div>
+            <div class="attr-row"><span class="c-gray">A-xA</span><span :class="activeModalStats.xA!=null&&(activeModalStats.assists-activeModalStats.xA)>0?'c-green':activeModalStats.xA!=null&&(activeModalStats.assists-activeModalStats.xA)<0?'c-red':''">{{fmtDiff(activeModalStats.xA!=null?(activeModalStats.assists||0)-activeModalStats.xA:null)}}</span></div>
             <div class="attr-row"><span class="c-gray">G/90</span><span class="c-green">{{activeModalStats.minutes>=30?(activeModalStats.goals/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
             <div class="attr-row"><span class="c-gray">A/90</span><span class="c-blue">{{activeModalStats.minutes>=30?(activeModalStats.assists/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
             <div class="attr-row"><span class="c-gray">xG/90</span><span class="c-orange">{{activeModalStats.minutes>=30&&activeModalStats.xG!=null?(activeModalStats.xG/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
             <div class="attr-row"><span class="c-gray">xA/90</span><span>{{activeModalStats.minutes>=30&&activeModalStats.xA!=null?(activeModalStats.xA/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">GC/90</span><span style="font-weight:700">{{activeModalStats.minutes>=30?(((activeModalStats.goals||0)+(activeModalStats.assists||0))/activeModalStats.minutes*90).toFixed(2):'—'}}</span></div>
+            <div class="attr-row"><span class="c-gray">G-xG/90</span><span :class="activeModalStats.minutes>=30&&activeModalStats.xG!=null&&(activeModalStats.goals-activeModalStats.xG)>0?'c-green':activeModalStats.minutes>=30&&activeModalStats.xG!=null&&(activeModalStats.goals-activeModalStats.xG)<0?'c-red':''">{{fmtDiff(activeModalStats.minutes>=30&&activeModalStats.xG!=null?((activeModalStats.goals||0)-activeModalStats.xG)/activeModalStats.minutes*90:null)}}</span></div>
+            <div class="attr-row"><span class="c-gray">A-xA/90</span><span :class="activeModalStats.minutes>=30&&activeModalStats.xA!=null&&(activeModalStats.assists-activeModalStats.xA)>0?'c-green':activeModalStats.minutes>=30&&activeModalStats.xA!=null&&(activeModalStats.assists-activeModalStats.xA)<0?'c-red':''">{{fmtDiff(activeModalStats.minutes>=30&&activeModalStats.xA!=null?((activeModalStats.assists||0)-activeModalStats.xA)/activeModalStats.minutes*90:null)}}</span></div>
             <div class="attr-row"><span class="c-gray">Yellow</span><span :class="(activeModalStats.yellow||0)>=2?'c-orange':''">{{activeModalStats.yellow||0}}</span></div>
             <div class="attr-row"><span class="c-gray">Red</span><span :class="(activeModalStats.red||0)>=1?'c-red':''">{{activeModalStats.red||0}}</span></div>
             <div class="attr-row"><span class="c-gray">Tackle%</span><span>{{activeModalStats.tacklePct!=null?activeModalStats.tacklePct.toFixed(0)+'%':'—'}}</span></div>
@@ -355,10 +361,16 @@
               <div class="attr-row"><span class="c-gray">xG</span><span class="c-orange">{{selectedPlayer.xG!=null?selectedPlayer.xG.toFixed(2):'—'}}</span></div>
               <div class="attr-row"><span class="c-gray">Assists</span><span class="c-blue" style="font-weight:700">{{selectedPlayer.Assists||0}}</span></div>
               <div class="attr-row"><span class="c-gray">xA</span><span>{{selectedPlayer.xA!=null?selectedPlayer.xA.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">Goal Contrib</span><span style="font-weight:700">{{selectedPlayer._gc||0}}</span></div>
+              <div class="attr-row"><span class="c-gray">G-xG</span><span :class="selectedPlayer._gDiff>0?'c-green':selectedPlayer._gDiff<0?'c-red':''">{{fmtDiff(selectedPlayer._gDiff)}}</span></div>
+              <div class="attr-row"><span class="c-gray">A-xA</span><span :class="selectedPlayer._aDiff>0?'c-green':selectedPlayer._aDiff<0?'c-red':''">{{fmtDiff(selectedPlayer._aDiff)}}</span></div>
               <div class="attr-row"><span class="c-gray">G/90</span><span class="c-green">{{selectedPlayer._g90!=null?selectedPlayer._g90.toFixed(2):'—'}}</span></div>
               <div class="attr-row"><span class="c-gray">A/90</span><span class="c-blue">{{selectedPlayer._a90!=null?selectedPlayer._a90.toFixed(2):'—'}}</span></div>
               <div class="attr-row"><span class="c-gray">xG/90</span><span class="c-orange">{{selectedPlayer._xG90!=null?selectedPlayer._xG90.toFixed(2):'—'}}</span></div>
               <div class="attr-row"><span class="c-gray">xA/90</span><span>{{selectedPlayer._xA90!=null?selectedPlayer._xA90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">GC/90</span><span style="font-weight:700">{{selectedPlayer._gc90!=null?selectedPlayer._gc90.toFixed(2):'—'}}</span></div>
+              <div class="attr-row"><span class="c-gray">G-xG/90</span><span :class="selectedPlayer._gDiff90>0?'c-green':selectedPlayer._gDiff90<0?'c-red':''">{{fmtDiff(selectedPlayer._gDiff90)}}</span></div>
+              <div class="attr-row"><span class="c-gray">A-xA/90</span><span :class="selectedPlayer._aDiff90>0?'c-green':selectedPlayer._aDiff90<0?'c-red':''">{{fmtDiff(selectedPlayer._aDiff90)}}</span></div>
               <div class="attr-row"><span class="c-gray">Yellow</span><span :class="(selectedPlayer.Yellow||0)>=2?'c-orange':''">{{selectedPlayer.Yellow||0}}</span></div>
               <div class="attr-row"><span class="c-gray">Red</span><span :class="(selectedPlayer.Red||0)>=1?'c-red':''">{{selectedPlayer.Red||0}}</span></div>
               <div class="attr-row"><span class="c-gray">Tackle%</span><span>{{selectedPlayer['Tackle %']!=null?selectedPlayer['Tackle %'].toFixed(0)+'%':'—'}}</span></div>

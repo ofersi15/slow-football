@@ -149,6 +149,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 - `retiring` → retiring, `homegrown` → homegrown, `slowIcon` → icon, `inAcademy` → academy
 - 32 players have `_incompleteStats` (partial badge) — null-ID or custom-transfer players
 - `FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']`
+- Derived scoring fields (computed in `src/methods/data.js`, 3 spots — cache load, stats enrich, fresh fetch): `_gc` (Goals+Assists), `_gc90`, `_gDiff`/`_aDiff` (Goals-xG / Assists-xA), `_gDiff90`/`_aDiff90` — rendered via `fmtDiff()` in `src/utils.js`
 
 ---
 

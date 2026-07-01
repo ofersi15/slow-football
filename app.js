@@ -1,7 +1,7 @@
 import { createApp, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import { API, MY_CLUB, PROXY_TOKEN_URL, ALL_LEAGUES, AI_CLUBS, ALL_POSITIONS, OUTFIELD_POSITIONS, PAGE_SIZE, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, PLAYERS_CACHE_KEY, STATS_CACHE_KEY, PLAYERS_CACHE_TTL, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_CACHE_TTL, SUBMISSIONS_LS_KEY, GAME_ATTRS, GAME_ATTR_LABELS, FORMATIONS, FORMATION_SLOT_POS, MAIN_ATTR, POS_ORDER, POS_COLORS, SLOT_COMPAT, SLOT_ATTRS, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, GAME_START, WEEK_MS } from './src/constants.js'
-import { buildSlotKeys, calcGameRating, calcWeightedRating, calcEstValue, fmtVal, fmtWage, gameWeekNow, playerArrivalWeeks, computeTraits, computeBonds, computeClubChem, computeDislikes } from './src/utils.js'
+import { buildSlotKeys, calcGameRating, calcWeightedRating, calcEstValue, fmtVal, fmtWage, fmtDiff, gameWeekNow, playerArrivalWeeks, computeTraits, computeBonds, computeClubChem, computeDislikes } from './src/utils.js'
 import { parseAsync, stringifyAsync, getAuthToken, authHeaders, SF_CACHE_BASE, SF_WORKER_BASE, serverCacheGet, serverCacheSet, serverCacheDelete } from './src/cache.js'
 import { youthMethods } from './src/methods/youth.js'
 import { matchesMethods } from './src/methods/matches.js'
@@ -175,10 +175,16 @@ createApp({
         {key:'xG',label:'xG',w:38,full:'Expected Goals',group:'stats'},
         {key:'Assists',label:'Ast',w:32,full:'Assists',group:'stats'},
         {key:'xA',label:'xA',w:38,full:'Expected Assists',group:'stats'},
+        {key:'_gc',label:'GC',w:32,full:'Goal Contributions (Goals + Assists)',group:'stats'},
+        {key:'_gDiff',label:'G-xG',w:44,full:'Goals minus Expected Goals — finishing performance vs expectation',group:'stats'},
+        {key:'_aDiff',label:'A-xA',w:44,full:'Assists minus Expected Assists — creativity performance vs expectation',group:'stats'},
         {key:'_g90',label:'G/90',w:38,full:'Goals per 90 minutes (min 30 mins played)',group:'per90'},
         {key:'_a90',label:'A/90',w:38,full:'Assists per 90 minutes (min 30 mins played)',group:'per90'},
         {key:'_xG90',label:'xG/90',w:44,full:'Expected Goals per 90 minutes',group:'per90'},
         {key:'_xA90',label:'xA/90',w:44,full:'Expected Assists per 90 minutes',group:'per90'},
+        {key:'_gc90',label:'GC/90',w:44,full:'Goal Contributions per 90 minutes',group:'per90'},
+        {key:'_gDiff90',label:'G-xG/90',w:52,full:'Goals minus Expected Goals, per 90 minutes',group:'per90'},
+        {key:'_aDiff90',label:'A-xA/90',w:52,full:'Assists minus Expected Assists, per 90 minutes',group:'per90'},
         {key:'Yellow',label:'Yel',w:28,full:'Yellow Cards',group:'stats'},
         {key:'Red',label:'Red',w:28,full:'Red Cards',group:'stats'},
         {key:'Tackle %',label:'Tkl%',w:42,full:'Tackle Success %',group:'stats'},
@@ -306,7 +312,7 @@ createApp({
     ...clubsMethods,
     ...dataMethods,
     ...helperMethods,
-    fmtVal,fmtWage,
+    fmtVal,fmtWage,fmtDiff,
     ratingClass(r) { if(!r) return 'c-gray'; return r>=84?'rating-high':r>=77?'rating-mid':'rating-low'; },
     attrBarColor(v) { return (v||0)>=80?'#7ee787':(v||0)>=65?'#ffa657':'#ff7b72'; },
     isKeyAttr(attrKey, position) { const pos=this.highlightedPos||position; const a=GAME_ATTRS[pos]; return a?a.includes(attrKey):false; },

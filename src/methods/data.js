@@ -82,6 +82,16 @@ export const dataMethods = {
                 p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
                 p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
               }
+              // Recompute goal-contribution stats in case cache predates this feature
+              if (p._gc === undefined) {
+                const mins=p.Minutes||0;
+                p._gc=(p.Goals||0)+(p.Assists||0);
+                p._gc90=mins>=30?Math.round(p._gc/mins*90*100)/100:null;
+                p._gDiff=p.xG!=null?Math.round(((p.Goals||0)-p.xG)*100)/100:null;
+                p._aDiff=p.xA!=null?Math.round(((p.Assists||0)-p.xA)*100)/100:null;
+                p._gDiff90=mins>=30&&p.xG!=null?Math.round(((p.Goals||0)-p.xG)/mins*90*100)/100:null;
+                p._aDiff90=mins>=30&&p.xA!=null?Math.round(((p.Assists||0)-p.xA)/mins*90*100)/100:null;
+              }
               // Recompute age group flags (DOB may now be in cache)
               if (p.DOB) {
                 const dob = new Date(p.DOB);
@@ -238,6 +248,12 @@ export const dataMethods = {
               _a90: mins>=30 ? Math.round((s.assists||0)/mins*90*100)/100 : null,
               _xG90: mins>=30 && s.xG!=null ? Math.round(s.xG/mins*90*100)/100 : null,
               _xA90: mins>=30 && s.xA!=null ? Math.round(s.xA/mins*90*100)/100 : null,
+              _gc: (s.goals||0)+(s.assists||0),
+              _gc90: mins>=30 ? Math.round(((s.goals||0)+(s.assists||0))/mins*90*100)/100 : null,
+              _gDiff: s.xG!=null ? Math.round(((s.goals||0)-s.xG)*100)/100 : null,
+              _aDiff: s.xA!=null ? Math.round(((s.assists||0)-s.xA)*100)/100 : null,
+              _gDiff90: mins>=30 && s.xG!=null ? Math.round(((s.goals||0)-s.xG)/mins*90*100)/100 : null,
+              _aDiff90: mins>=30 && s.xA!=null ? Math.round(((s.assists||0)-s.xA)/mins*90*100)/100 : null,
             };
             statsMap[(p.Player||'').toLowerCase()] = enriched;
           } catch(e) { /* skip on error */ }
@@ -338,6 +354,12 @@ export const dataMethods = {
             p._a90=mins>=30?Math.round((p.Assists||0)/mins*90*100)/100:null;
             p._xG90=mins>=30&&p.xG!=null?Math.round(p.xG/mins*90*100)/100:null;
             p._xA90=mins>=30&&p.xA!=null?Math.round(p.xA/mins*90*100)/100:null;
+            p._gc=(p.Goals||0)+(p.Assists||0);
+            p._gc90=mins>=30?Math.round(p._gc/mins*90*100)/100:null;
+            p._gDiff=p.xG!=null?Math.round(((p.Goals||0)-p.xG)*100)/100:null;
+            p._aDiff=p.xA!=null?Math.round(((p.Assists||0)-p.xA)*100)/100:null;
+            p._gDiff90=mins>=30&&p.xG!=null?Math.round(((p.Goals||0)-p.xG)/mins*90*100)/100:null;
+            p._aDiff90=mins>=30&&p.xA!=null?Math.round(((p.Assists||0)-p.xA)/mins*90*100)/100:null;
             // Age group & academy eligibility from DOB
             if (p.DOB) {
               const dob = new Date(p.DOB);

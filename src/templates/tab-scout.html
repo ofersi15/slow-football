@@ -45,12 +45,18 @@
               <td class="c-orange">{{p.xG!=null?p.xG.toFixed(2):'—'}}</td>
               <td class="c-blue">{{p.Assists||0}}</td>
               <td>{{p.xA!=null?p.xA.toFixed(2):'—'}}</td>
+              <td style="font-weight:600">{{p._gc||0}}</td>
+              <td :class="p._gDiff>0?'c-green':p._gDiff<0?'c-red':''">{{fmtDiff(p._gDiff)}}</td>
+              <td :class="p._aDiff>0?'c-green':p._aDiff<0?'c-red':''">{{fmtDiff(p._aDiff)}}</td>
               </template>
               <template v-if="colGroups.per90">
               <td class="c-green">{{p._g90!=null?p._g90.toFixed(2):'—'}}</td>
               <td class="c-blue">{{p._a90!=null?p._a90.toFixed(2):'—'}}</td>
               <td class="c-orange">{{p._xG90!=null?p._xG90.toFixed(2):'—'}}</td>
               <td>{{p._xA90!=null?p._xA90.toFixed(2):'—'}}</td>
+              <td style="font-weight:600">{{p._gc90!=null?p._gc90.toFixed(2):'—'}}</td>
+              <td :class="p._gDiff90>0?'c-green':p._gDiff90<0?'c-red':''">{{fmtDiff(p._gDiff90)}}</td>
+              <td :class="p._aDiff90>0?'c-green':p._aDiff90<0?'c-red':''">{{fmtDiff(p._aDiff90)}}</td>
               </template>
               <template v-if="colGroups.stats">
               <td :class="(p.Yellow||0)>=3?'c-red':(p.Yellow||0)>=2?'c-orange':''">{{p.Yellow||''}}</td>

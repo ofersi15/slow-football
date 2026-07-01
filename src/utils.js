@@ -43,6 +43,8 @@ export function calcEstValue(p) {
 // ── Formatters ────────────────────────────────────────────────────────────────
 export function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
 export function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
+// Signed diff (e.g. Goals - xG): shows a leading +/- so over/underperformance is obvious at a glance
+export function fmtDiff(v) { return v==null?'—':(v>=0?'+':'')+v.toFixed(2); }
 export function fmtFormation(code) { return code ? String(code).split('').join('-') : null; }
 export function stripDashes(s) { return s ? String(s).replace(/-/g, '') : null; }
 export function fmtSubStatus(sub) {
