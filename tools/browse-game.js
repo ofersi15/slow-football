@@ -17,8 +17,11 @@ const SESSION_FILE = path.join(__dirname, '.session.json');
 const BASE = 'https://slowfootball.club';
 
 function loadCreds() {
+  if (process.env.SF_USERNAME && process.env.SF_PASSWORD) {
+    return { username: process.env.SF_USERNAME, password: process.env.SF_PASSWORD };
+  }
   if (!existsSync(CREDS_FILE)) {
-    console.error('ERROR: .game-creds.json not found at', CREDS_FILE);
+    console.error('ERROR: set SF_USERNAME/SF_PASSWORD env vars or create .game-creds.json at', CREDS_FILE);
     process.exit(1);
   }
   return JSON.parse(readFileSync(CREDS_FILE, 'utf8'));
