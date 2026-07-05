@@ -259,6 +259,8 @@
               </td>
               <td><span :class="'pos pos-'+p.Position">{{p.Position}}</span></td>
               <td>{{p.Age||'—'}}</td>
+              <td><span v-if="p._bestPos" :class="'pos pos-'+p._bestPos" :title="p._bestPos!==p.Position?'Rates higher at '+p._bestPos+' than native '+p.Position:'Native position is their best'">{{p._bestPos}}</span><span v-else>—</span></td>
+              <td :class="ratingClass(p._bestPosRating)">{{p._bestPosRating?p._bestPosRating.toFixed(1):'—'}}</td>
               <td :class="ratingClass(p._gameRating)">{{p._gameRating?p._gameRating.toFixed(1):'—'}}</td>
               <td :class="ratingClass(p._weightedRating)" :title="p._weightedRating&&p._gameRating?'Δ '+(p._weightedRating-p._gameRating).toFixed(1)+' vs game rating':''">{{p._weightedRating?p._weightedRating.toFixed(1):'—'}}</td>
               <td>{{fmtVal(p.Value)}}</td>

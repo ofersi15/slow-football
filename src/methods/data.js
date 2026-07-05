@@ -35,6 +35,9 @@ export const dataMethods = {
     },
 
     async loadData() {
+      // Managers can change independent of the (up to 6h stale) players cache, so always
+      // refresh this in the background regardless of which cache path below is taken.
+      this.refreshManagerMap();
       // Cache-first: show app instantly from server cache (falls back to localStorage)
       try {
         const _ls0 = performance.now();
@@ -73,6 +76,11 @@ export const dataMethods = {
                   if (rtg != null && rtg > pos2Rtg) { pos2 = pos; pos2Rtg = rtg; }
                 }
                 if (pos2Rtg > 0) { p._pos2 = pos2; p._pos2Rating = Math.round(pos2Rtg * 10) / 10; }
+              }
+              if (p._pos2Rating != null && p._pos2Rating > (p._gameRating||0)) {
+                p._bestPos = p._pos2; p._bestPosRating = p._pos2Rating;
+              } else {
+                p._bestPos = p.Position; p._bestPosRating = p._gameRating;
               }
               // Recompute per-90 stats in case cache predates this feature
               if (p._g90 === undefined) {
@@ -288,12 +296,24 @@ export const dataMethods = {
       this.statsProgress = 100;
     },
 
+    // Fetch /api/managers and rebuild managerMap + managedSet — cheap enough to call on every load
+    async refreshManagerMap() {
+      try {
+        const managersRes = await fetch(`${API}/managers`).then(r=>r.json());
+        const activeMgrs = (managersRes.managers||[]).filter(m=>m.club&&!m.username?.includes('~deleted~'));
+        const managerMap = {};
+        activeMgrs.forEach(m => { managerMap[m.club] = m.name || m.username || '?'; });
+        this.managerMap = managerMap;
+        this.managedSet = new Set(activeMgrs.map(m=>m.club));
+      } catch(e) {}
+    },
+
     async fetchFreshData(foreground=true) {
       try {
         if (foreground) { this.loadMsg='Fetching leagues & managers…'; this.progress=5; }
-        const [tablesRes, managersRes, clubsRes] = await Promise.all([
+        const [tablesRes, , clubsRes] = await Promise.all([
           fetch(`${API}/tables/from-fixtures`).then(r=>r.json()),
-          fetch(`${API}/managers`).then(r=>r.json()),
+          this.refreshManagerMap(),
           fetch(`${API}/admin/squads/public/clubs`).then(r=>r.json()),
         ]);
         this.leagueTables = tablesRes;
@@ -301,12 +321,7 @@ export const dataMethods = {
 
         const leagueMap = {};
         ALL_LEAGUES.forEach(l=>(tablesRes[l]||[]).forEach(t=>{leagueMap[t.Team]=l;}));
-        const activeMgrs = (managersRes.managers||[]).filter(m=>m.club&&!m.username?.includes('~deleted~'));
-        const managedClubs = new Set(activeMgrs.map(m=>m.club));
-        const managerMap = {};
-        activeMgrs.forEach(m => { managerMap[m.club] = m.name || m.username || '?'; });
-        this.managedSet = managedClubs;
-        this.managerMap = managerMap;
+        const managedClubs = this.managedSet;
 
         // Load vacancies from KV (populated by cron every 6h) — fall back to managed diff
         try {
@@ -359,6 +374,11 @@ export const dataMethods = {
                 if (rtg != null && rtg > pos2Rtg) { pos2 = pos; pos2Rtg = rtg; }
               }
               if (pos2Rtg > 0) { p._pos2 = pos2; p._pos2Rating = Math.round(pos2Rtg * 10) / 10; }
+            }
+            if (p._pos2Rating != null && p._pos2Rating > (p._gameRating||0)) {
+              p._bestPos = p._pos2; p._bestPosRating = p._pos2Rating;
+            } else {
+              p._bestPos = p.Position; p._bestPosRating = p._gameRating;
             }
             const mins=p.Minutes||0;
             p._g90=mins>=30?Math.round((p.Goals||0)/mins*90*100)/100:null;

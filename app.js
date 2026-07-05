@@ -164,6 +164,8 @@ createApp({
         {key:'Club',label:'Club',w:130,full:'Club (league tag + vacancy indicator)'},
         {key:'Position',label:'Pos',w:38,full:'Position'},
         {key:'Age',label:'Age',w:34,full:'Age'},
+        {key:'_bestPos',label:'Best',w:40,full:'Best Position — position (incl. alternates) where this player rates highest'},
+        {key:'_bestPosRating',label:'BstRtg',w:52,full:'Rating at their Best Position'},
         {key:'_gameRating',label:'Rtg',w:44,full:'Game Rating — avg of the 4 key position attributes (same formula as the game\'s own Rating)'},
         {key:'_weightedRating',label:'WRtg',w:52,full:'Weighted Rating: overall rating blended with mental attrs (Mentality, Experience etc) — configure weight in sidebar'},
         {key:'Value',label:'Val',w:60,full:'In-game value (Transfermarkt baseline — actual transfers typically 2-4x higher)'},
