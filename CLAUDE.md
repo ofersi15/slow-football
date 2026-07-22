@@ -135,7 +135,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | `sf_youth_idx_v2` | Scouts, academy, facilities, staff (Arsenal) | 10min live / 1h static | CF cron 4×/day + browser |
 | `sf_tactics_v4` | Formation/style analysis | 7 days stale | Browser only |
 | `sf_negos_history_v1` | All-time nego history | permanent, never delete | CF cron every 5–15min |
-| `sf_auctions_v1` | Auction items | — | CF cron 4×/day |
+| `sf_auctions_v1` | Auction items | — | CF cron 4×/day + `⟳ Refresh` button in Transfers tab (worker `/_budget` route also re-fetches auctions now, not just budget) |
 | `sf_arsenal_fin_v1` | Arsenal budget | — | CF cron 4×/day |
 | `sf_vacancies_v1` | Vacant clubs | — | CF cron 4×/day |
 | `sf_match_archive_v3` | Archive index | permanent | Browser (manual) |
