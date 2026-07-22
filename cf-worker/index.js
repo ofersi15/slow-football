@@ -285,25 +285,32 @@ export default {
     if (url.pathname === '/_budget') {
       ctx.waitUntil((async () => {
         console.log('[budget] manual pull triggered');
-        // Try without auth first
+        // Budget can work without auth; auctions always needs a token — so login once and reuse it.
+        let budgetDone = false;
         try {
           const r = await fetch(`${GAME_API}/budgets?format=full`);
-          if (r.ok) { await cacheBudget(env, await r.json()); return; }
+          if (r.ok) { await cacheBudget(env, await r.json()); budgetDone = true; }
         } catch(e) {}
-        // Auth required — login and fetch
         try {
-          const loginRes = await fetch(`${GAME_API}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: env.SF_USERNAME, password: env.SF_PASSWORD }),
-          });
-          if (!loginRes.ok) { console.error('[budget] login failed:', loginRes.status); return; }
-          const { token } = await loginRes.json();
+          const token = await gameLogin(env);
+          if (!token) { console.error('[budget] login failed'); return; }
           const h = { 'Authorization': `Bearer ${token}`, 'X-Club': 'Arsenal', 'X-Role': 'manager', 'Content-Type': 'application/json' };
-          const br = await fetch(`${GAME_API}/budgets?format=full`, { headers: h });
-          if (br.ok) await cacheBudget(env, await br.json());
-          else console.error('[budget] fetch failed:', br.status);
-        } catch(e) { console.error('[budget] pull error:', e.message); }
+          if (!budgetDone) {
+            const br = await fetch(`${GAME_API}/budgets?format=full`, { headers: h });
+            if (br.ok) await cacheBudget(env, await br.json());
+            else console.error('[budget] fetch failed:', br.status);
+          }
+          // Auctions — refresh so new bids show up promptly instead of waiting for the next cron
+          const auctionsRes = await fetch(`${GAME_API}/auctions`, { headers: h });
+          if (auctionsRes.ok) {
+            const auctionsData = await auctionsRes.json();
+            await env.SF_CACHE.put('sf_auctions_v1', JSON.stringify({ data: auctionsData, ts: Date.now() }));
+            const count = Array.isArray(auctionsData) ? auctionsData.length : (auctionsData.items?.length || 0);
+            console.log('[auctions] manual pull:', count, 'cached');
+          } else {
+            console.error('[auctions] fetch failed:', auctionsRes.status);
+          }
+        } catch(e) { console.error('[budget/auctions] pull error:', e.message); }
       })());
       return new Response('budget pull queued', { headers: cors });
     }
