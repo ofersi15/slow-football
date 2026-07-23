@@ -9,6 +9,7 @@ import { espionageMethods } from './src/methods/espionage.js'
 import { clubsMethods } from './src/methods/clubs.js'
 import { dataMethods } from './src/methods/data.js'
 import { helperMethods } from './src/methods/helpers.js'
+import { assistantMethods } from './src/methods/assistant.js'
 import { matchesComputed } from './src/computed/matches.js'
 import { squadComputed } from './src/computed/squad.js'
 import { espionageComputed } from './src/computed/espionage.js'
@@ -42,11 +43,11 @@ createApp({
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: (() => {
         const hash = location.hash.slice(1);
-        const validIds = ['scout','squad','moneyball','analysis','youth','club','clubs','espionage','matches'];
+        const validIds = ['scout','squad','moneyball','analysis','youth','club','clubs','espionage','matches','assistant'];
         if (hash && validIds.includes(hash)) return hash;
         return localStorage.getItem('sf_activeTab') || 'squad';
       })(),
-      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'analysis',label:'🔬 Analysis'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'}],
+      tabs: [{id:'scout',label:'🔍 Scout'},{id:'squad',label:'🛡 My Squad'},{id:'moneyball',label:'📊 Moneyball'},{id:'analysis',label:'🔬 Analysis'},{id:'youth',label:'🌱 Youth'},{id:'club',label:'🏟 My Club'},{id:'clubs',label:'🏟 Clubs'},{id:'espionage',label:'💰 Transfers'},{id:'matches',label:'📺 Matches'},{id:'assistant',label:'🤖 Assistant'}],
       mySquadFormation: '4231',
       formationKeys: Object.keys(FORMATIONS),
       attrFiltersOpen: false,
@@ -125,6 +126,8 @@ createApp({
       espionageSubTab: 'negos', espionageSearch: '', espionageSort: 'club', espShowVacantOnly: false,
       espionageNegoSearch: '', negoExpandedId: null, negoShowAll: false, negoShowAllModal: false,
       negoDisplayCount: 50,
+      // Assistant tab (AI chat)
+      chatMessages: [], chatInput: '', chatLoading: false, chatError: '',
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,
@@ -314,6 +317,7 @@ createApp({
     ...clubsMethods,
     ...dataMethods,
     ...helperMethods,
+    ...assistantMethods,
     fmtVal,fmtWage,fmtDiff,
     ratingClass(r) { if(!r) return 'c-gray'; return r>=84?'rating-high':r>=77?'rating-mid':'rating-low'; },
     attrBarColor(v) { return (v||0)>=80?'#7ee787':(v||0)>=65?'#ffa657':'#ff7b72'; },
@@ -429,6 +433,7 @@ createApp({
     requestAnimationFrame(() => requestAnimationFrame(() => this.loadData()));
     this.loadCachedSubmissions();
     this.loadMatchArchive();
+    this.loadChatHistory();
     // Restore last viewed club only if the active tab is clubs
     try {
       const lastClub = localStorage.getItem('sf_last_club');

@@ -23,6 +23,58 @@ function cacheMaxAge(key) {
 }
 
 const GAME_API = 'https://slowfootball.club/api';
+const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
+const CHAT_MODEL = 'claude-sonnet-5';
+
+// Proxies chat messages to the Claude API server-side (keeps ANTHROPIC_API_KEY off the client).
+async function handleChat(request, env, cors) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return new Response(JSON.stringify({ error: 'Assistant not configured — missing ANTHROPIC_API_KEY worker secret' }),
+      { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  let body;
+  try { body = await request.json(); } catch(e) {
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  const messages = Array.isArray(body.messages)
+    ? body.messages.slice(-20).filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map(m => ({ role: m.role, content: m.content.slice(0, 4000) }))
+    : [];
+  const context = typeof body.context === 'string' ? body.context.slice(0, 16000) : '';
+  if (!messages.length) {
+    return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+
+  const system = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing.\n\n${context}`;
+
+  try {
+    const r = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: {
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        max_tokens: 1500,
+        system,
+        messages,
+        output_config: { effort: 'medium' },
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
+      return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
+        { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    return new Response(JSON.stringify({ reply: text, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+  } catch(e) {
+    console.error('[chat] request failed:', e.message);
+    return new Response(JSON.stringify({ error: 'Request failed: ' + e.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+}
 
 // Parse /api/budgets?format=full response and cache budgets.
 // Response shape: { budgets:{club→{transfer,wage,...}}, committed, available:{obj}, updatedAt, source }
@@ -275,6 +327,11 @@ export default {
       } catch(e) {
         return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: cors });
       }
+    }
+
+    // ── AI assistant ──
+    if (url.pathname === '/_chat' && request.method === 'POST') {
+      return handleChat(request, env, cors);
     }
 
     // ── Admin routes ──

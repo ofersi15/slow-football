@@ -42,6 +42,7 @@ Personal fantasy football analytics app for slowfootball.club. Owner: Ofer (ofer
 | Clubs | `src/templates/tab-clubs.html` |
 | Transfers | `src/templates/tab-espionage.html` |
 | Matches | `src/templates/tab-matches.html` |
+| Assistant (AI chat) | `src/templates/tab-assistant.html` |
 | Player modal | `src/templates/modal.html` |
 | Scout sidebar | `src/templates/sidebar.html` |
 | Tab bar / shell | `src/index.html` |
@@ -60,6 +61,7 @@ Personal fantasy football analytics app for slowfootball.club. Owner: Ofer (ofer
 | Espionage / negotiations | `src/methods/espionage.js` |
 | Clubs tab / pitch / submissions | `src/methods/clubs.js` |
 | Sort helpers, staff | `src/methods/helpers.js` |
+| AI Assistant chat + context builder | `src/methods/assistant.js` |
 | Constants, cache keys | `src/constants.js` |
 | Utility functions | `src/utils.js` |
 | Cache helpers | `src/cache.js` |
@@ -112,6 +114,19 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | clubs | Clubs | All clubs — Latest XI pitch viz, Academy, History, Transfers |
 | espionage | Transfers | Opponent scouting, negotiations, auctions |
 | matches | Matches | Match archive, filters, rebuild/append |
+| assistant | Assistant | AI chat — ask about transfers/tactics/squad |
+
+---
+
+## AI Assistant
+
+- Chat UI in `src/templates/tab-assistant.html`, logic in `src/methods/assistant.js`
+- Frontend POSTs `{messages, context}` to `POST {SF_WORKER_BASE}/_chat` — the `sf-cache` worker (`cf-worker/index.js`, `handleChat`) proxies to the Claude API server-side so the API key never reaches the browser
+- Model: `claude-sonnet-5`, `output_config.effort: 'medium'`, `max_tokens: 1500` — chosen for cost (fractions of a cent per exchange at this usage volume)
+- `buildChatContext()` in `assistant.js` summarizes the already-loaded squad, budget, and top-rated transfer targets (no extra API calls) and is sent as the system prompt context on every message
+- Chat history persists to `localStorage` (`sf_chat_history_v1`, capped to last 30 messages) — not synced to the server
+- **Setup required**: the worker needs an `ANTHROPIC_API_KEY` secret — get a key at console.anthropic.com (separate from a Claude Pro subscription, which doesn't include API access), then `cd cf-worker && npx wrangler secret put ANTHROPIC_API_KEY`
+- No auth on the `/_chat` route itself (consistent with the worker's other admin routes) — relies on the worker URL not being published
 
 ---
 

@@ -1,0 +1,38 @@
+  <!-- ── ASSISTANT TAB (AI chat) ── -->
+      <div v-if="activeTab==='assistant'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:10px;height:100%">
+
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:15px;font-weight:700">🤖 Assistant</div>
+      <button class="btn" style="font-size:11px" @click="clearChat" :disabled="!chatMessages.length">🗑 Clear chat</button>
+    </div>
+    <div class="c-gray" style="font-size:11px;margin-top:-6px">Ask about transfers, tactics, your squad or scout targets — it can see your current squad, budget and top-rated players elsewhere.</div>
+
+    <!-- Message list -->
+    <div ref="chatScroll" class="card" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:14px">
+      <div v-if="!chatMessages.length" class="c-gray" style="text-align:center;padding:30px;font-style:italic">
+        No messages yet. Try: "Who should I target at CB under £15m?" or "Is my current formation working?"
+      </div>
+      <div v-for="(m,i) in chatMessages" :key="i"
+        :style="{alignSelf: m.role==='user' ? 'flex-end' : 'flex-start', maxWidth:'80%'}">
+        <div :style="{
+          background: m.role==='user' ? '#1f6feb' : '#0d1117',
+          border: m.role==='user' ? 'none' : '1px solid #21262d',
+          color: m.role==='user' ? '#fff' : '#e6edf3',
+          borderRadius:'10px', padding:'8px 12px', fontSize:'13px', lineHeight:'1.5', whiteSpace:'pre-wrap'}">{{m.content}}</div>
+      </div>
+      <div v-if="chatLoading" class="c-gray" style="align-self:flex-start;font-size:12px;font-style:italic;padding:4px 12px">🤖 thinking…</div>
+    </div>
+
+    <div v-if="chatError" style="color:#ff7b72;font-size:12px">⚠ {{chatError}}</div>
+
+    <!-- Input -->
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <textarea v-model="chatInput" @keydown="onChatKeydown" placeholder="Ask your assistant… (Enter to send, Shift+Enter for new line)"
+        :disabled="chatLoading" rows="2"
+        style="flex:1;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:8px 10px;font-size:13px;outline:none;resize:vertical;font-family:inherit"></textarea>
+      <button class="btn green" style="padding:8px 16px" :disabled="chatLoading || !chatInput.trim()" @click="sendChatMessage">
+        {{chatLoading ? '…' : 'Send'}}
+      </button>
+    </div>
+
+      </div>
