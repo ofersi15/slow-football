@@ -128,6 +128,7 @@ createApp({
       negoDisplayCount: 50,
       // Assistant tab (AI chat)
       chatMessages: [], chatInput: '', chatLoading: false, chatError: '',
+      chatAttachments: [], chatSessions: [], activeChatSessionId: null,
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,

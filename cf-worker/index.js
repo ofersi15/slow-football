@@ -25,6 +25,38 @@ function cacheMaxAge(key) {
 const GAME_API = 'https://slowfootball.club/api';
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const CHAT_MODEL = 'claude-sonnet-5';
+const MAX_CHAT_BODY_BYTES = 20 * 1024 * 1024; // safety margin under Anthropic's 32MB request limit
+const ALLOWED_CHAT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const MAX_CHAT_TEXT_BLOCK_CHARS = 24000;  // covers an attached JSON/CSV/text file plus the user's own message
+const MAX_CHAT_IMAGE_B64_CHARS = 6000000; // ~4.5MB raw
+const MAX_CHAT_DOC_B64_CHARS = 14000000;  // ~10.5MB raw
+const MAX_CHAT_BLOCKS_PER_MESSAGE = 4;
+
+// Reconstructs a message content block from client JSON, dropping anything that doesn't match
+// a known shape — the /_chat route has no auth, so treat all client input as untrusted.
+function sanitizeChatBlock(b) {
+  if (!b || typeof b !== 'object') return null;
+  if (b.type === 'text' && typeof b.text === 'string' && b.text.length) {
+    return { type: 'text', text: b.text.slice(0, MAX_CHAT_TEXT_BLOCK_CHARS) };
+  }
+  if (b.type === 'image' && b.source && b.source.type === 'base64'
+      && ALLOWED_CHAT_IMAGE_TYPES.has(b.source.media_type) && typeof b.source.data === 'string'
+      && b.source.data.length && b.source.data.length <= MAX_CHAT_IMAGE_B64_CHARS) {
+    return { type: 'image', source: { type: 'base64', media_type: b.source.media_type, data: b.source.data } };
+  }
+  if (b.type === 'document' && b.source && b.source.type === 'base64'
+      && b.source.media_type === 'application/pdf' && typeof b.source.data === 'string'
+      && b.source.data.length && b.source.data.length <= MAX_CHAT_DOC_B64_CHARS) {
+    return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b.source.data } };
+  }
+  return null;
+}
+
+function sanitizeChatContent(content) {
+  const blocks = typeof content === 'string' ? [{ type: 'text', text: content }]
+    : Array.isArray(content) ? content : [];
+  return blocks.map(sanitizeChatBlock).filter(Boolean).slice(0, MAX_CHAT_BLOCKS_PER_MESSAGE);
+}
 
 // Proxies chat messages to the Claude API server-side (keeps ANTHROPIC_API_KEY off the client).
 async function handleChat(request, env, cors) {
@@ -32,30 +64,40 @@ async function handleChat(request, env, cors) {
     return new Response(JSON.stringify({ error: 'Assistant not configured — missing ANTHROPIC_API_KEY worker secret' }),
       { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
+  const raw = await request.text();
+  if (raw.length > MAX_CHAT_BODY_BYTES) {
+    return new Response(JSON.stringify({ error: 'Request too large' }), { status: 413, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
   let body;
-  try { body = await request.json(); } catch(e) {
+  try { body = JSON.parse(raw); } catch(e) {
     return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
   const messages = Array.isArray(body.messages)
-    ? body.messages.slice(-20).filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map(m => ({ role: m.role, content: m.content.slice(0, 4000) }))
+    ? body.messages.slice(-20)
+        .filter(m => m && (m.role === 'user' || m.role === 'assistant'))
+        .map(m => ({ role: m.role, content: sanitizeChatContent(m.content) }))
+        .filter(m => m.content.length)
     : [];
   const context = typeof body.context === 'string' ? body.context.slice(0, 16000) : '';
   if (!messages.length) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const systemText = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing.\n\n${context}`;
+  const systemText = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing. The user may attach images or files (screenshots, exported data) — factor them into your analysis.\n\n${context}`;
 
   // Cache the system prompt (instructions + squad/budget/targets context): buildChatContext()
   // is deterministic, so this is byte-identical across messages within a chat session — after
   // the first turn, cached reads cost ~10% of the uncached price.
   const system = [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }];
 
-  // Cache the growing conversation too: mark everything but the newest user message so each
-  // new turn only pays full price for what's actually new.
-  const cachedMessages = messages.map((m, i) => i === messages.length - 2
-    ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }] }
-    : m);
+  // Cache the growing conversation too: mark the last block of everything but the newest user
+  // message so each new turn only pays full price for what's actually new.
+  const cachedMessages = messages.map((m, i) => {
+    if (i !== messages.length - 2 || !m.content.length) return m;
+    const content = m.content.slice();
+    content[content.length - 1] = { ...content[content.length - 1], cache_control: { type: 'ephemeral' } };
+    return { role: m.role, content };
+  });
 
   try {
     const r = await fetch(ANTHROPIC_API, {
@@ -70,7 +112,7 @@ async function handleChat(request, env, cors) {
         max_tokens: 1500,
         system,
         messages: cachedMessages,
-        output_config: { effort: 'medium' },
+        output_config: { effort: 'low' },
       }),
     });
     const data = await r.json();
