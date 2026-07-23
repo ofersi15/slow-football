@@ -49,10 +49,15 @@ Pull these keys and build sections:
   is 4000+ rows of noise, don't dump it all) + `sf_all_budgets_v1` +
   `sf_vacancies_v1` → **transferMarket** section
 - `GET https://slowfootball.club/api/transfers/done` (live API call, not a
-  KV key — public, no auth needed) → `.deals`, filtered to deals where
-  `seller == "Arsenal"` or `buyer == "Arsenal"` (the full list is 1600+
-  league-wide deals — don't dump it all), sorted most-recent first →
-  **completedTransfers** array inside the **transferMarket** section
+  KV key — public, no auth needed) → `.deals` (the full list is 1600+
+  league-wide deals going back to last September — don't dump it all) →
+  two arrays inside the **transferMarket** section, both sorted most-recent
+  first:
+  - **arsenalTransfers**: all deals where `seller == "Arsenal"` or
+    `buyer == "Arsenal"` (no time cap — this is only ~30 deals all-time)
+  - **recentLeagueTransfers**: all deals from the last 14 days (by `ts`/
+    `updatedAt`), regardless of club — gives league-wide market context
+    without dumping the full history (~100-150 deals typically)
 - `GET https://slowfootball.club/api/tables/from-fixtures` (live API call,
   not a KV key — public, no auth needed; ⚠️ the `sf_tables_raw_v1` KV key is
   a stale, orphaned cache nothing writes to anymore — do not use it) →
