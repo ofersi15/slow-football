@@ -129,6 +129,7 @@ createApp({
       // Assistant tab (AI chat)
       chatMessages: [], chatInput: '', chatLoading: false, chatError: '',
       chatAttachments: [], chatSessions: [], activeChatSessionId: null,
+      assistantDockOpen: (() => { try { return localStorage.getItem('sf_assistant_dock_open') === '1'; } catch(e) { return false; } })(),
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,

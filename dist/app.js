@@ -17177,6 +17177,23 @@ ${t.text}
     const e = this.chatSessions.findIndex((s) => s.id === t);
     e !== -1 && confirm("Delete this chat?") && (this.chatSessions.splice(e, 1), this.chatSessions.length ? (this.activeChatSessionId = this.chatSessions[0].id, this.chatMessages = this.chatSessions[0].messages) : this.newChatSession(), this.saveChatHistory());
   },
+  toggleAssistantDock() {
+    if (this.activeTab !== "assistant") {
+      this.assistantDockOpen = !this.assistantDockOpen;
+      try {
+        localStorage.setItem("sf_assistant_dock_open", this.assistantDockOpen ? "1" : "0");
+      } catch {
+      }
+      this.assistantDockOpen && this.$nextTick(() => this.scrollChatToBottom());
+    }
+  },
+  closeAssistantDock() {
+    this.assistantDockOpen = !1;
+    try {
+      localStorage.setItem("sf_assistant_dock_open", "0");
+    } catch {
+    }
+  },
   scrollChatToBottom() {
     const t = this.$refs.chatScroll;
     t && (t.scrollTop = t.scrollHeight);
@@ -18156,6 +18173,13 @@ qo({
       chatAttachments: [],
       chatSessions: [],
       activeChatSessionId: null,
+      assistantDockOpen: (() => {
+        try {
+          return localStorage.getItem("sf_assistant_dock_open") === "1";
+        } catch {
+          return !1;
+        }
+      })(),
       workerLog: null,
       workerLogOpen: !1,
       trueValueMap: {},

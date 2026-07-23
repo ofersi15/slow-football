@@ -38,12 +38,16 @@
         <div class="tab-bar">
           <a v-for="t in tabs" :key="t.id" :class="['btn',{active:activeTab===t.id}]"
              :href="'#'+t.id" :aria-label="t.label" role="tab" :aria-selected="activeTab===t.id"
-             @click.prevent="activeTab=t.id; if(t.id==='clubs') selectedClubName=null">{{t.label}}</a>
-          <span class="header-meta" style="margin-left:auto;flex-shrink:0;display:block">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
+             @click.prevent="activeTab=t.id; if(t.id==='clubs') selectedClubName=null; if(t.id==='assistant') closeAssistantDock()">{{t.label}}</a>
+          <button class="btn" :class="{active:assistantDockOpen}" :disabled="activeTab==='assistant'"
+            style="margin-left:auto;flex-shrink:0" @click="toggleAssistantDock"
+            :title="activeTab==='assistant' ? 'Already open as the Assistant tab' : (assistantDockOpen ? 'Close Assistant side panel' : 'Open Assistant in a side panel')">💬</button>
+          <span class="header-meta" style="flex-shrink:0;display:block">{{allPlayers.length}} players · {{totalClubs}} clubs</span>
         </div>
       </div>
       <div style="display:flex;flex:1;overflow:hidden">
 <!-- include:sidebar -->
+<!-- include:assistant-dock -->
 <!-- include:tab-scout -->
 <!-- include:tab-squad -->
 <!-- include:tab-moneyball -->

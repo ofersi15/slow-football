@@ -210,6 +210,16 @@ export const assistantMethods = {
     }
     this.saveChatHistory();
   },
+  toggleAssistantDock() {
+    if (this.activeTab === 'assistant') return; // already fully visible as the tab
+    this.assistantDockOpen = !this.assistantDockOpen;
+    try { localStorage.setItem('sf_assistant_dock_open', this.assistantDockOpen ? '1' : '0'); } catch (e) {}
+    if (this.assistantDockOpen) this.$nextTick(() => this.scrollChatToBottom());
+  },
+  closeAssistantDock() {
+    this.assistantDockOpen = false;
+    try { localStorage.setItem('sf_assistant_dock_open', '0'); } catch (e) {}
+  },
   scrollChatToBottom() {
     const el = this.$refs.chatScroll;
     if (el) el.scrollTop = el.scrollHeight;

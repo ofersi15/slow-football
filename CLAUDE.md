@@ -121,6 +121,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 ## AI Assistant
 
 - Chat UI in `src/templates/tab-assistant.html`, logic in `src/methods/assistant.js`
+- **Two layouts, same chat state**: the Assistant tab (`tab-assistant.html`) renders the chat centered with `max-width:820px` so lines stay readable on wide/4K monitors. A 💬 button in the header (`src/index.html` tab-bar, always visible, disabled while already on the Assistant tab) opens the same chat as a 400px docked panel on the right (`assistant-dock.html`, `.assistant-dock` in `style.css`, `order:2` to always render rightmost regardless of DOM position) while browsing any other tab. Only one of the two is ever mounted at once (`assistantDockOpen && activeTab!=='assistant'`) — they'd otherwise collide on the shared `ref="chatScroll"`. Navigating to the Assistant tab auto-closes the dock (`closeAssistantDock()`); state persists to `localStorage` (`sf_assistant_dock_open`)
 - Frontend POSTs `{messages, context}` to `POST {SF_WORKER_BASE}/_chat` — the `sf-cache` worker (`cf-worker/index.js`, `handleChat`) proxies to the Claude API server-side so the API key never reaches the browser
 - Model: `claude-sonnet-5`, `output_config.effort: 'low'`, `max_tokens: 1500` — `low` cut thinking-token spend by ~58% vs `medium` with no quality loss in testing, and stopped the reply from hitting the `max_tokens` cap
 - `buildChatContext()` in `assistant.js` summarizes the already-loaded squad, budget, and top-rated transfer targets (no extra API calls) and is sent as the system prompt context on every message
@@ -212,7 +213,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 
 ## Known Quirks
 
-- 1 unclosed `<div>` in index.html — pre-existing, browsers handle it, do not touch
+- **Row/main closing tags live in the last content tab, not in the shell.** `src/index.html` opens `.main` and the flex row (`display:flex;flex:1;overflow:hidden`) but never closes them — the last tab partial in the include list must close both (see the trailing `</div><!-- end row -->` / `</div><!-- end .main -->` at the bottom of `tab-assistant.html`, mirroring modal.html's `<!-- end .layout -->`). This used to live in `tab-matches.html` when Matches was the last tab; when Assistant was added after it, those closing tags weren't moved, silently pushing every tab from Matches onward one+ DOM levels above the flex row (invisible for full-width tabs, but broke side-by-side layouts like the Assistant dock — fixed 2026-07-23). **If you reorder the tab includes in `src/index.html`, move these 2 closing divs to whichever partial is now last.**
 - `xiPlayerInfo(name)` guards `typeof name !== 'string'` — stale cache can store objects as names
 - `_normalizeSubs(s)` — called on both fresh fetch and localStorage load; fixes malformed subs entries
 - Subs normalization handles JSON strings, stringified objects in the `name` field

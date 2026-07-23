@@ -11,6 +11,7 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-seri
 .tab-bar .btn{flex-shrink:0;white-space:nowrap}
 .header-meta{font-size:11px;color:#8b949e;padding:0 14px 5px;line-height:1}
 .content{flex:1;overflow:auto}
+.assistant-dock{width:400px;min-width:400px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;order:2}
 .btn{padding:4px 10px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#8b949e;transition:all .12s;min-height:36px}
 .btn:hover{background:#161b22;color:#e6edf3}
 .btn.active{background:#1f6feb;color:#fff;border-color:#388bfd}
@@ -117,4 +118,5 @@ tr.clickable:hover td.scout-sticky{background:#1c2128}
   .pitch-detail-row{flex-direction:column}
   .clubs-grid{grid-template-columns:1fr}
   .mb-sub-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .assistant-dock{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;min-width:0;z-index:50;border-left:none}
 }

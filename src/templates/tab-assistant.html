@@ -1,5 +1,7 @@
   <!-- ── ASSISTANT TAB (AI chat) ── -->
-      <div v-if="activeTab==='assistant'" class="content" style="padding:14px;display:flex;flex-direction:column;gap:10px;height:100%">
+      <div v-if="activeTab==='assistant'" class="content" style="padding:14px;display:flex;flex-direction:column;height:100%">
+    <!-- Capped width so lines stay readable on wide/4K monitors; see assistant-dock.html for the side-panel variant -->
+    <div style="max-width:820px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px;height:100%;min-height:0">
 
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <div style="font-size:15px;font-weight:700">🤖 Assistant</div>
@@ -62,4 +64,8 @@
       </button>
     </div>
 
+    </div>
       </div>
+
+    </div><!-- end row (was closed in tab-matches.html until Assistant became the last tab; see modal.html's ".layout" close for the same pattern) -->
+  </div><!-- end .main -->
