@@ -124,6 +124,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 - Frontend POSTs `{messages, context}` to `POST {SF_WORKER_BASE}/_chat` — the `sf-cache` worker (`cf-worker/index.js`, `handleChat`) proxies to the Claude API server-side so the API key never reaches the browser
 - Model: `claude-sonnet-5`, `output_config.effort: 'medium'`, `max_tokens: 1500` — chosen for cost (fractions of a cent per exchange at this usage volume)
 - `buildChatContext()` in `assistant.js` summarizes the already-loaded squad, budget, and top-rated transfer targets (no extra API calls) and is sent as the system prompt context on every message
+- **Prompt caching**: the worker (`handleChat`) marks the system prompt and the second-to-last message with `cache_control: {type: "ephemeral"}` (5min TTL). `buildChatContext()` is deterministic, so the system prompt is byte-identical across messages in a session — cached reads cost ~10% of the uncached price. Verify hits via `usage.cache_read_input_tokens` (logged server-side, visible with `wrangler tail`)
 - Chat history persists to `localStorage` (`sf_chat_history_v1`, capped to last 30 messages) — not synced to the server
 - **Setup required**: the worker needs an `ANTHROPIC_API_KEY` secret — get a key at console.anthropic.com (separate from a Claude Pro subscription, which doesn't include API access), then `cd cf-worker && npx wrangler secret put ANTHROPIC_API_KEY`
 - No auth on the `/_chat` route itself (consistent with the worker's other admin routes) — relies on the worker URL not being published

@@ -44,7 +44,18 @@ async function handleChat(request, env, cors) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const system = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing.\n\n${context}`;
+  const systemText = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing.\n\n${context}`;
+
+  // Cache the system prompt (instructions + squad/budget/targets context): buildChatContext()
+  // is deterministic, so this is byte-identical across messages within a chat session — after
+  // the first turn, cached reads cost ~10% of the uncached price.
+  const system = [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }];
+
+  // Cache the growing conversation too: mark everything but the newest user message so each
+  // new turn only pays full price for what's actually new.
+  const cachedMessages = messages.map((m, i) => i === messages.length - 2
+    ? { role: m.role, content: [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }] }
+    : m);
 
   try {
     const r = await fetch(ANTHROPIC_API, {
@@ -58,7 +69,7 @@ async function handleChat(request, env, cors) {
         model: CHAT_MODEL,
         max_tokens: 1500,
         system,
-        messages,
+        messages: cachedMessages,
         output_config: { effort: 'medium' },
       }),
     });
@@ -67,6 +78,9 @@ async function handleChat(request, env, cors) {
       console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
       return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
         { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    if (data.usage) {
+      console.log('[chat] usage:', JSON.stringify(data.usage));
     }
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     return new Response(JSON.stringify({ reply: text, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
