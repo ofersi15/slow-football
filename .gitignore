@@ -3,6 +3,9 @@
 tools/.session.json
 tools/node_modules/
 
+# generated data exports (live game-state snapshots)
+exports/
+
 # wrangler files
 .wrangler
 .dev.vars*

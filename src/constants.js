@@ -6,8 +6,8 @@ export const PROXY_TOKEN_URL = 'https://sf-game-proxy.ofersi15.workers.dev/token
 export const ALL_LEAGUES = ['north','south','europa','world','conference','hipster'];
 // AI-controlled clubs — excluded from scout/tables; never count as vacancies
 export const AI_CLUBS = new Set(['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami']);
-export const ALL_POSITIONS = ['GK','FB','CB','DM','CM','AM','WF','CF'];
-export const OUTFIELD_POSITIONS = ['FB','CB','DM','CM','AM','WF','CF'];
+export const ALL_POSITIONS = ['GK','FB','CB','DM','AM','WF','CF'];
+export const OUTFIELD_POSITIONS = ['FB','CB','DM','AM','WF','CF'];
 export const PAGE_SIZE = 100;
 
 // ── Cache keys & TTLs ─────────────────────────────────────────────────────────
@@ -29,7 +29,6 @@ export const GAME_ATTRS = {
   FB: ['Passing','Tackling','Stamina','Marking'],
   CB: ['Marking','Heading','Tackling','Speed'],
   DM: ['Tackling','Passing','Vision','Marking'],
-  CM: ['Vision','Passing','Dribbling','Shooting'],
   AM: ['Passing','Dribbling','Shooting','Vision'],
   WF: ['Dribbling','Passing','Speed','Shooting'],
   CF: ['Speed','Dribbling','Heading','Shooting'],
@@ -37,7 +36,7 @@ export const GAME_ATTRS = {
 export const GAME_ATTR_LABELS = {
   GK: 'Han, Ref, Spd, Pas',   FB: 'Pas, Tck, Sta, Mk',
   CB: 'Mk, Hdg, Tck, Spd',    DM: 'Tck, Pas, Vis, Mk',
-  CM: 'Vis, Pas, Drb, Sh',    AM: 'Pas, Drb, Sh, Vis',
+  AM: 'Pas, Drb, Sh, Vis',
   WF: 'Drb, Pas, Spd, Sh',    CF: 'Spd, Drb, Hdg, Sh',
 };
 

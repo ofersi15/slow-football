@@ -14511,12 +14511,11 @@ const oC = [
   aC
 ];
 ur.register(...oC);
-const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-game-proxy.ofersi15.workers.dev/token", ea = ["north", "south", "europa", "world", "conference", "hipster"], _l = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), fo = ["GK", "FB", "CB", "DM", "CM", "AM", "WF", "CF"], fc = ["FB", "CB", "DM", "CM", "AM", "WF", "CF"], xl = 100, zn = "sf_tactics_v4", lC = 7 * 24 * 60 * 60 * 1e3, Gn = "sf_players_v6", po = "sf_stats_v1", cC = 6 * 60 * 60 * 1e3, hC = 7 * 24 * 60 * 60 * 1e3, uC = 6 * 60 * 60 * 1e3, nf = "sf_submissions_all_v1", go = "sf_subs_ls", mi = {
+const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-game-proxy.ofersi15.workers.dev/token", ea = ["north", "south", "europa", "world", "conference", "hipster"], _l = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), fo = ["GK", "FB", "CB", "DM", "AM", "WF", "CF"], fc = ["FB", "CB", "DM", "AM", "WF", "CF"], xl = 100, zn = "sf_tactics_v4", lC = 7 * 24 * 60 * 60 * 1e3, Gn = "sf_players_v6", po = "sf_stats_v1", cC = 6 * 60 * 60 * 1e3, hC = 7 * 24 * 60 * 60 * 1e3, uC = 6 * 60 * 60 * 1e3, nf = "sf_submissions_all_v1", go = "sf_subs_ls", mi = {
   GK: ["Handling", "Reflexes", "Speed", "Passing"],
   FB: ["Passing", "Tackling", "Stamina", "Marking"],
   CB: ["Marking", "Heading", "Tackling", "Speed"],
   DM: ["Tackling", "Passing", "Vision", "Marking"],
-  CM: ["Vision", "Passing", "Dribbling", "Shooting"],
   AM: ["Passing", "Dribbling", "Shooting", "Vision"],
   WF: ["Dribbling", "Passing", "Speed", "Shooting"],
   CF: ["Speed", "Dribbling", "Heading", "Shooting"]
@@ -14525,7 +14524,6 @@ const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-gam
   FB: "Pas, Tck, Sta, Mk",
   CB: "Mk, Hdg, Tck, Spd",
   DM: "Tck, Pas, Vis, Mk",
-  CM: "Vis, Pas, Drb, Sh",
   AM: "Pas, Drb, Sh, Vis",
   WF: "Drb, Pas, Spd, Sh",
   CF: "Spd, Drb, Hdg, Sh"
@@ -17575,7 +17573,7 @@ My club's recent match results (most recent first; no fixture list is available 
     };
   },
   mySquadByPosition() {
-    const t = ["GK", "FB", "CB", "DM", "CM", "AM", "WF", "CF"], e = {};
+    const t = ["GK", "FB", "CB", "DM", "AM", "WF", "CF"], e = {};
     return t.forEach((s) => {
       e[s] = [];
     }), this.mySquadPlayers.forEach((s) => {

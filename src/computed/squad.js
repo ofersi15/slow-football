@@ -51,7 +51,7 @@ export const squadComputed = {
     };
   },
   mySquadByPosition() {
-    const order = ['GK','FB','CB','DM','CM','AM','WF','CF'];
+    const order = ['GK','FB','CB','DM','AM','WF','CF'];
     const groups = {};
     order.forEach(pos => { groups[pos] = []; });
     this.mySquadPlayers.forEach(p => {
