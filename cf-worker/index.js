@@ -110,7 +110,7 @@ async function handleChat(request, env, cors) {
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        max_tokens: 1500,
+        max_tokens: 2500,
         system,
         messages: cachedMessages,
         output_config: { effort: 'low' },

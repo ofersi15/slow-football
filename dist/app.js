@@ -17295,42 +17295,71 @@ Assistant: ${i(n[0])}`.trim().slice(0, 2e3);
   buildChatContext() {
     var h, u;
     const t = [`My club: ${Ot}. Current game week: ~${this.asOfWeek || "?"}.`];
-    this.clubBudget != null && t.push(`Transfer budget: ${Hs(this.clubBudget)}${this.clubWageBudget != null ? `, wage budget: ${Hs(this.clubWageBudget)}/wk` : ""}.`), t.push(`
+    this.clubBudget != null && t.push(`Transfer budget: ${Hs(this.clubBudget)}${this.clubWageBudget != null ? `, wage budget: ${Hs(this.clubWageBudget)}/wk` : ""}.`);
+    const e = Object.entries(this.espionageSubmissions || {}).filter(([d]) => d !== Ot).sort(([d], [p]) => d.localeCompare(p));
+    e.length && t.push(`
+Response format for "how should I line up against X" questions: follow this template exactly, all 6 sections, every time, in this order — never skip a section, and never invent extra headers or sub-groupings of your own:
+
+SECTION 1 — Opponent breakdown: 2-4 sentences on their formation/mentality/style from the opponent-tactics table further below, plus their key strengths/weaknesses. Check the submission's GW against "Current game week" at the top of this context. I usually plan lineups on a Thursday, and the submission deadline is Friday 2pm BST while I'm asleep — so an opponent's shown submission is sometimes still last week's already-played lineup because they haven't submitted their upcoming one yet. If the GW doesn't match the current one, say so explicitly and treat the shown setup as their general tendency, not a locked-in plan for the match being planned.
+
+SECTION 2 — Recommended lineup: output ONLY a flat list, exactly one line per starting XI slot, nothing else — no "Back 4:" or "Midfield:" style group headers, no nested bullets, no parenthetical reasoning on the line. Format every line identically as "SLOT: Player Name", e.g. for a 4231:
+GK: Player Name
+RB: Player Name
+CB: Player Name
+CB: Player Name
+LB: Player Name
+DM: Player Name
+DM: Player Name
+RW: Player Name
+AM: Player Name (C)
+LW: Player Name
+CF: Player Name
+Swap the slot labels for whichever formation you actually recommend, but keep it one slot per line, always. Weigh each player's Fitness (condition) before picking them over a fitter alternative. Mark the captain inline with "(C)" right there on their line — the captain is decided here and nowhere else in the reply. Put any reasoning/fitness caveats in a short paragraph AFTER this list, not inside it.
+
+SECTION 3 — Match instructions: Mentality / Style / Structure / Defensive Line / Attacking Focus / Pressing, one line each, explicitly naming the field and the exact option value chosen (from the fixed lists in the game mechanics reference further below).
+
+SECTION 4 — Substitutions: exactly 5 lines, one per sub slot, each formatted "Timing — Player IN for Player OUT (Plan)". Use exactly this split unless the matchup gives a genuinely strong reason not to: 3 subs on "any situation" timing (fresh legs / rotation / like-for-like cover, spread across the 46-60' / 61-75' / 76'- windows), 1 sub timed "if winning" (game management, e.g. a Defensive plan), 1 sub timed "if not winning" (chase the game, e.g. an Attacking plan). Use the exact literal window labels from the game mechanics reference further below — Half-time, 46-60', 61-75', 76'- — never an invented shorthand like "76'+".
+
+SECTION 5 — Set pieces: state the takers — Penalty: Player Name / Free-kick: Player Name / Corner: Player Name (the captain is already marked in Section 2, don't repeat it).
+
+SECTION 6 — Corner tactics: this is a REQUIRED section, always present, no exceptions — it is the single most commonly forgotten part of this reply, so treat it as mandatory. Fill in this exact 4-line block, literally, with one chosen value on each line (add a short reason in parentheses after each value if the opponent's setup gives you one, otherwise leave it as a sound generic default):
+Attacking corner — Delivery: [Inswinger/Outswinger/Driven/Short Corner]
+Attacking corner — Stay Back: [1/2]
+Defensive corner — Scheme: [Zonal/Man-to-Man/Hybrid]
+Defensive corner — Press: [Hold Shape/Press Taker]`), t.push(`
 Pricing note: the raw "Value" field from the game API is NOT a reliable market price — quality players are scarce and in high demand, so real fees run well above it. Use "TrueVal" instead (shown below as value/source) — it's the last real transfer fee, the live transfer-list asking price, or recent negotiation activity where known, else a rating-scaled estimate off Value (marked "formula"). Ground any pricing discussion in TrueVal plus the recent transfers and transfer-list sections below, not the raw Value field.`);
-    const e = { 1: ["442", "433", "4231", "532", "343"], 2: ["352", "541", "4411"], 3: ["4321", "451"], 4: ["4141", "442 D", "3421"], 5: ["3241", "4222", "4132"] }, s = (u = (h = this.clubFacData) == null ? void 0 : h.levels) == null ? void 0 : u.analytics, n = s ? Object.keys(e).filter((d) => +d <= s).flatMap((d) => e[d]).join(", ") : null;
+    const s = { 1: ["442", "433", "4231", "532", "343"], 2: ["352", "541", "4411"], 3: ["4321", "451"], 4: ["4141", "442 D", "3421"], 5: ["3241", "4222", "4132"] }, n = (u = (h = this.clubFacData) == null ? void 0 : h.levels) == null ? void 0 : u.analytics, i = n ? Object.keys(s).filter((d) => +d <= n).flatMap((d) => s[d]).join(", ") : null;
     t.push(`
 Game mechanics reference (fixed game rules — these are the actual dropdown options in the live submission form, not opponent-specific data):
-- Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132.${s ? ` My club's Analytics Dept is level ${s} → currently unlocked: ${n}.` : " (My club's current Analytics Dept level isn't loaded this session — check the My Club tab.)"}
+- Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132.${n ? ` My club's Analytics Dept is level ${n} → currently unlocked: ${i}.` : " (My club's current Analytics Dept level isn't loaded this session — check the My Club tab.)"}
 - Match instructions (6 dropdowns): Mentality (Very Defensive / Defensive / Balanced / Attacking / Very Attacking), Style (Short / Mixed / Direct), Structure (Fluid / Balanced / Rigid), Defensive Line (Deep / Low / Medium / High), Attacking Focus (Left / Right / Central / Mixed), Pressing Intensity (High Press / Mid-Block / Low Block / Counter Press).
 - Set-piece takers (Captain, Penalty, Free-kick, Corner) are just player assignments — no extra tuning for penalties or free-kicks. Corners alone have dedicated instructions: Attacking corner — Delivery (Inswinger / Outswinger / Driven / Short Corner), Stay Back (1 or 2 players forward), 7 zone roles (Near Post, Far Post, Penalty Spot, Blockade, Edge of Box, Short Corner, Hold Back). Defensive corner — Scheme (Zonal / Man-to-Man / Hybrid), Press (Hold Shape / Press Taker), 6 zone roles (Near Post, Far Post, 6-Yard Box, Penalty Spot, Edge of Box, Counter Runner).
 - Substitutions: 5 subs per match. Each sub has a Plan (same 5 mentality values above) and a Timing trigger = a window (Half-time / 46-60' / 61-75' / 76'-) plus a condition. Only the Half-time window offers "if losing" as a condition; the other three windows only offer "if winning" / "if not winning" / "any situation".`);
-    const i = (this.allPlayers || []).filter((d) => d.Club === Ot);
-    i.length && (t.push(`
-My squad (${i.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source) | AltPosFit | Ldr/Ment/Exp | FK/Pen/Cor:`), i.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
+    const a = (this.allPlayers || []).filter((d) => d.Club === Ot);
+    a.length && (t.push(`
+My squad (${a.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source) | AltPosFit | Ldr/Ment/Exp | FK/Pen/Cor:`), a.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
       const p = d.fitnessPct != null ? `${d.fitnessPct}%` : "?", g = (Nm[d.Position] || []).filter((y) => y !== d.Position && y !== "GK").map((y) => `${y}:${is(d, y) ?? "?"}`).join(",") || "-", m = `${d.Leadership ?? "?"}/${d.Mentality ?? "?"}/${d.Experience ?? "?"}`, _ = `${d["Free kicks"] ?? "?"}/${d.Penalties ?? "?"}/${d.Corners ?? "?"}`;
       t.push(`${d.Player} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${p} | ${Hs(this.trueVal(d))} (${this.trueValSrc(d)}) | ${g} | ${m} | ${_}${d.injured ? " [INJURED]" : ""}${d.suspended ? " [SUSPENDED]" : ""}`);
     }), t.push(`Lineup-suggestion guidance: "AltPosFit" is each player's game-formula rating (same weighted-attribute formula as "Rating") if played at a different compatible position instead of their listed one. Some players inflate their nominal position's rating via one shared attribute (e.g. a converted DM's high Stamina alone can push their FB rating above a true fullback's) — always cross-check AltPosFit and recommend whichever position the numbers actually favor, not just the listed Position. For captain, weigh Leadership ("Ldr/Ment/Exp", first number) most heavily, with Mentality and Experience as secondary factors — do not just default to the highest-rated or best-known player. For set-piece takers, use the dedicated Free kicks / Penalties / Corners attributes ("FK/Pen/Cor") for the free-kick / penalty / corner taker respectively — these are literal in-game attributes, not proxies. For substitutions, the game allows 5 subs per match (not 3) — actively plan to use 3-5 of them with sensible Plan + Timing combinations suited to the match state (e.g. fresh legs / attacking sub late if chasing the game, a defensive sub to protect a lead), rather than defaulting to only 1-2 subs or leaving slots blank.`));
-    const a = (this.allPlayers || []).filter((d) => {
+    const o = (this.allPlayers || []).filter((d) => {
       var p;
       return d.Club && d.Club !== Ot && !((p = this.vacantClubs) != null && p.has(d.Club)) && (d._gameRating || 0) >= 78;
-    }).sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).slice(0, 40);
-    a.length && (t.push(`
-Top-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source):`), a.forEach((d) => {
+    }).sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).slice(0, 25);
+    o.length && (t.push(`
+Top-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source):`), o.forEach((d) => {
       t.push(`${d.Player} | ${d.Club} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${Hs(this.trueVal(d))} (${this.trueValSrc(d)})`);
     }));
-    const o = (this.allPlayers || []).flatMap((d) => (d._transferHistory || []).filter((p) => p.isReal).map((p) => ({ name: d.Player, ...p }))).sort((d, p) => new Date(p.date) - new Date(d.date)).slice(0, 30);
-    o.length && (t.push(`
-Recent real completed transfers league-wide (most recent first) — Player | Fee | Seller → Buyer | Date:`), o.forEach((d) => {
+    const r = (this.allPlayers || []).flatMap((d) => (d._transferHistory || []).filter((p) => p.isReal).map((p) => ({ name: d.Player, ...p }))).sort((d, p) => new Date(p.date) - new Date(d.date)).slice(0, 20);
+    r.length && (t.push(`
+Recent real completed transfers league-wide (most recent first) — Player | Fee | Seller → Buyer | Date:`), r.forEach((d) => {
       t.push(`${d.name} | ${Hs(d.amount)} | ${d.seller || "?"} → ${d.buyer || "?"} | ${d.date ? new Date(d.date).toLocaleDateString("en-GB") : "?"}`);
     }));
-    const r = (this.allPlayers || []).filter((d) => d._transferListed && d._listingAsk);
-    r.length && (t.push(`
-Players currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`), r.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
-      t.push(`${d.Player} | ${d.Club} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${Hs(d._listingAsk)} | ${d._listingBids || 0}`);
-    }));
-    const l = Object.entries(this.espionageSubmissions || {}).filter(([d]) => d !== Ot).sort(([d], [p]) => d.localeCompare(p));
+    const l = (this.allPlayers || []).filter((d) => d._transferListed && d._listingAsk);
     l.length && (t.push(`
-Opponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW | XI:`), l.forEach(([d, p]) => {
+Players currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`), l.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
+      t.push(`${d.Player} | ${d.Club} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${Hs(d._listingAsk)} | ${d._listingBids || 0}`);
+    })), e.length && (t.push(`
+Opponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW | XI:`), e.forEach(([d, p]) => {
       var g, m;
       const f = (p.xi || []).map((_) => _.name).filter(Boolean).join(", ");
       t.push(`${d} | ${Lo(p.formation) || "?"} | ${((g = p.instructions) == null ? void 0 : g.mentality) || "?"} | ${((m = p.instructions) == null ? void 0 : m.style) || "?"} | ${p._gw ?? p.gameweek ?? "?"} | ${f || "?"}`);
@@ -17344,7 +17373,10 @@ My club's recent match results (most recent first; no fixture list is available 
       var _;
       const p = ((_ = d.home) == null ? void 0 : _.club) === Ot, f = p ? d.home : d.away, g = p ? d.away : d.home, m = d.score ? `${d.score.home ?? "?"}-${d.score.away ?? "?"}` : "?";
       t.push(`GW${d.gameweek ?? "?"} | ${(g == null ? void 0 : g.club) || "?"} (${p ? "H" : "A"}) | ${m} | ${Lo(f == null ? void 0 : f.formation) || "?"}/${(f == null ? void 0 : f.mentality) || "?"} | ${Lo(g == null ? void 0 : g.formation) || "?"}/${(g == null ? void 0 : g.mentality) || "?"}`);
-    })), t.join(`
+    })), e.length && t.push(`
+Before you send a reply to a "how should I line up against X" question, check it against this list — if any item is missing, add it now, don't send an incomplete reply:
+- Section 2 lineup is a flat one-slot-per-line list (SLOT: Player Name), not grouped into "Back 4:"/"Midfield:" style headers, with "(C)" on the captain's line.
+- Section 6 (Corner tactics) exists as its own section with the literal 4-line Delivery/Stay Back/Scheme/Press block. This is the single most commonly forgotten section of this reply — verify it's actually there before sending.`), t.join(`
 `);
   },
   async sendChatMessage() {
