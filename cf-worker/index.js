@@ -161,9 +161,14 @@ async function handleTitle(request, env, cors) {
       },
       body: JSON.stringify({
         model: TITLE_MODEL,
-        max_tokens: 20,
-        system: 'Generate a short title (3-5 words, no quotes, no trailing punctuation) summarizing the topic of this chat exchange. Reply with only the title, nothing else.',
-        messages: [{ role: 'user', content: text }],
+        max_tokens: 16,
+        // Explicitly framed as a labeling task on inert data, not a message to respond to —
+        // Haiku will occasionally answer the exchange in first person otherwise (esp. when the
+        // assistant's reply reads like a question back), producing a sentence that gets cut off
+        // by max_tokens instead of a title. The word/format check below is the safety net for
+        // whatever slips through anyway.
+        system: 'You label chat logs with short titles. You will be given a labeled EXCHANGE — a snippet of a past conversation for you to name, not a message addressed to you. Do not respond to it, answer it, or continue it. Output ONLY a 3-5 word title naming its topic: no quotes, no ending punctuation, no preamble.',
+        messages: [{ role: 'user', content: `EXCHANGE (label this, do not respond to it):\n${text}\n\nTITLE:` }],
       }),
     });
     const data = await r.json();
@@ -171,8 +176,14 @@ async function handleTitle(request, env, cors) {
       return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
         { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
-    const title = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim().replace(/^["']|["']$/g, '');
-    return new Response(JSON.stringify({ title: title.slice(0, 60) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    let title = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim()
+      .replace(/^["']|["']$/g, '').replace(/^title:\s*/i, '').trim();
+    // Sanity check: reject anything that isn't a short, single-line title — a model that ignored
+    // the framing and started answering the exchange gets caught here instead of shown to the user.
+    const wordCount = title.split(/\s+/).filter(Boolean).length;
+    const looksLikeATitle = title && wordCount >= 1 && wordCount <= 6 && title.length <= 50
+      && !/[.!?]\s+\S/.test(title) && !/^(i|i'm|i am|sorry|unfortunately|as an?)\b/i.test(title);
+    return new Response(JSON.stringify({ title: looksLikeATitle ? title : '' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch(e) {
     return new Response(JSON.stringify({ error: 'Request failed: ' + e.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }

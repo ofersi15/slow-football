@@ -22,7 +22,7 @@
             @click="switchChatSession(s.id); assistantDockListOpen=false">
             <input v-if="renamingSessionId===s.id" :ref="'renameInput_'+s.id" v-model="renameDraft"
               @keydown.enter="commitRenameSession" @keydown.esc="cancelRenameSession" @blur="commitRenameSession" @click.stop />
-            <span v-else class="title">{{s.title}}</span>
+            <span v-else class="title" :title="s.title">{{s.title}}</span>
             <span class="row-actions">
               <span @click="startRenameSession(s.id,$event)" title="Rename">✎</span>
               <span @click.stop="deleteChatSession(s.id)" title="Delete">🗑</span>

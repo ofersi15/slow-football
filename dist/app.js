@@ -18138,7 +18138,7 @@ Ko({
       sortDir: -1,
       page: 0,
       // Per-position rating filters — each pos has its own min threshold
-      posRatingFilters: { GK: 60, FB: 60, CB: 60, DM: 60, CM: 60, AM: 60, WF: 60, CF: 60 },
+      posRatingFilters: { GK: 60, FB: 60, CB: 60, DM: 60, AM: 60, WF: 60, CF: 60 },
       posRatingMax: 99,
       // global max rating cap
       posRatingUseWeighted: !1,

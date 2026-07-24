@@ -13,7 +13,7 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-seri
 .content{flex:1;overflow:auto}
 .assistant-dock{width:400px;min-width:400px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;order:2;position:relative}
 .assistant-sidebar{width:44px;min-width:44px;background:#0d1117;border-right:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .15s}
-.assistant-sidebar.expanded{width:240px;min-width:240px}
+.assistant-sidebar.expanded{width:280px;min-width:280px}
 .assistant-sidebar-top{display:flex;flex-direction:column;gap:6px;padding:8px;border-bottom:1px solid #21262d;flex-shrink:0}
 .assistant-sidebar-backdrop{display:none}
 /* Shared chat-session list styling — used by the full-tab sidebar AND the docked panel's overlay */
