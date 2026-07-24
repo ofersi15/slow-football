@@ -11,22 +11,25 @@ body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-seri
 .tab-bar .btn{flex-shrink:0;white-space:nowrap}
 .header-meta{font-size:11px;color:#8b949e;padding:0 14px 5px;line-height:1}
 .content{flex:1;overflow:auto}
-.assistant-dock{width:400px;min-width:400px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;order:2}
+.assistant-dock{width:400px;min-width:400px;background:#0d1117;border-left:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;order:2;position:relative}
 .assistant-sidebar{width:44px;min-width:44px;background:#0d1117;border-right:1px solid #21262d;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .15s}
 .assistant-sidebar.expanded{width:240px;min-width:240px}
 .assistant-sidebar-top{display:flex;flex-direction:column;gap:6px;padding:8px;border-bottom:1px solid #21262d;flex-shrink:0}
-.assistant-sidebar-list{flex:1;overflow-y:auto;padding:6px}
-.assistant-sidebar-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6e7681;padding:10px 8px 4px}
-.assistant-session-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:#c9d1d9}
-.assistant-session-row:hover{background:#161b22}
-.assistant-session-row.active{background:#1f2d3d;color:#79c0ff}
-.assistant-session-row .title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.assistant-session-row .row-actions{display:none;gap:6px;flex-shrink:0}
-.assistant-session-row:hover .row-actions,.assistant-session-row.active .row-actions{display:flex}
-.assistant-session-row .row-actions span{cursor:pointer;opacity:.7}
-.assistant-session-row .row-actions span:hover{opacity:1}
-.assistant-session-row input{width:100%;background:#0d1117;border:1px solid #388bfd;color:#e6edf3;border-radius:4px;padding:2px 4px;font-size:12px;outline:none}
 .assistant-sidebar-backdrop{display:none}
+/* Shared chat-session list styling — used by the full-tab sidebar AND the docked panel's overlay */
+.chat-session-list{flex:1;overflow-y:auto;padding:6px}
+.chat-session-group-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6e7681;padding:10px 8px 4px}
+.chat-session-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px;color:#c9d1d9}
+.chat-session-row:hover{background:#161b22}
+.chat-session-row.active{background:#1f2d3d;color:#79c0ff}
+.chat-session-row .title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.chat-session-row .row-actions{display:none;gap:6px;flex-shrink:0}
+.chat-session-row:hover .row-actions,.chat-session-row.active .row-actions{display:flex}
+.chat-session-row .row-actions span{cursor:pointer;opacity:.7}
+.chat-session-row .row-actions span:hover{opacity:1}
+.chat-session-row input{width:100%;background:#0d1117;border:1px solid #388bfd;color:#e6edf3;border-radius:4px;padding:2px 4px;font-size:12px;outline:none}
+/* Docked panel's session list — an overlay that temporarily replaces the message thread (no room for a persistent rail at 400px) */
+.assistant-dock-list{position:absolute;inset:0;background:#0d1117;display:flex;flex-direction:column;z-index:5}
 .btn{padding:4px 10px;border-radius:6px;border:1px solid #30363d;cursor:pointer;font-size:12px;font-weight:600;background:transparent;color:#8b949e;transition:all .12s;min-height:36px}
 .btn:hover{background:#161b22;color:#e6edf3}
 .btn.active{background:#1f6feb;color:#fff;border-color:#388bfd}

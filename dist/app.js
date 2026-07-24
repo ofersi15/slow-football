@@ -17276,11 +17276,11 @@ Assistant: ${i(n[0])}`.trim().slice(0, 2e3);
         localStorage.setItem("sf_assistant_dock_open", this.assistantDockOpen ? "1" : "0");
       } catch {
       }
-      this.assistantDockOpen && this.$nextTick(() => this.scrollChatToBottom());
+      this.assistantDockOpen ? this.$nextTick(() => this.scrollChatToBottom()) : this.assistantDockListOpen = !1;
     }
   },
   closeAssistantDock() {
-    this.assistantDockOpen = !1;
+    this.assistantDockOpen = !1, this.assistantDockListOpen = !1;
     try {
       localStorage.setItem("sf_assistant_dock_open", "0");
     } catch {
@@ -17345,7 +17345,30 @@ My club's recent match results (most recent first; no fixture list is available 
     const t = (this.chatInput || "").trim();
     if (!t && !this.chatAttachments.length || this.chatLoading) return;
     const e = this.activeChatSessionId, s = [];
-    t && s.push({ type: "text", text: t }), this.chatAttachments.forEach((n) => s.push(this.attachmentToBlock(n))), this.chatMessages.push({ role: "user", content: s, ts: Date.now() }), this.chatInput = "", this.chatAttachments = [], this.chatError = "", this.chatLoading = !0, this.saveChatHistory(e), this.$nextTick(() => this.scrollChatToBottom());
+    t && s.push({ type: "text", text: t }), this.chatAttachments.forEach((n) => s.push(this.attachmentToBlock(n))), this.chatMessages.push({ role: "user", content: s, ts: Date.now() }), this.chatInput = "", this.chatAttachments = [], await this._requestAssistantReply(e);
+  },
+  // Pops the last assistant reply and re-requests one for the same conversation so far.
+  async regenerateLastResponse() {
+    if (this.chatLoading) return;
+    const t = this.activeChatSessionId;
+    let e = -1;
+    for (let s = this.chatMessages.length - 1; s >= 0; s--)
+      if (this.chatMessages[s].role === "assistant") {
+        e = s;
+        break;
+      }
+    e !== -1 && (this.chatMessages.splice(e, 1), await this._requestAssistantReply(t));
+  },
+  stopChatMessage() {
+    this._chatAbortController && (this._chatStoppedByUser = !0, this._chatAbortController.abort());
+  },
+  // Shared by sendChatMessage (after the new user turn) and regenerateLastResponse (after
+  // popping the old reply) — both just need "ask for the next assistant message and handle it".
+  async _requestAssistantReply(t) {
+    this.chatError = "", this.chatLoading = !0, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
+    const e = new AbortController();
+    this._chatAbortController = e;
+    const s = setTimeout(() => e.abort(), 45e3);
     try {
       const n = {
         context: this.buildChatContext(),
@@ -17354,14 +17377,14 @@ My club's recent match results (most recent first; no fixture list is available 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(n),
-        signal: AbortSignal.timeout(45e3)
+        signal: e.signal
       }), a = await i.json();
       if (!i.ok || a.error) throw new Error(a.error || `Request failed (${i.status})`);
-      this.chatMessages.push({ role: "assistant", content: a.reply || "(no response)", ts: Date.now() }), this._maybeGenerateAiTitle(e);
+      this.chatMessages.push({ role: "assistant", content: a.reply || "(no response)", ts: Date.now() }), this._maybeGenerateAiTitle(t);
     } catch (n) {
-      this.chatError = n.message || "Failed to reach assistant";
+      n.name === "AbortError" ? this._chatStoppedByUser || (this.chatError = "Request timed out") : this.chatError = n.message || "Failed to reach assistant";
     } finally {
-      this.chatLoading = !1, this.saveChatHistory(e), this.$nextTick(() => this.scrollChatToBottom());
+      clearTimeout(s), this._chatAbortController = null, this._chatStoppedByUser = !1, this.chatLoading = !1, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
     }
   }
 }, BC = {
@@ -18303,13 +18326,17 @@ Ko({
           return !1;
         }
       })(),
+      // Defaults to expanded on wide screens (plenty of room), collapsed on narrow ones —
+      // but once the user explicitly toggles it, that choice sticks regardless of width.
       assistantSidebarExpanded: (() => {
         try {
-          return localStorage.getItem("sf_assistant_sidebar_expanded") === "1";
+          const t = localStorage.getItem("sf_assistant_sidebar_expanded");
+          if (t !== null) return t === "1";
         } catch {
-          return !1;
         }
+        return typeof window < "u" && window.innerWidth >= 1300;
       })(),
+      assistantDockListOpen: !1,
       workerLog: null,
       workerLogOpen: !1,
       trueValueMap: {},

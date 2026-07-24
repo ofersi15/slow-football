@@ -300,9 +300,11 @@ export const assistantMethods = {
     this.assistantDockOpen = !this.assistantDockOpen;
     try { localStorage.setItem('sf_assistant_dock_open', this.assistantDockOpen ? '1' : '0'); } catch (e) {}
     if (this.assistantDockOpen) this.$nextTick(() => this.scrollChatToBottom());
+    else this.assistantDockListOpen = false;
   },
   closeAssistantDock() {
     this.assistantDockOpen = false;
+    this.assistantDockListOpen = false;
     try { localStorage.setItem('sf_assistant_dock_open', '0'); } catch (e) {}
   },
   scrollChatToBottom() {
@@ -402,11 +404,37 @@ export const assistantMethods = {
     this.chatMessages.push({ role: 'user', content, ts: Date.now() });
     this.chatInput = '';
     this.chatAttachments = [];
+    await this._requestAssistantReply(sessionId);
+  },
+  // Pops the last assistant reply and re-requests one for the same conversation so far.
+  async regenerateLastResponse() {
+    if (this.chatLoading) return;
+    const sessionId = this.activeChatSessionId;
+    let idx = -1;
+    for (let i = this.chatMessages.length - 1; i >= 0; i--) {
+      if (this.chatMessages[i].role === 'assistant') { idx = i; break; }
+    }
+    if (idx === -1) return;
+    this.chatMessages.splice(idx, 1);
+    await this._requestAssistantReply(sessionId);
+  },
+  stopChatMessage() {
+    if (this._chatAbortController) {
+      this._chatStoppedByUser = true;
+      this._chatAbortController.abort();
+    }
+  },
+  // Shared by sendChatMessage (after the new user turn) and regenerateLastResponse (after
+  // popping the old reply) — both just need "ask for the next assistant message and handle it".
+  async _requestAssistantReply(sessionId) {
     this.chatError = '';
     this.chatLoading = true;
     this.saveChatHistory(sessionId);
     this.$nextTick(() => this.scrollChatToBottom());
 
+    const controller = new AbortController();
+    this._chatAbortController = controller;
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
       const payload = {
         context: this.buildChatContext(),
@@ -418,15 +446,22 @@ export const assistantMethods = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(45000),
+        signal: controller.signal,
       });
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
       this.chatMessages.push({ role: 'assistant', content: data.reply || '(no response)', ts: Date.now() });
       this._maybeGenerateAiTitle(sessionId); // fire-and-forget — replaces the truncated fallback title
     } catch(e) {
-      this.chatError = e.message || 'Failed to reach assistant';
+      if (e.name === 'AbortError') {
+        if (!this._chatStoppedByUser) this.chatError = 'Request timed out';
+      } else {
+        this.chatError = e.message || 'Failed to reach assistant';
+      }
     } finally {
+      clearTimeout(timeoutId);
+      this._chatAbortController = null;
+      this._chatStoppedByUser = false;
       this.chatLoading = false;
       this.saveChatHistory(sessionId);
       this.$nextTick(() => this.scrollChatToBottom());

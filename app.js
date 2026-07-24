@@ -131,7 +131,13 @@ createApp({
       chatAttachments: [], chatSessions: [], activeChatSessionId: null,
       renamingSessionId: null, renameDraft: '',
       assistantDockOpen: (() => { try { return localStorage.getItem('sf_assistant_dock_open') === '1'; } catch(e) { return false; } })(),
-      assistantSidebarExpanded: (() => { try { return localStorage.getItem('sf_assistant_sidebar_expanded') === '1'; } catch(e) { return false; } })(),
+      // Defaults to expanded on wide screens (plenty of room), collapsed on narrow ones —
+      // but once the user explicitly toggles it, that choice sticks regardless of width.
+      assistantSidebarExpanded: (() => {
+        try { const v = localStorage.getItem('sf_assistant_sidebar_expanded'); if (v !== null) return v === '1'; } catch(e) {}
+        return typeof window !== 'undefined' && window.innerWidth >= 1300;
+      })(),
+      assistantDockListOpen: false,
       workerLog: null, workerLogOpen: false,
       trueValueMap: {},
       negosPollingInterval: null, _nowMs: Date.now(), _clockInterval: null,

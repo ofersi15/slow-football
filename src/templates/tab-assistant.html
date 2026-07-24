@@ -4,7 +4,7 @@
     <!-- Mobile-only backdrop, closes the sidebar when tapped outside it -->
     <div v-if="assistantSidebarExpanded" class="assistant-sidebar-backdrop" @click="toggleAssistantSidebar"></div>
 
-    <!-- Claude-style chat sidebar: narrow icon rail by default, expands to a full list on demand -->
+    <!-- Claude-style chat sidebar: defaults to expanded when there's room, narrow icon rail otherwise -->
     <div class="assistant-sidebar" :class="{expanded: assistantSidebarExpanded}">
       <div class="assistant-sidebar-top">
         <button class="btn" style="width:100%;justify-content:center;display:flex" @click="toggleAssistantSidebar" :title="assistantSidebarExpanded ? 'Collapse' : 'Expand chat list'">☰</button>
@@ -12,10 +12,10 @@
           <span>+</span><span v-if="assistantSidebarExpanded">New chat</span>
         </button>
       </div>
-      <div v-if="assistantSidebarExpanded" class="assistant-sidebar-list">
+      <div v-if="assistantSidebarExpanded" class="chat-session-list">
         <div v-for="g in chatSessionGroups()" :key="g.label">
-          <div class="assistant-sidebar-group-label">{{g.label}}</div>
-          <div v-for="s in g.sessions" :key="s.id" class="assistant-session-row" :class="{active: s.id===activeChatSessionId}" @click="switchChatSession(s.id)">
+          <div class="chat-session-group-label">{{g.label}}</div>
+          <div v-for="s in g.sessions" :key="s.id" class="chat-session-row" :class="{active: s.id===activeChatSessionId}" @click="switchChatSession(s.id)">
             <input v-if="renamingSessionId===s.id" :ref="'renameInput_'+s.id" v-model="renameDraft"
               @keydown.enter="commitRenameSession" @keydown.esc="cancelRenameSession" @blur="commitRenameSession" @click.stop />
             <span v-else class="title">{{s.title}}</span>
@@ -30,7 +30,7 @@
 
     <div style="flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;padding:14px">
     <!-- Capped width so lines stay readable on wide/4K monitors; see assistant-dock.html for the side-panel variant -->
-    <div style="max-width:820px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px;height:100%;min-height:0">
+    <div style="max-width:900px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:10px;height:100%;min-height:0">
 
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <div style="font-size:15px;font-weight:700">🤖 Assistant</div>
@@ -38,17 +38,17 @@
     <div class="c-gray" style="font-size:11px;margin-top:-6px">Ask about transfers, tactics, your squad or scout targets — it can see your current squad, budget, opponent tactics and top-rated players elsewhere. Attach a screenshot, PDF or file with 📎.</div>
 
     <!-- Message list -->
-    <div ref="chatScroll" class="card" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:14px">
+    <div ref="chatScroll" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:16px;padding:6px 4px">
       <div v-if="!chatMessages.length" class="c-gray" style="text-align:center;padding:30px;font-style:italic">
         No messages yet. Try: "Who should I target at CB under £15m?" or "Is my current formation working?"
       </div>
       <div v-for="(m,i) in chatMessages" :key="i"
-        :style="{alignSelf: m.role==='user' ? 'flex-end' : 'flex-start', maxWidth:'80%'}">
-        <div :style="{
-          background: m.role==='user' ? '#1f6feb' : '#0d1117',
-          border: m.role==='user' ? 'none' : '1px solid #21262d',
-          color: m.role==='user' ? '#fff' : '#e6edf3',
-          borderRadius:'10px', padding:'8px 12px', fontSize:'13px', lineHeight:'1.5'}">
+        :style="m.role==='user' ? {alignSelf:'flex-end', maxWidth:'80%'} : {alignSelf:'stretch', width:'100%'}">
+        <div :style="m.role==='user' ? {
+          background:'#1f6feb', color:'#fff', borderRadius:'14px', padding:'8px 14px', fontSize:'13px', lineHeight:'1.55'
+        } : {
+          color:'#e6edf3', padding:'2px 2px', fontSize:'13.5px', lineHeight:'1.65'
+        }">
           <template v-for="(b,bi) in chatBlocks(m.content)" :key="bi">
             <div v-if="b.type==='text' && b.text && m.role==='assistant'" class="chat-md" v-html="renderMarkdown(b.text)"></div>
             <div v-else-if="b.type==='text' && b.text" style="white-space:pre-wrap">{{b.text}}</div>
@@ -58,7 +58,10 @@
           </template>
         </div>
       </div>
-      <div v-if="chatLoading" class="c-gray" style="align-self:flex-start;font-size:12px;font-style:italic;padding:4px 12px">🤖 thinking…</div>
+      <div v-if="chatLoading" class="c-gray" style="align-self:flex-start;font-size:12px;font-style:italic;padding:4px 2px">🤖 thinking…</div>
+      <div v-if="!chatLoading && chatMessages.length && chatMessages[chatMessages.length-1].role==='assistant'" style="align-self:flex-start">
+        <button class="btn" style="font-size:11px;padding:3px 9px" @click="regenerateLastResponse" title="Regenerate this response">⟳ Regenerate</button>
+      </div>
     </div>
 
     <div v-if="chatError" style="color:#ff7b72;font-size:12px">⚠ {{chatError}}</div>
@@ -81,8 +84,10 @@
       <textarea v-model="chatInput" @keydown="onChatKeydown" placeholder="Ask your assistant… (Enter to send, Shift+Enter for new line)"
         :disabled="chatLoading" rows="2"
         style="flex:1;background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:6px;padding:8px 10px;font-size:13px;outline:none;resize:vertical;font-family:inherit"></textarea>
-      <button class="btn green" style="padding:8px 16px" :disabled="chatLoading || (!chatInput.trim() && !chatAttachments.length)" @click="sendChatMessage">
-        {{chatLoading ? '…' : 'Send'}}
+      <button :class="['btn', chatLoading ? 'red' : 'green']" style="padding:8px 16px"
+        :disabled="!chatLoading && (!chatInput.trim() && !chatAttachments.length)"
+        @click="chatLoading ? stopChatMessage() : sendChatMessage()">
+        {{chatLoading ? '■ Stop' : 'Send'}}
       </button>
     </div>
 
