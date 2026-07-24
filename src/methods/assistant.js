@@ -1,6 +1,6 @@
 import { SF_WORKER_BASE } from '../cache.js'
-import { MY_CLUB } from '../constants.js'
-import { fmtVal, fmtFormation } from '../utils.js'
+import { MY_CLUB, SLOT_COMPAT } from '../constants.js'
+import { fmtVal, fmtFormation, calcGameRating } from '../utils.js'
 
 const CHAT_SESSIONS_KEY = 'sf_chat_sessions_v1';
 const LEGACY_CHAT_KEY = 'sf_chat_history_v1';
@@ -340,11 +340,16 @@ export const assistantMethods = {
 
     const squad = (this.allPlayers || []).filter(p => p.Club === MY_CLUB);
     if (squad.length) {
-      lines.push(`\nMy squad (${squad.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source):`);
+      lines.push(`\nMy squad (${squad.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source) | AltPosFit | Ldr/Ment/Exp | FK/Pen/Cor:`);
       squad.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
         const fit = p.fitnessPct != null ? `${p.fitnessPct}%` : '?';
-        lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fit} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)})${p.injured ? ' [INJURED]' : ''}${p.suspended ? ' [SUSPENDED]' : ''}`);
+        const altPositions = (SLOT_COMPAT[p.Position] || []).filter(pos => pos !== p.Position && pos !== 'GK');
+        const altFit = altPositions.map(pos => `${pos}:${calcGameRating(p, pos) ?? '?'}`).join(',') || '-';
+        const capt = `${p.Leadership ?? '?'}/${p.Mentality ?? '?'}/${p.Experience ?? '?'}`;
+        const setPiece = `${p['Free kicks'] ?? '?'}/${p.Penalties ?? '?'}/${p.Corners ?? '?'}`;
+        lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fit} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${altFit} | ${capt} | ${setPiece}${p.injured ? ' [INJURED]' : ''}${p.suspended ? ' [SUSPENDED]' : ''}`);
       });
+      lines.push(`Lineup-suggestion guidance: "AltPosFit" is each player's game-formula rating (same weighted-attribute formula as "Rating") if played at a different compatible position instead of their listed one. Some players inflate their nominal position's rating via one shared attribute (e.g. a converted DM's high Stamina alone can push their FB rating above a true fullback's) — always cross-check AltPosFit and recommend whichever position the numbers actually favor, not just the listed Position. For captain, weigh Leadership ("Ldr/Ment/Exp", first number) most heavily, with Mentality and Experience as secondary factors — do not just default to the highest-rated or best-known player. For set-piece takers, use the dedicated Free kicks / Penalties / Corners attributes ("FK/Pen/Cor") for the free-kick / penalty / corner taker respectively — these are literal in-game attributes, not proxies. For substitutions, the game allows 5 subs per match (not 3) — actively plan to use 3-5 of them with sensible Plan + Timing combinations suited to the match state (e.g. fresh legs / attacking sub late if chasing the game, a defensive sub to protect a lead), rather than defaulting to only 1-2 subs or leaving slots blank.`);
     }
 
     const targets = (this.allPlayers || [])
