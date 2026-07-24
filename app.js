@@ -1,7 +1,7 @@
 import { createApp, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import { API, MY_CLUB, PROXY_TOKEN_URL, ALL_LEAGUES, AI_CLUBS, ALL_POSITIONS, OUTFIELD_POSITIONS, PAGE_SIZE, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, PLAYERS_CACHE_KEY, STATS_CACHE_KEY, PLAYERS_CACHE_TTL, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_CACHE_TTL, SUBMISSIONS_LS_KEY, GAME_ATTRS, GAME_ATTR_LABELS, FORMATIONS, FORMATION_SLOT_POS, MAIN_ATTR, POS_ORDER, POS_COLORS, SLOT_COMPAT, SLOT_ATTRS, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, GAME_START, WEEK_MS } from './src/constants.js'
-import { buildSlotKeys, calcGameRating, calcWeightedRating, calcEstValue, fmtVal, fmtWage, fmtDiff, gameWeekNow, playerArrivalWeeks, computeTraits, computeBonds, computeClubChem, computeDislikes } from './src/utils.js'
+import { buildSlotKeys, calcGameRating, calcWeightedRating, calcEstValue, fmtVal, fmtWage, fmtDiff, gameWeekNow, playerArrivalWeeks, computeTraits, computeBonds, computeClubChem, computeDislikes, renderMarkdown } from './src/utils.js'
 import { parseAsync, stringifyAsync, getAuthToken, authHeaders, SF_CACHE_BASE, SF_WORKER_BASE, serverCacheGet, serverCacheSet, serverCacheDelete } from './src/cache.js'
 import { youthMethods } from './src/methods/youth.js'
 import { matchesMethods } from './src/methods/matches.js'
@@ -320,7 +320,7 @@ createApp({
     ...dataMethods,
     ...helperMethods,
     ...assistantMethods,
-    fmtVal,fmtWage,fmtDiff,
+    fmtVal,fmtWage,fmtDiff,renderMarkdown,
     ratingClass(r) { if(!r) return 'c-gray'; return r>=84?'rating-high':r>=77?'rating-mid':'rating-low'; },
     attrBarColor(v) { return (v||0)>=80?'#7ee787':(v||0)>=65?'#ffa657':'#ff7b72'; },
     isKeyAttr(attrKey, position) { const pos=this.highlightedPos||position; const a=GAME_ATTRS[pos]; return a?a.includes(attrKey):false; },

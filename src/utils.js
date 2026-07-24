@@ -40,6 +40,45 @@ export function calcEstValue(p) {
   return Math.round(est / 500000) * 500000 || Math.round(est / 100000) * 100000;
 }
 
+// ── Lightweight markdown → HTML (no dependency) ─────────────────────────────────
+// Escapes all text first, so any literal HTML in the source is neutralized before
+// markup is reinserted — safe to use with v-html even on untrusted text.
+export function renderMarkdown(text) {
+  if (!text) return '';
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^\w])_([^_]+)_(?!\w)/g, '$1<em>$2</em>');
+  let html = '';
+  let listType = null; // 'ul' | 'ol' while inside a list
+  const closeList = () => { if (listType) { html += listType === 'ul' ? '</ul>' : '</ol>'; listType = null; } };
+  for (const raw of String(text).split('\n')) {
+    const line = raw.trim();
+    const h = /^(#{1,4})\s+(.*)$/.exec(line);
+    const ul = /^[-*]\s+(.*)$/.exec(line);
+    const ol = /^\d+[.)]\s+(.*)$/.exec(line);
+    if (h) {
+      closeList();
+      const lvl = Math.min(h[1].length + 2, 6);
+      html += `<h${lvl}>${inline(h[2])}</h${lvl}>`;
+    } else if (ul) {
+      if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
+      html += `<li>${inline(ul[1])}</li>`;
+    } else if (ol) {
+      if (listType !== 'ol') { closeList(); html += '<ol>'; listType = 'ol'; }
+      html += `<li>${inline(ol[1])}</li>`;
+    } else if (line === '') {
+      closeList();
+    } else {
+      closeList();
+      html += `<p>${inline(line)}</p>`;
+    }
+  }
+  closeList();
+  return html;
+}
+
 // ── Formatters ────────────────────────────────────────────────────────────────
 export function fmtVal(v) { return v>=1e6?`£${(v/1e6).toFixed(1)}m`:v>=1e3?`£${(v/1e3).toFixed(0)}k`:v?`£${v}`:'—'; }
 export function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }

@@ -1,6 +1,6 @@
 import { SF_WORKER_BASE } from '../cache.js'
 import { MY_CLUB } from '../constants.js'
-import { fmtVal } from '../utils.js'
+import { fmtVal, fmtFormation } from '../utils.js'
 
 const CHAT_SESSIONS_KEY = 'sf_chat_sessions_v1';
 const LEGACY_CHAT_KEY = 'sf_chat_history_v1';
@@ -275,6 +275,32 @@ export const assistantMethods = {
       lines.push(`\nPlayers currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`);
       listed.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
         lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(p._listingAsk)} | ${p._listingBids || 0}`);
+      });
+    }
+
+    const tactics = Object.entries(this.espionageSubmissions || {})
+      .filter(([club]) => club !== MY_CLUB)
+      .sort(([a], [b]) => a.localeCompare(b));
+    if (tactics.length) {
+      lines.push(`\nOpponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW | XI:`);
+      tactics.forEach(([club, s]) => {
+        const xi = (s.xi || []).map(p => p.name).filter(Boolean).join(', ');
+        lines.push(`${club} | ${fmtFormation(s.formation) || '?'} | ${s.instructions?.mentality || '?'} | ${s.instructions?.style || '?'} | ${s._gw ?? s.gameweek ?? '?'} | ${xi || '?'}`);
+      });
+    }
+
+    const myMatches = (this.matchArchive || [])
+      .filter(m => m.home?.club === MY_CLUB || m.away?.club === MY_CLUB)
+      .sort((a, b) => (b.gameweek || 0) - (a.gameweek || 0))
+      .slice(0, 8);
+    if (myMatches.length) {
+      lines.push(`\nMy club's recent match results (most recent first; no fixture list is available so I don't know future opponents) — GW | Opponent (H/A) | Score | My formation/mentality | Opponent formation/mentality:`);
+      myMatches.forEach(m => {
+        const isHome = m.home?.club === MY_CLUB;
+        const mine = isHome ? m.home : m.away;
+        const opp = isHome ? m.away : m.home;
+        const score = m.score ? `${m.score.home ?? '?'}-${m.score.away ?? '?'}` : '?';
+        lines.push(`GW${m.gameweek ?? '?'} | ${opp?.club || '?'} (${isHome ? 'H' : 'A'}) | ${score} | ${fmtFormation(mine?.formation) || '?'}/${mine?.mentality || '?'} | ${fmtFormation(opp?.formation) || '?'}/${opp?.mentality || '?'}`);
       });
     }
 

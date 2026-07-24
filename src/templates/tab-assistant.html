@@ -29,7 +29,8 @@
           color: m.role==='user' ? '#fff' : '#e6edf3',
           borderRadius:'10px', padding:'8px 12px', fontSize:'13px', lineHeight:'1.5'}">
           <template v-for="(b,bi) in chatBlocks(m.content)" :key="bi">
-            <div v-if="b.type==='text' && b.text" style="white-space:pre-wrap">{{b.text}}</div>
+            <div v-if="b.type==='text' && b.text && m.role==='assistant'" class="chat-md" v-html="renderMarkdown(b.text)"></div>
+            <div v-else-if="b.type==='text' && b.text" style="white-space:pre-wrap">{{b.text}}</div>
             <img v-else-if="b.type==='image'" :src="'data:'+b.source.media_type+';base64,'+b.source.data"
               style="max-width:220px;max-height:220px;border-radius:8px;display:block;margin-top:6px;object-fit:cover" />
             <div v-else-if="b.type==='document'" class="c-gray" style="font-size:11px;margin-top:6px">📄 PDF attached</div>
