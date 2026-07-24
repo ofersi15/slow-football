@@ -163,6 +163,8 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | `sf_match_archive_v3_gw_{N}` | Per-GW data | permanent | Browser (manual) |
 | `sf_submissions_all_v1` | Submissions by club | 2h stale | Browser |
 
+`/export-game-state` snapshots these KV keys + a couple of live API calls into a timestamped JSON in `./exports/` — see `.claude/commands/export-game-state.md` for exact field mapping.
+
 ---
 
 ## Player Data
