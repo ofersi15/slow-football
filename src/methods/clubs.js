@@ -225,7 +225,13 @@ export const clubsMethods = {
         }
         for (const s of Object.values(byGw)) this._normalizeSubs(s);
         this.submissionsCache[club] = byGw;
-      } catch(e) { this.submissionsCache[club] = {}; }
+      } catch(e) {
+        // Leave submissionsCache[club] unset (not {}) on failure — the game API can't handle
+        // ~55 fully concurrent requests (verified: ~half time out/reset under that load), so a
+        // transient failure here shouldn't be cached as "confirmed no submissions" forever with
+        // no way to retry. loadEspionageSubmissions() retries anything still unset after its
+        // first batched pass.
+      }
     },
 
     _normalizeSubs(s) {
@@ -274,11 +280,23 @@ export const clubsMethods = {
       } catch(e) {}
     },
 
-    // Load latest submission for every club in espionageClubs (parallel, non-blocking)
+    // Load latest submission for every club in espionageClubs (batched, non-blocking).
+    // Firing all ~55 clubs' fetches at once overwhelms the game API — verified ~half of a
+    // fully-parallel burst times out or gets connection-reset — so this goes in small batches
+    // like loadEspionage()'s staff/facilities fetch does, then retries whichever clubs still
+    // came back empty (a much smaller, lighter-load retry pass).
     async loadEspionageSubmissions() {
       const clubs = (this.espionageClubs || []).map(c => c.club).filter(Boolean);
       if (!clubs.length) return;
-      await Promise.all(clubs.map(club => this._fetchClubSubmissions(club)));
+      const BATCH = 8;
+      const runBatched = async (list) => {
+        for (let i = 0; i < list.length; i += BATCH) {
+          await Promise.all(list.slice(i, i + BATCH).map(club => this._fetchClubSubmissions(club)));
+        }
+      };
+      await runBatched(clubs);
+      const stillMissing = clubs.filter(club => this.submissionsCache[club] === undefined);
+      if (stillMissing.length) await runBatched(stillMissing);
       const result = {};
       for (const club of clubs) {
         const allSubs = Object.values(this.submissionsCache[club] || {});

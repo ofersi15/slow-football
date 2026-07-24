@@ -16209,7 +16209,6 @@ const SC = {
         for (const n of Object.values(s)) this._normalizeSubs(n);
         this.submissionsCache[t] = s;
       } catch {
-        this.submissionsCache[t] = {};
       }
   },
   _normalizeSubs(t) {
@@ -16262,23 +16261,33 @@ const SC = {
     } catch {
     }
   },
-  // Load latest submission for every club in espionageClubs (parallel, non-blocking)
+  // Load latest submission for every club in espionageClubs (batched, non-blocking).
+  // Firing all ~55 clubs' fetches at once overwhelms the game API — verified ~half of a
+  // fully-parallel burst times out or gets connection-reset — so this goes in small batches
+  // like loadEspionage()'s staff/facilities fetch does, then retries whichever clubs still
+  // came back empty (a much smaller, lighter-load retry pass).
   async loadEspionageSubmissions() {
-    const t = (this.espionageClubs || []).map((n) => n.club).filter(Boolean);
+    const t = (this.espionageClubs || []).map((o) => o.club).filter(Boolean);
     if (!t.length) return;
-    await Promise.all(t.map((n) => this._fetchClubSubmissions(n)));
-    const e = {};
-    for (const n of t) {
-      const a = Object.values(this.submissionsCache[n] || {}).sort((o, r) => (r.submittedAt || 0) - (o.submittedAt || 0))[0];
-      a && (e[n] = a);
+    const e = 8, s = async (o) => {
+      for (let r = 0; r < o.length; r += e)
+        await Promise.all(o.slice(r, r + e).map((l) => this._fetchClubSubmissions(l)));
+    };
+    await s(t);
+    const n = t.filter((o) => this.submissionsCache[o] === void 0);
+    n.length && await s(n);
+    const i = {};
+    for (const o of t) {
+      const l = Object.values(this.submissionsCache[o] || {}).sort((c, h) => (h.submittedAt || 0) - (c.submittedAt || 0))[0];
+      l && (i[o] = l);
     }
-    this.espionageSubmissions = e, this.allSubmissionsLoaded = !0;
-    const s = { builtAt: Date.now(), clubs: this.submissionsCache };
+    this.espionageSubmissions = i, this.allSubmissionsLoaded = !0;
+    const a = { builtAt: Date.now(), clubs: this.submissionsCache };
     try {
-      localStorage.setItem(go, JSON.stringify(s));
+      localStorage.setItem(go, JSON.stringify(a));
     } catch {
     }
-    yc(s).then((n) => Ke(nf, n)).catch(() => {
+    yc(a).then((o) => Ke(nf, o)).catch(() => {
     });
   },
   async openClubDetail(t) {
