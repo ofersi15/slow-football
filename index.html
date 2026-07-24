@@ -230,7 +230,7 @@
   <!-- ── ASSISTANT DOCK (side panel — mirrors tab-assistant.html; kept as a separate instance since only one can be mounted at a time) ── -->
       <div v-if="assistantDockOpen && activeTab!=='assistant'" class="assistant-dock">
 
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px;border-bottom:1px solid #21262d;flex-shrink:0">
+    <div style="position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px;border-bottom:1px solid #21262d;flex-shrink:0;background:#0d1117">
       <div style="display:flex;align-items:center;gap:6px">
         <button class="btn" style="font-size:11px;padding:3px 7px;min-height:auto" @click="assistantDockListOpen=!assistantDockListOpen" :title="assistantDockListOpen ? 'Close chat list' : 'Chat list'">☰</button>
         <div style="font-size:13px;font-weight:700">🤖 Assistant</div>
@@ -242,9 +242,17 @@
     </div>
 
     <!-- Chat list overlay — the 400px dock has no room for a persistent sidebar, so this temporarily
-         covers the thread instead. Shares chatSessionGroups()/rename/delete with the full-tab sidebar. -->
+         covers the thread instead. Shares chatSessionGroups()/rename/delete with the full-tab sidebar.
+         The header above stays clickable (z-index:10 vs this z-index:5) so ☰ always closes it again —
+         a real bug previously: the overlay covered the header itself, and ☰ became unclickable, so the
+         only way back to the chat was toggling the whole dock closed and open. Also has its own close
+         button so closing doesn't depend on remembering what ☰ does. -->
     <div v-if="assistantDockListOpen" class="assistant-dock-list">
-      <div class="chat-session-list" style="padding:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 8px 4px;flex-shrink:0">
+        <span style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Chats</span>
+        <button class="btn" style="font-size:10px;padding:3px 8px;min-height:auto" @click="assistantDockListOpen=false">✕ Close</button>
+      </div>
+      <div class="chat-session-list" style="padding:0 8px 8px">
         <div v-for="g in chatSessionGroups()" :key="g.label">
           <div class="chat-session-group-label">{{g.label}}</div>
           <div v-for="s in g.sessions" :key="s.id" class="chat-session-row" :class="{active: s.id===activeChatSessionId}"

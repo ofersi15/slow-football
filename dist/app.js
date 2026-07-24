@@ -13992,11 +13992,11 @@ function Im(t, e, s, n) {
       a = t.getPointPosition(o, e), i.lineTo(a.x, a.y);
   }
 }
-function tC(t, e, s, n, i) {
+function t1(t, e, s, n, i) {
   const a = t.ctx, o = e.circular, { color: r, lineWidth: l } = e;
   !o && !n || !r || !l || s < 0 || (a.save(), a.strokeStyle = r, a.lineWidth = l, a.setLineDash(i.dash || []), a.lineDashOffset = i.dashOffset, a.beginPath(), Im(t, s, o, n), a.closePath(), a.stroke(), a.restore());
 }
-function eC(t, e, s) {
+function e1(t, e, s) {
   return en(t, {
     label: s,
     index: e,
@@ -14054,7 +14054,7 @@ class ji extends fr {
     const s = this._pointLabels || [];
     if (e >= 0 && e < s.length) {
       const n = s[e];
-      return eC(this.getContext(), e, n);
+      return e1(this.getContext(), e, n);
     }
   }
   getPointPosition(e, s, n = 0) {
@@ -14094,7 +14094,7 @@ class ji extends fr {
       if (u !== 0 || u === 0 && this.min < 0) {
         l = this.getDistanceFromCenterForValue(h.value);
         const d = this.getContext(u), p = i.setContext(d), f = a.setContext(d);
-        tC(this, p, l, o, f);
+        t1(this, p, l, o, f);
       }
     }), n.display) {
       for (e.save(), r = o - 1; r >= 0; r--) {
@@ -14236,7 +14236,7 @@ function tf(t, e, s, n) {
   }
   return Ae[i - 1];
 }
-function sC(t, e, s, n, i) {
+function s1(t, e, s, n, i) {
   for (let a = Ae.length - 1; a >= Ae.indexOf(s); a--) {
     const o = Ae[a];
     if (Wr[o].common && t._adapter.diff(i, n, o) >= e - 1)
@@ -14244,7 +14244,7 @@ function sC(t, e, s, n, i) {
   }
   return Ae[s ? Ae.indexOf(s) : 0];
 }
-function nC(t) {
+function n1(t) {
   for (let e = Ae.indexOf(t) + 1, s = Ae.length; e < s; ++e)
     if (Wr[Ae[e]].common)
       return Ae[e];
@@ -14257,7 +14257,7 @@ function ef(t, e, s) {
     t[a] = !0;
   }
 }
-function iC(t, e, s, n) {
+function i1(t, e, s, n) {
   const i = t._adapter, a = +i.startOf(e[0].value, n), o = e[e.length - 1].value;
   let r, l;
   for (r = a; r <= o; r = +i.add(r, 1, n))
@@ -14272,7 +14272,7 @@ function sf(t, e, s) {
       value: r,
       major: !1
     });
-  return a === 0 || !s ? n : iC(t, n, i, s);
+  return a === 0 || !s ? n : i1(t, n, i, s);
 }
 class Sa extends Nn {
   constructor(e) {
@@ -14320,7 +14320,7 @@ class Sa extends Nn {
     const e = this.options, s = e.time, n = e.ticks, i = n.source === "labels" ? this.getLabelTimestamps() : this._generate();
     e.bounds === "ticks" && i.length && (this.min = this._userMin || i[0], this.max = this._userMax || i[i.length - 1]);
     const a = this.min, o = this.max, r = I_(i, a, o);
-    return this._unit = s.unit || (n.autoSkip ? tf(s.minUnit, this.min, this.max, this._getLabelCapacity(a)) : sC(this, r.length, s.minUnit, this.min, this.max)), this._majorUnit = !n.major.enabled || this._unit === "year" ? void 0 : nC(this._unit), this.initOffsets(i), e.reverse && r.reverse(), sf(this, r, this._majorUnit);
+    return this._unit = s.unit || (n.autoSkip ? tf(s.minUnit, this.min, this.max, this._getLabelCapacity(a)) : s1(this, r.length, s.minUnit, this.min, this.max)), this._majorUnit = !n.major.enabled || this._unit === "year" ? void 0 : n1(this._unit), this.initOffsets(i), e.reverse && r.reverse(), sf(this, r, this._majorUnit);
   }
   afterAutoSkip() {
     this.options.offsetAfterAutoskip && this.initOffsets(this.ticks.map((e) => +e.value));
@@ -14495,7 +14495,7 @@ class dc extends Sa {
   }
 }
 Q(dc, "id", "timeseries"), Q(dc, "defaults", Sa.defaults);
-var aC = /* @__PURE__ */ Object.freeze({
+var a1 = /* @__PURE__ */ Object.freeze({
   __proto__: null,
   CategoryScale: lc,
   LinearScale: cc,
@@ -14504,14 +14504,14 @@ var aC = /* @__PURE__ */ Object.freeze({
   TimeScale: Sa,
   TimeSeriesScale: dc
 });
-const oC = [
+const o1 = [
   uv,
   WS,
   Iw,
-  aC
+  a1
 ];
-ur.register(...oC);
-const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-game-proxy.ofersi15.workers.dev/token", ea = ["north", "south", "europa", "world", "conference", "hipster"], _l = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), fo = ["GK", "FB", "CB", "DM", "AM", "WF", "CF"], fc = ["FB", "CB", "DM", "AM", "WF", "CF"], xl = 100, zn = "sf_tactics_v4", lC = 7 * 24 * 60 * 60 * 1e3, Gn = "sf_players_v6", po = "sf_stats_v1", cC = 6 * 60 * 60 * 1e3, hC = 7 * 24 * 60 * 60 * 1e3, uC = 6 * 60 * 60 * 1e3, nf = "sf_submissions_all_v1", go = "sf_subs_ls", mi = {
+ur.register(...o1);
+const it = "https://slowfootball.club/api", Ot = "Arsenal", r1 = "https://sf-game-proxy.ofersi15.workers.dev/token", ea = ["north", "south", "europa", "world", "conference", "hipster"], _l = /* @__PURE__ */ new Set(["Barcelona", "Bayern Munich", "Juventus", "Damac", "Saudi All-Stars", "Inter Miami"]), fo = ["GK", "FB", "CB", "DM", "AM", "WF", "CF"], fc = ["FB", "CB", "DM", "AM", "WF", "CF"], xl = 100, zn = "sf_tactics_v4", l1 = 7 * 24 * 60 * 60 * 1e3, Gn = "sf_players_v6", po = "sf_stats_v1", c1 = 6 * 60 * 60 * 1e3, h1 = 7 * 24 * 60 * 60 * 1e3, u1 = 6 * 60 * 60 * 1e3, nf = "sf_submissions_all_v1", go = "sf_subs_ls", mi = {
   GK: ["Handling", "Reflexes", "Speed", "Passing"],
   FB: ["Passing", "Tackling", "Stamina", "Marking"],
   CB: ["Marking", "Heading", "Tackling", "Speed"],
@@ -14527,7 +14527,7 @@ const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-gam
   AM: "Pas, Drb, Sh, Vis",
   WF: "Drb, Pas, Spd, Sh",
   CF: "Spd, Drb, Hdg, Sh"
-}, dC = {
+}, d1 = {
   GK: ["GK"],
   CB: ["CB", "FB", "DM"],
   FB: ["FB", "CB", "DM"],
@@ -14537,7 +14537,7 @@ const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-gam
   WM: ["FB", "DM", "AM", "WF"],
   WF: ["WF", "AM", "CF"],
   CF: ["CF", "WF", "AM"]
-}, fC = {
+}, f1 = {
   GK: ["Handling", "Reflexes", "Speed", "Passing"],
   CB: ["Marking", "Heading", "Tackling", "Speed"],
   FB: ["Passing", "Tackling", "Stamina", "Marking"],
@@ -14556,7 +14556,7 @@ const it = "https://slowfootball.club/api", Ot = "Arsenal", rC = "https://sf-gam
   3421: ["GK", "CB", "CB", "CB", "WM", "CM", "CM", "WM", "AM", "AM", "CF"],
   352: ["GK", "CB", "CB", "CB", "WM", "CM", "CM", "CM", "WM", "CF", "CF"],
   343: ["GK", "CB", "CB", "CB", "WM", "CM", "CM", "WM", "WF", "CF", "WF"]
-}, pC = {
+}, p1 = {
   442: [{ x: 34, y: 97 }, { x: 60, y: 78 }, { x: 45, y: 78 }, { x: 23, y: 78 }, { x: 8, y: 78 }, { x: 59, y: 55 }, { x: 44, y: 55 }, { x: 24, y: 55 }, { x: 9, y: 55 }, { x: 44, y: 20 }, { x: 24, y: 20 }],
   4411: [{ x: 34, y: 97 }, { x: 60, y: 78 }, { x: 45, y: 78 }, { x: 23, y: 78 }, { x: 8, y: 78 }, { x: 59, y: 57 }, { x: 44, y: 57 }, { x: 24, y: 57 }, { x: 9, y: 57 }, { x: 34, y: 35 }, { x: 34, y: 13 }],
   4231: [{ x: 34, y: 97 }, { x: 60, y: 78 }, { x: 45, y: 78 }, { x: 23, y: 78 }, { x: 8, y: 78 }, { x: 45, y: 63 }, { x: 23, y: 63 }, { x: 58, y: 40 }, { x: 34, y: 40 }, { x: 10, y: 40 }, { x: 34, y: 13 }],
@@ -14591,12 +14591,12 @@ function wa(t, e, s, n) {
   const o = a.reduce((l, c) => l + c, 0) / a.length, r = n / 100;
   return Math.round((i * (1 - r) + o * r) * 10) / 10;
 }
-function gC(t) {
+function g1(t) {
   if (!t.Value || !t.Rating) return null;
   const e = t.Rating, s = t.Age || 26, n = e >= 87 ? 4 : e >= 84 ? 3 : e >= 81 ? 2.2 : e >= 78 ? 1.7 : e >= 75 ? 1.3 : 1, i = s <= 22 ? 1.5 : s <= 25 ? 1.3 : s <= 28 ? 1 : s <= 31 ? 0.75 : 0.5, a = t.Value * n * i;
   return Math.round(a / 5e5) * 5e5 || Math.round(a / 1e5) * 1e5;
 }
-function mC(t) {
+function m1(t) {
   if (!t) return "";
   const e = (o) => o.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"), s = (o) => e(o).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>").replace(/(^|[^\w])_([^_]+)_(?!\w)/g, "$1<em>$2</em>");
   let n = "", i = null;
@@ -14617,10 +14617,10 @@ function mC(t) {
 function Hs(t) {
   return t >= 1e6 ? `£${(t / 1e6).toFixed(1)}m` : t >= 1e3 ? `£${(t / 1e3).toFixed(0)}k` : t ? `£${t}` : "—";
 }
-function yC(t) {
+function y1(t) {
   return t ? `£${(t / 1e3).toFixed(0)}k/w` : "—";
 }
-function bC(t) {
+function b1(t) {
   return t == null ? "—" : (t >= 0 ? "+" : "") + t.toFixed(2);
 }
 function Lo(t) {
@@ -14629,7 +14629,7 @@ function Lo(t) {
 function Ri(t) {
   return t ? String(t).replace(/-/g, "") : null;
 }
-function _C(t) {
+function _1(t) {
   return t ? {
     withdrawn: "↩ Withdrawn",
     declined: "✗ Declined",
@@ -14647,7 +14647,7 @@ function _C(t) {
     "auction-bid": "Auction bid"
   }[t] || t : "—";
 }
-function xC(t) {
+function x1(t) {
   if (!t) return "—";
   const e = new Date(t);
   if (isNaN(e.getTime())) return "—";
@@ -14686,7 +14686,7 @@ function Bm(t, e, s) {
     return { name: o.Player, pos: o.Position, weeks: l, category: h, label: u, sameNat: c };
   }).filter(Boolean).sort((o, r) => r.weeks - o.weeks);
 }
-function vC(t, e) {
+function v1(t, e) {
   const [s, n] = [t, e].sort(), i = s + "" + n;
   let a = 2166136261;
   for (let o = 0; o < i.length; o++)
@@ -14698,7 +14698,7 @@ function vh(t, e, s) {
   const n = Hr(), i = Ca(t.Player, t.Club, s) ?? n;
   return (e || []).filter((a) => a.Player !== t.Player && a.Position).map((a) => {
     const o = Ca(a.Player, t.Club, s) ?? n, r = Math.min(i, o);
-    return r < 13 || vC(t.Player, a.Player) >= 7 ? null : { name: a.Player, pos: a.Position, weeks: r };
+    return r < 13 || v1(t.Player, a.Player) >= 7 ? null : { name: a.Player, pos: a.Position, weeks: r };
   }).filter(Boolean).sort((a, o) => o.weeks - a.weeks);
 }
 function $m(t, e) {
@@ -14740,7 +14740,7 @@ function yc(t) {
 }
 let mo = null;
 async function vl() {
-  return mo || (mo = (await fetch(rC).then((e) => e.json())).token || null, mo);
+  return mo || (mo = (await fetch(r1).then((e) => e.json())).token || null, mo);
 }
 const gs = location.hostname === "sf.ofersi15.workers.dev" ? "https://sf-cache.ofersi15.workers.dev/sf-cache" : "/sf-cache", sa = "https://sf-cache.ofersi15.workers.dev";
 async function kt(t, e = !1) {
@@ -14773,7 +14773,7 @@ async function hf(t) {
     } catch {
     }
 }
-const SC = {
+const S1 = {
   async loadYouth(t = !1) {
     var r, l, c, h, u, d, p;
     const e = "sf_youth_idx_v2";
@@ -15175,7 +15175,7 @@ const SC = {
       }
     })();
   }
-}, wC = {
+}, w1 = {
   async buildMatchArchive() {
     var a, o, r, l, c;
     if (this.matchArchiveBuilding) return;
@@ -15605,7 +15605,7 @@ const SC = {
     ]);
     n._homeFormation = o || this.extractFormation(n.reportNarrative, (g = n.home) == null ? void 0 : g.club) || n.ratings && this.deriveFormation(n.ratings.home), n._awayFormation = r || this.extractFormation(n.reportNarrative, (m = n.away) == null ? void 0 : m.club) || n.ratings && this.deriveFormation(n.ratings.away), this.matchDetailLoading = !1;
   }
-}, CC = {
+}, C1 = {
   espRatingClass(t) {
     return t ? t >= 85 ? "c-green" : t >= 75 ? "c-orange" : "c-gray" : "c-gray";
   },
@@ -15725,8 +15725,8 @@ const SC = {
   negoSubStatusStyle(t) {
     return t ? ["agreed", "finalised", "won"].includes(t) ? { color: "#7ee787", fontWeight: "600" } : ["declined", "withdrawn", "counter_rejected", "moved_elsewhere", "outbid", "insufficient_funds"].includes(t) ? { color: "#ff7b72" } : ["offer", "finalising", "adjusted", "auction-bid"].includes(t) ? { color: "#ffa657" } : { color: "#8b949e" } : { color: "#8b949e" };
   },
-  fmtSubStatus: _C,
-  fmtNegoDate: xC,
+  fmtSubStatus: _1,
+  fmtNegoDate: x1,
   computeTrueValues() {
     var a;
     if (!this.allPlayers.length) return;
@@ -15917,7 +15917,7 @@ const SC = {
   },
   async loadEspionage(t = !1) {
     this.espionageLoading = !0, this.espionageMsg = "Loading…", this.espionageProgress = 0;
-    const e = "sf_espionage_v3", s = uC;
+    const e = "sf_espionage_v3", s = u1;
     if (!t)
       try {
         let n = await kt(e);
@@ -16043,7 +16043,7 @@ const SC = {
       });
     }
   }
-}, kC = {
+}, k1 = {
   // ── Match processing helpers (all from stored data, no API calls) ────────
   // Extract formation string from narrative text, looking near club name
   extractFormation(t, e) {
@@ -16124,7 +16124,7 @@ const SC = {
   pitchLayout(t) {
     var o;
     if (!((o = t == null ? void 0 : t.xi) != null && o.length)) return [];
-    const e = String(t.formation || "").replace(/-/g, ""), s = pC[e];
+    const e = String(t.formation || "").replace(/-/g, ""), s = p1[e];
     if (!s) return [];
     const n = t.xi.map((r, l) => {
       const c = s[l] || { x: 50, y: 50 }, h = r.slot || (xh[e] || [])[l] || "CM", u = this.basePos(r.position || h), d = cf[u] || cf.CM;
@@ -16360,7 +16360,7 @@ const SC = {
     const s = ((r = t.home) == null ? void 0 : r.club) === e, n = ((l = t.score) == null ? void 0 : l.home) ?? 0, i = ((c = t.score) == null ? void 0 : c.away) ?? 0, a = s ? n : i, o = s ? i : n;
     return a > o ? "W" : a < o ? "L" : "D";
   }
-}, MC = {
+}, M1 = {
   async openModal(t, e = null) {
     if (this.selectedPlayer = t, this.highlightedPos = null, this.selectedJobCtx = e || null, this.negoShowAllModal = !1, this.selectedPlayerStats = null, this.selectedPlayerStatsTab = "career", this.selectedPlayerStatsLoading = !0, this.playerModalTab = "overview", this.espionageNegos.length === 0)
       try {
@@ -16439,7 +16439,7 @@ const SC = {
           const l = performance.now();
           i.forEach((u) => Object.freeze(u)), console.log("[SF] Object.freeze:", Math.round(performance.now() - l) + "ms");
           const c = performance.now();
-          this.allPlayers = i, console.log("[SF] Vue allPlayers set:", Math.round(performance.now() - c) + "ms"), this.playersCacheDate = new Date(o).toLocaleDateString(), this.progress = 100, this.loaded = !0, this.buildBookmarklet(), this.checkTacticsCache(), Date.now() - o > cC ? (this.playersRefreshing = !0, this.fetchFreshData(!1)) : (fetch(`${it}/tables/from-fixtures`).then((u) => u.json()).then((u) => {
+          this.allPlayers = i, console.log("[SF] Vue allPlayers set:", Math.round(performance.now() - c) + "ms"), this.playersCacheDate = new Date(o).toLocaleDateString(), this.progress = 100, this.loaded = !0, this.buildBookmarklet(), this.checkTacticsCache(), Date.now() - o > c1 ? (this.playersRefreshing = !0, this.fetchFreshData(!1)) : (fetch(`${it}/tables/from-fixtures`).then((u) => u.json()).then((u) => {
             var p;
             const d = (p = u == null ? void 0 : u.meta) == null ? void 0 : p.asOfWeek;
             d != null && d !== "?" && (this.asOfWeek = d);
@@ -16510,7 +16510,7 @@ const SC = {
               return Object.freeze(d);
             });
             if (l > 0) {
-              await new Promise((u) => requestAnimationFrame(u)), this.allPlayers = c, this.statsEnriched = !0, Date.now() - r > hC && setTimeout(() => this.enrichStats(!0), 3e3);
+              await new Promise((u) => requestAnimationFrame(u)), this.allPlayers = c, this.statsEnriched = !0, Date.now() - r > h1 && setTimeout(() => this.enrichStats(!0), 3e3);
               return;
             }
           }
@@ -16631,7 +16631,7 @@ const SC = {
         (p || []).forEach((f) => {
           const g = `${f.Player}|${f.Club || d}`;
           if (l.has(g)) return;
-          if (l.add(g), f.Club = f.Club || d, f._league = _l.has(f.Club) ? "other" : a[f.Club] || "world", f._managed = o.has(f.Club), f._gameRating = Ss(f, f.Position), f._weightedRating = wa(f, f.Position, of, 20), f._estValue = gC(f), f._incompleteStats = bn.filter((_) => f[_] != null && f[_] > 0).length < 5, f.Position !== "GK") {
+          if (l.add(g), f.Club = f.Club || d, f._league = _l.has(f.Club) ? "other" : a[f.Club] || "world", f._managed = o.has(f.Club), f._gameRating = Ss(f, f.Position), f._weightedRating = wa(f, f.Position, of, 20), f._estValue = g1(f), f._incompleteStats = bn.filter((_) => f[_] != null && f[_] > 0).length < 5, f.Position !== "GK") {
             let _ = null, y = -1;
             for (const b of fc) {
               if (b === f.Position) continue;
@@ -16803,7 +16803,7 @@ const SC = {
         let S = await kt(zn);
         if (S || (S = localStorage.getItem(zn)), S) {
           const { data: C, ts: D } = JSON.parse(S);
-          if (Date.now() - D < lC) {
+          if (Date.now() - D < l1) {
             this.tacticsData = C, this.tacticsCacheDate = new Date(D).toLocaleDateString(), this.tacticsLoaded = !0;
             return;
           }
@@ -16886,7 +16886,7 @@ const SC = {
     }
     this.tacticsMsg = "Done!", this.tacticsProgress = 100, this.tacticsLoading = !1, this.tacticsLoaded = !0;
   }
-}, AC = {
+}, A1 = {
   getYouthAttr(t, e) {
     return t[e] != null && t[e] > 0 ? t[e] : t.stats && t.stats[e] != null && t.stats[e] > 0 ? t.stats[e] : null;
   },
@@ -17056,7 +17056,7 @@ const SC = {
       this.staffGenLoading = !1;
     }
   }
-}, uf = "sf_chat_sessions_v1", df = "sf_chat_history_v1", PC = 20, TC = 30, ff = 3, DC = 8 * 1024 * 1024, RC = 10 * 1024 * 1024, pf = 2e4, LC = /\.(json|csv|txt|md)$/i, OC = 1568;
+}, uf = "sf_chat_sessions_v1", df = "sf_chat_history_v1", P1 = 20, T1 = 30, ff = 3, D1 = 8 * 1024 * 1024, R1 = 10 * 1024 * 1024, pf = 2e4, L1 = /\.(json|csv|txt|md)$/i, O1 = 1568;
 function yo(t) {
   return typeof t == "string" ? [{ type: "text", text: t }] : Array.isArray(t) ? t : [];
 }
@@ -17066,26 +17066,26 @@ function jm(t) {
     n.onload = () => e(n.result), n.onerror = () => s(new Error(`Could not read ${t.name}`)), n.readAsDataURL(t);
   });
 }
-function EC(t) {
+function E1(t) {
   return new Promise((e, s) => {
     const n = new FileReader();
     n.onload = () => e(n.result), n.onerror = () => s(new Error(`Could not read ${t.name}`)), n.readAsText(t);
   });
 }
-function FC(t) {
+function F1(t) {
   return new Promise((e, s) => {
     const n = new Image();
     n.onload = () => e(n), n.onerror = () => s(new Error("Could not decode image")), n.src = t;
   });
 }
-async function IC(t) {
-  const e = await jm(t), s = await FC(e), n = Math.min(1, OC / Math.max(s.width, s.height)), i = Math.max(1, Math.round(s.width * n)), a = Math.max(1, Math.round(s.height * n)), o = document.createElement("canvas");
+async function I1(t) {
+  const e = await jm(t), s = await F1(e), n = Math.min(1, O1 / Math.max(s.width, s.height)), i = Math.max(1, Math.round(s.width * n)), a = Math.max(1, Math.round(s.height * n)), o = document.createElement("canvas");
   o.width = i, o.height = a, o.getContext("2d").drawImage(s, 0, 0, i, a);
   const r = o.toDataURL("image/jpeg", 0.85), l = /^data:(.+?);base64,(.*)$/.exec(r);
   if (!l) throw new Error(`Could not process ${t.name}`);
   return { mediaType: l[1], base64: l[2] };
 }
-const NC = {
+const N1 = {
   _newChatSessionId() {
     return "cs_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   },
@@ -17121,16 +17121,16 @@ ${t.text}
       }
       try {
         if (s.type.startsWith("image/")) {
-          if (s.size > DC) throw new Error(`${s.name} is too large (max 8MB)`);
-          const { mediaType: n, base64: i } = await IC(s);
+          if (s.size > D1) throw new Error(`${s.name} is too large (max 8MB)`);
+          const { mediaType: n, base64: i } = await I1(s);
           this.chatAttachments.push({ id: this._newChatSessionId(), kind: "image", name: s.name, mediaType: n, base64: i });
         } else if (s.type === "application/pdf") {
-          if (s.size > RC) throw new Error(`${s.name} is too large (max 10MB)`);
+          if (s.size > R1) throw new Error(`${s.name} is too large (max 10MB)`);
           const n = await jm(s), i = /^data:(.+?);base64,(.*)$/.exec(n);
           if (!i) throw new Error(`Could not read ${s.name}`);
           this.chatAttachments.push({ id: this._newChatSessionId(), kind: "document", name: s.name, mediaType: "application/pdf", base64: i[2] });
-        } else if (s.type.startsWith("text/") || s.type === "application/json" || LC.test(s.name)) {
-          const n = await EC(s), i = n.length > pf ? n.slice(0, pf) + `
+        } else if (s.type.startsWith("text/") || s.type === "application/json" || L1.test(s.name)) {
+          const n = await E1(s), i = n.length > pf ? n.slice(0, pf) + `
 …[truncated]` : n;
           this.chatAttachments.push({ id: this._newChatSessionId(), kind: "text", name: s.name, text: i });
         } else
@@ -17180,7 +17180,7 @@ ${t.text}
         const s = this.chatSessions.find((n) => n.id === t);
         s && (s.updatedAt = Date.now(), (!s.title || s.title === "New chat") && (s.title = this._deriveChatTitle(s.messages)));
       }
-      const e = this.chatSessions.slice().sort((s, n) => (n.updatedAt || 0) - (s.updatedAt || 0)).slice(0, PC).map((s) => ({ ...s, messages: s.messages.slice(-TC).map((n) => this._stripForStorage(n)) }));
+      const e = this.chatSessions.slice().sort((s, n) => (n.updatedAt || 0) - (s.updatedAt || 0)).slice(0, P1).map((s) => ({ ...s, messages: s.messages.slice(-T1).map((n) => this._stripForStorage(n)) }));
       localStorage.setItem(uf, JSON.stringify({ sessions: e, activeId: this.activeChatSessionId }));
     } catch {
     }
@@ -17293,49 +17293,57 @@ Assistant: ${i(n[0])}`.trim().slice(0, 2e3);
   },
   // Summarizes squad, budget and top transfer targets from already-loaded data — no extra API calls.
   buildChatContext() {
+    var h, u;
     const t = [`My club: ${Ot}. Current game week: ~${this.asOfWeek || "?"}.`];
     this.clubBudget != null && t.push(`Transfer budget: ${Hs(this.clubBudget)}${this.clubWageBudget != null ? `, wage budget: ${Hs(this.clubWageBudget)}/wk` : ""}.`), t.push(`
 Pricing note: the raw "Value" field from the game API is NOT a reliable market price — quality players are scarce and in high demand, so real fees run well above it. Use "TrueVal" instead (shown below as value/source) — it's the last real transfer fee, the live transfer-list asking price, or recent negotiation activity where known, else a rating-scaled estimate off Value (marked "formula"). Ground any pricing discussion in TrueVal plus the recent transfers and transfer-list sections below, not the raw Value field.`);
-    const e = (this.allPlayers || []).filter((r) => r.Club === Ot);
-    e.length && (t.push(`
-My squad (${e.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source):`), e.slice().sort((r, l) => (l._gameRating || 0) - (r._gameRating || 0)).forEach((r) => {
-      const l = r.fitnessPct != null ? `${r.fitnessPct}%` : "?";
-      t.push(`${r.Player} | ${r.Position} | ${r.Age} | ${r._gameRating || "?"} | ${l} | ${Hs(this.trueVal(r))} (${this.trueValSrc(r)})${r.injured ? " [INJURED]" : ""}${r.suspended ? " [SUSPENDED]" : ""}`);
-    }));
-    const s = (this.allPlayers || []).filter((r) => {
-      var l;
-      return r.Club && r.Club !== Ot && !((l = this.vacantClubs) != null && l.has(r.Club)) && (r._gameRating || 0) >= 78;
-    }).sort((r, l) => (l._gameRating || 0) - (r._gameRating || 0)).slice(0, 40);
-    s.length && (t.push(`
-Top-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source):`), s.forEach((r) => {
-      t.push(`${r.Player} | ${r.Club} | ${r.Position} | ${r.Age} | ${r._gameRating || "?"} | ${Hs(this.trueVal(r))} (${this.trueValSrc(r)})`);
-    }));
-    const n = (this.allPlayers || []).flatMap((r) => (r._transferHistory || []).filter((l) => l.isReal).map((l) => ({ name: r.Player, ...l }))).sort((r, l) => new Date(l.date) - new Date(r.date)).slice(0, 30);
-    n.length && (t.push(`
-Recent real completed transfers league-wide (most recent first) — Player | Fee | Seller → Buyer | Date:`), n.forEach((r) => {
-      t.push(`${r.name} | ${Hs(r.amount)} | ${r.seller || "?"} → ${r.buyer || "?"} | ${r.date ? new Date(r.date).toLocaleDateString("en-GB") : "?"}`);
-    }));
-    const i = (this.allPlayers || []).filter((r) => r._transferListed && r._listingAsk);
+    const e = { 1: ["442", "433", "4231", "532", "343"], 2: ["352", "541", "4411"], 3: ["4321", "451"], 4: ["4141", "442 D", "3421"], 5: ["3241", "4222", "4132"] }, s = (u = (h = this.clubFacData) == null ? void 0 : h.levels) == null ? void 0 : u.analytics, n = s ? Object.keys(e).filter((d) => +d <= s).flatMap((d) => e[d]).join(", ") : null;
+    t.push(`
+Game mechanics reference (fixed game rules — these are the actual dropdown options in the live submission form, not opponent-specific data):
+- Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132.${s ? ` My club's Analytics Dept is level ${s} → currently unlocked: ${n}.` : " (My club's current Analytics Dept level isn't loaded this session — check the My Club tab.)"}
+- Match instructions (6 dropdowns): Mentality (Very Defensive / Defensive / Balanced / Attacking / Very Attacking), Style (Short / Mixed / Direct), Structure (Fluid / Balanced / Rigid), Defensive Line (Deep / Low / Medium / High), Attacking Focus (Left / Right / Central / Mixed), Pressing Intensity (High Press / Mid-Block / Low Block / Counter Press).
+- Set-piece takers (Captain, Penalty, Free-kick, Corner) are just player assignments — no extra tuning for penalties or free-kicks. Corners alone have dedicated instructions: Attacking corner — Delivery (Inswinger / Outswinger / Driven / Short Corner), Stay Back (1 or 2 players forward), 7 zone roles (Near Post, Far Post, Penalty Spot, Blockade, Edge of Box, Short Corner, Hold Back). Defensive corner — Scheme (Zonal / Man-to-Man / Hybrid), Press (Hold Shape / Press Taker), 6 zone roles (Near Post, Far Post, 6-Yard Box, Penalty Spot, Edge of Box, Counter Runner).
+- Substitutions: 5 subs per match. Each sub has a Plan (same 5 mentality values above) and a Timing trigger = a window (Half-time / 46-60' / 61-75' / 76'-) plus a condition. Only the Half-time window offers "if losing" as a condition; the other three windows only offer "if winning" / "if not winning" / "any situation".`);
+    const i = (this.allPlayers || []).filter((d) => d.Club === Ot);
     i.length && (t.push(`
-Players currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`), i.slice().sort((r, l) => (l._gameRating || 0) - (r._gameRating || 0)).forEach((r) => {
-      t.push(`${r.Player} | ${r.Club} | ${r.Position} | ${r.Age} | ${r._gameRating || "?"} | ${Hs(r._listingAsk)} | ${r._listingBids || 0}`);
+My squad (${i.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source):`), i.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
+      const p = d.fitnessPct != null ? `${d.fitnessPct}%` : "?";
+      t.push(`${d.Player} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${p} | ${Hs(this.trueVal(d))} (${this.trueValSrc(d)})${d.injured ? " [INJURED]" : ""}${d.suspended ? " [SUSPENDED]" : ""}`);
     }));
-    const a = Object.entries(this.espionageSubmissions || {}).filter(([r]) => r !== Ot).sort(([r], [l]) => r.localeCompare(l));
+    const a = (this.allPlayers || []).filter((d) => {
+      var p;
+      return d.Club && d.Club !== Ot && !((p = this.vacantClubs) != null && p.has(d.Club)) && (d._gameRating || 0) >= 78;
+    }).sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).slice(0, 40);
     a.length && (t.push(`
-Opponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW | XI:`), a.forEach(([r, l]) => {
-      var h, u;
-      const c = (l.xi || []).map((d) => d.name).filter(Boolean).join(", ");
-      t.push(`${r} | ${Lo(l.formation) || "?"} | ${((h = l.instructions) == null ? void 0 : h.mentality) || "?"} | ${((u = l.instructions) == null ? void 0 : u.style) || "?"} | ${l._gw ?? l.gameweek ?? "?"} | ${c || "?"}`);
+Top-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source):`), a.forEach((d) => {
+      t.push(`${d.Player} | ${d.Club} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${Hs(this.trueVal(d))} (${this.trueValSrc(d)})`);
     }));
-    const o = (this.matchArchive || []).filter((r) => {
-      var l, c;
-      return ((l = r.home) == null ? void 0 : l.club) === Ot || ((c = r.away) == null ? void 0 : c.club) === Ot;
-    }).sort((r, l) => (l.gameweek || 0) - (r.gameweek || 0)).slice(0, 8);
-    return o.length && (t.push(`
-My club's recent match results (most recent first; no fixture list is available so I don't know future opponents) — GW | Opponent (H/A) | Score | My formation/mentality | Opponent formation/mentality:`), o.forEach((r) => {
-      var d;
-      const l = ((d = r.home) == null ? void 0 : d.club) === Ot, c = l ? r.home : r.away, h = l ? r.away : r.home, u = r.score ? `${r.score.home ?? "?"}-${r.score.away ?? "?"}` : "?";
-      t.push(`GW${r.gameweek ?? "?"} | ${(h == null ? void 0 : h.club) || "?"} (${l ? "H" : "A"}) | ${u} | ${Lo(c == null ? void 0 : c.formation) || "?"}/${(c == null ? void 0 : c.mentality) || "?"} | ${Lo(h == null ? void 0 : h.formation) || "?"}/${(h == null ? void 0 : h.mentality) || "?"}`);
+    const o = (this.allPlayers || []).flatMap((d) => (d._transferHistory || []).filter((p) => p.isReal).map((p) => ({ name: d.Player, ...p }))).sort((d, p) => new Date(p.date) - new Date(d.date)).slice(0, 30);
+    o.length && (t.push(`
+Recent real completed transfers league-wide (most recent first) — Player | Fee | Seller → Buyer | Date:`), o.forEach((d) => {
+      t.push(`${d.name} | ${Hs(d.amount)} | ${d.seller || "?"} → ${d.buyer || "?"} | ${d.date ? new Date(d.date).toLocaleDateString("en-GB") : "?"}`);
+    }));
+    const r = (this.allPlayers || []).filter((d) => d._transferListed && d._listingAsk);
+    r.length && (t.push(`
+Players currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`), r.slice().sort((d, p) => (p._gameRating || 0) - (d._gameRating || 0)).forEach((d) => {
+      t.push(`${d.Player} | ${d.Club} | ${d.Position} | ${d.Age} | ${d._gameRating || "?"} | ${Hs(d._listingAsk)} | ${d._listingBids || 0}`);
+    }));
+    const l = Object.entries(this.espionageSubmissions || {}).filter(([d]) => d !== Ot).sort(([d], [p]) => d.localeCompare(p));
+    l.length && (t.push(`
+Opponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW | XI:`), l.forEach(([d, p]) => {
+      var g, m;
+      const f = (p.xi || []).map((_) => _.name).filter(Boolean).join(", ");
+      t.push(`${d} | ${Lo(p.formation) || "?"} | ${((g = p.instructions) == null ? void 0 : g.mentality) || "?"} | ${((m = p.instructions) == null ? void 0 : m.style) || "?"} | ${p._gw ?? p.gameweek ?? "?"} | ${f || "?"}`);
+    }));
+    const c = (this.matchArchive || []).filter((d) => {
+      var p, f;
+      return ((p = d.home) == null ? void 0 : p.club) === Ot || ((f = d.away) == null ? void 0 : f.club) === Ot;
+    }).sort((d, p) => (p.gameweek || 0) - (d.gameweek || 0)).slice(0, 8);
+    return c.length && (t.push(`
+My club's recent match results (most recent first; no fixture list is available so I don't know future opponents) — GW | Opponent (H/A) | Score | My formation/mentality | Opponent formation/mentality:`), c.forEach((d) => {
+      var _;
+      const p = ((_ = d.home) == null ? void 0 : _.club) === Ot, f = p ? d.home : d.away, g = p ? d.away : d.home, m = d.score ? `${d.score.home ?? "?"}-${d.score.away ?? "?"}` : "?";
+      t.push(`GW${d.gameweek ?? "?"} | ${(g == null ? void 0 : g.club) || "?"} (${p ? "H" : "A"}) | ${m} | ${Lo(f == null ? void 0 : f.formation) || "?"}/${(f == null ? void 0 : f.mentality) || "?"} | ${Lo(g == null ? void 0 : g.formation) || "?"}/${(g == null ? void 0 : g.mentality) || "?"}`);
     })), t.join(`
 `);
   },
@@ -17385,7 +17393,7 @@ My club's recent match results (most recent first; no fixture list is available 
       clearTimeout(s), this._chatAbortController = null, this._chatStoppedByUser = !1, this.chatLoading = !1, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
     }
   }
-}, BC = {
+}, B1 = {
   matchArchiveFiltered() {
     if (!this.matchArchive) return [];
     let t = this.matchArchive;
@@ -17518,7 +17526,7 @@ My club's recent match results (most recent first; no fixture list is available 
     const s = Object.values(e).sort((f, g) => g.gw - f.gw), n = this.matchArchive.length, i = s.reduce((f, g) => (f.bothSub += g.bothSub, f.bothFm += g.bothFm, f.bothMen += g.bothMen, f.sides += g.sides, f.press += g.press, f.line += g.line, f.trans += g.trans, f), { bothSub: 0, bothFm: 0, bothMen: 0, sides: 0, press: 0, line: 0, trans: 0 });
     return { rows: s, total: n, totals: i };
   }
-}, $C = {
+}, $1 = {
   filterableAttrs() {
     return [
       { k: "Speed", l: "Speed" },
@@ -17584,11 +17592,11 @@ My club's recent match results (most recent first; no fixture list is available 
     const t = xh[this.mySquadFormation];
     if (!t) return [];
     const e = this.mySquadPlayers, s = /* @__PURE__ */ new Set(), n = (i, a) => {
-      const r = (fC[a] || []).map((l) => i[l]).filter((l) => l != null && l > 0);
+      const r = (f1[a] || []).map((l) => i[l]).filter((l) => l != null && l > 0);
       return r.length ? r.reduce((l, c) => l + c, 0) / r.length : 0;
     };
     return t.map((i, a) => {
-      const o = dC[i] || [i];
+      const o = d1[i] || [i];
       let r = null, l = -1;
       for (const h of e) {
         if (s.has(h.Player) || !o.includes(h.Position)) continue;
@@ -17611,7 +17619,7 @@ My club's recent match results (most recent first; no fixture list is available 
   mySquadCaptainList() {
     return [...this.mySquadPlayers].filter((t) => t.Leadership != null).sort((t, e) => (e.Leadership || 0) - (t.Leadership || 0)).slice(0, 8);
   }
-}, jC = {
+}, j1 = {
   espionageFiltered() {
     let t = [...this.espionageClubs];
     if (this.espionageSearch.trim()) {
@@ -17745,7 +17753,7 @@ My club's recent match results (most recent first; no fixture list is available 
     const e = Math.floor(t / 36e5), s = Math.floor(t % 36e5 / 6e4);
     return e >= 48 ? `${Math.floor(e / 24)}d ${e % 24}h` : e > 0 ? `${e}h ${s}m` : `${s}m`;
   }
-}, WC = {
+}, W1 = {
   activeModalStats() {
     const t = this.selectedPlayerStats;
     return t ? this.selectedPlayerStatsTab === "season" ? t.seasonStats || null : this.selectedPlayerStatsTab === "career" && (t.career || t.seasonStats) || null : null;
@@ -17791,7 +17799,7 @@ My club's recent match results (most recent first; no fixture list is available 
     const e = Date.now() - 30 * 24 * 3600 * 1e3, s = t.filter((n) => new Date(n.updatedAt || 0).getTime() >= e);
     return s.length ? s : t.slice(0, 5);
   }
-}, HC = {
+}, H1 = {
   playersWithDislikesSet() {
     const t = /* @__PURE__ */ new Set(), e = {};
     for (const s of this.allPlayers)
@@ -17873,7 +17881,7 @@ My club's recent match results (most recent first; no fixture list is available 
       return { p: e, contrib90: i, overIndex: o, isGem: r };
     }).filter((e) => e.contrib90 > 0).sort((e, s) => s.overIndex - e.overIndex).slice(0, 60);
   }
-}, Sl = 50, VC = {
+}, Sl = 50, V1 = {
   // Pre-compute all expensive per-row derived values once, cached by Vue
   youthHistJobsEnriched() {
     return this.youthAllHistoryJobs.map((t) => {
@@ -18076,7 +18084,7 @@ My club's recent match results (most recent first; no fixture list is available 
     const t = new Date(this.youthFacilities.project.startedAt), e = new Date(this.youthFacilities.project.completeAt);
     return Math.min(100, Math.max(0, (/* @__PURE__ */ new Date() - t) / (e - t) * 100));
   }
-}, zC = {
+}, z1 = {
   selectedClubPlayers() {
     if (!this.selectedClubName) return [];
     const t = this.clubSquadSort || "pos";
@@ -18490,13 +18498,13 @@ Ko({
         };
       });
     },
-    ...BC,
-    ...$C,
-    ...jC,
-    ...WC,
-    ...HC,
-    ...VC,
-    ...zC
+    ...B1,
+    ...$1,
+    ...j1,
+    ...W1,
+    ...H1,
+    ...V1,
+    ...z1
   },
   watch: {
     filteredPlayers() {
@@ -18546,17 +18554,17 @@ Ko({
     }
   },
   methods: {
-    ...SC,
-    ...wC,
-    ...CC,
-    ...kC,
-    ...MC,
-    ...AC,
-    ...NC,
+    ...S1,
+    ...w1,
+    ...C1,
+    ...k1,
+    ...M1,
+    ...A1,
+    ...N1,
     fmtVal: Hs,
-    fmtWage: yC,
-    fmtDiff: bC,
-    renderMarkdown: mC,
+    fmtWage: y1,
+    fmtDiff: b1,
+    renderMarkdown: m1,
     ratingClass(t) {
       return t ? t >= 84 ? "rating-high" : t >= 77 ? "rating-mid" : "rating-low" : "c-gray";
     },
