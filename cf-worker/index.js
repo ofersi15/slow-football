@@ -25,6 +25,7 @@ function cacheMaxAge(key) {
 const GAME_API = 'https://slowfootball.club/api';
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const CHAT_MODEL = 'claude-sonnet-5';
+const TITLE_MODEL = 'claude-haiku-4-5'; // cheap/fast model — just for naming chat sessions
 const MAX_CHAT_BODY_BYTES = 20 * 1024 * 1024; // safety margin under Anthropic's 32MB request limit
 const ALLOWED_CHAT_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const MAX_CHAT_TEXT_BLOCK_CHARS = 24000;  // covers an attached JSON/CSV/text file plus the user's own message
@@ -128,6 +129,51 @@ async function handleChat(request, env, cors) {
     return new Response(JSON.stringify({ reply: text, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch(e) {
     console.error('[chat] request failed:', e.message);
+    return new Response(JSON.stringify({ error: 'Request failed: ' + e.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+}
+
+// Generates a short chat-session title from the first exchange, using Haiku (cheap/fast — no
+// thinking needed for a 5-word title). Best-effort: any failure just leaves the fallback title.
+async function handleTitle(request, env, cors) {
+  if (!env.ANTHROPIC_API_KEY) {
+    return new Response(JSON.stringify({ error: 'not configured' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  const raw = await request.text();
+  if (raw.length > 20000) {
+    return new Response(JSON.stringify({ error: 'Request too large' }), { status: 413, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  let body;
+  try { body = JSON.parse(raw); } catch(e) {
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  const text = typeof body.text === 'string' ? body.text.slice(0, 4000) : '';
+  if (!text.trim()) {
+    return new Response(JSON.stringify({ error: 'No text provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+  }
+  try {
+    const r = await fetch(ANTHROPIC_API, {
+      method: 'POST',
+      headers: {
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: TITLE_MODEL,
+        max_tokens: 20,
+        system: 'Generate a short title (3-5 words, no quotes, no trailing punctuation) summarizing the topic of this chat exchange. Reply with only the title, nothing else.',
+        messages: [{ role: 'user', content: text }],
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
+        { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+    const title = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim().replace(/^["']|["']$/g, '');
+    return new Response(JSON.stringify({ title: title.slice(0, 60) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+  } catch(e) {
     return new Response(JSON.stringify({ error: 'Request failed: ' + e.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 }
@@ -388,6 +434,9 @@ export default {
     // ── AI assistant ──
     if (url.pathname === '/_chat' && request.method === 'POST') {
       return handleChat(request, env, cors);
+    }
+    if (url.pathname === '/_title' && request.method === 'POST') {
+      return handleTitle(request, env, cors);
     }
 
     // ── Admin routes ──

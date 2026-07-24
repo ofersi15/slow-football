@@ -144,6 +144,7 @@ export const assistantMethods = {
           id: this._newChatSessionId(),
           title: this._deriveChatTitle(legacyMessages),
           messages: legacyMessages, createdAt: Date.now(), updatedAt: Date.now(),
+          aiTitled: true, // don't auto-rename pre-existing history on migration
         };
         this.chatSessions = [session];
         this.activeChatSessionId = session.id;
@@ -161,12 +162,17 @@ export const assistantMethods = {
     this.activeChatSessionId = active.id;
     this.chatMessages = active.messages;
   },
-  saveChatHistory() {
+  // touchedId: pass the session whose content actually changed (bumps its updatedAt for
+  // sort order + applies the fallback title). Omit for saves that don't represent new
+  // activity — renaming, deleting — so they don't reorder the list.
+  saveChatHistory(touchedId) {
     try {
-      const session = this.chatSessions.find(s => s.id === this.activeChatSessionId);
-      if (session) {
-        session.updatedAt = Date.now();
-        if (!session.title || session.title === 'New chat') session.title = this._deriveChatTitle(session.messages);
+      if (touchedId) {
+        const session = this.chatSessions.find(s => s.id === touchedId);
+        if (session) {
+          session.updatedAt = Date.now();
+          if (!session.title || session.title === 'New chat') session.title = this._deriveChatTitle(session.messages);
+        }
       }
       const sessions = this.chatSessions
         .slice()
@@ -179,8 +185,86 @@ export const assistantMethods = {
   sortedChatSessions() {
     return this.chatSessions.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   },
+  // Groups sortedChatSessions() into Claude-style date buckets for the sidebar list.
+  chatSessionGroups() {
+    const startOfDay = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+    const today = startOfDay(Date.now());
+    const yesterday = today - 86400000;
+    const weekAgo = today - 7 * 86400000;
+    const groups = [
+      { label: 'Today', sessions: [] },
+      { label: 'Yesterday', sessions: [] },
+      { label: 'Previous 7 days', sessions: [] },
+      { label: 'Older', sessions: [] },
+    ];
+    this.sortedChatSessions().forEach(s => {
+      const t = s.updatedAt || s.createdAt || 0;
+      if (t >= today) groups[0].sessions.push(s);
+      else if (t >= yesterday) groups[1].sessions.push(s);
+      else if (t >= weekAgo) groups[2].sessions.push(s);
+      else groups[3].sessions.push(s);
+    });
+    return groups.filter(g => g.sessions.length);
+  },
+  toggleAssistantSidebar() {
+    this.assistantSidebarExpanded = !this.assistantSidebarExpanded;
+    try { localStorage.setItem('sf_assistant_sidebar_expanded', this.assistantSidebarExpanded ? '1' : '0'); } catch (e) {}
+  },
+  startRenameSession(id, e) {
+    if (e) e.stopPropagation();
+    const session = this.chatSessions.find(s => s.id === id);
+    if (!session) return;
+    this.renamingSessionId = id;
+    this.renameDraft = session.title;
+    this.$nextTick(() => {
+      const el = this.$refs['renameInput_' + id];
+      const input = Array.isArray(el) ? el[0] : el;
+      if (input) { input.focus(); input.select(); }
+    });
+  },
+  commitRenameSession() {
+    const session = this.chatSessions.find(s => s.id === this.renamingSessionId);
+    if (session) {
+      const trimmed = (this.renameDraft || '').trim();
+      if (trimmed) session.title = trimmed.length > 60 ? trimmed.slice(0, 60) + '…' : trimmed;
+      session.aiTitled = true; // manual rename wins — don't let auto-titling overwrite it
+      this.saveChatHistory();
+    }
+    this.renamingSessionId = null;
+    this.renameDraft = '';
+  },
+  cancelRenameSession() {
+    this.renamingSessionId = null;
+    this.renameDraft = '';
+  },
+  // Fires once per session, right after the first assistant reply — replaces the truncated
+  // first-message title with a real AI-generated one. Best-effort: failures just keep the fallback.
+  async _maybeGenerateAiTitle(sessionId) {
+    const session = this.chatSessions.find(s => s.id === sessionId);
+    if (!session || session.aiTitled) return;
+    const userMsgs = session.messages.filter(m => m.role === 'user');
+    const assistantMsgs = session.messages.filter(m => m.role === 'assistant');
+    if (userMsgs.length !== 1 || assistantMsgs.length !== 1) return;
+    session.aiTitled = true; // mark immediately so a slow/failed request can't refire
+    const textOf = m => blocksOf(m.content).filter(b => b.type === 'text' && b.text).map(b => b.text).join(' ');
+    const snippet = `User: ${textOf(userMsgs[0])}\nAssistant: ${textOf(assistantMsgs[0])}`.trim().slice(0, 2000);
+    if (!snippet) return;
+    try {
+      const r = await fetch(`${SF_WORKER_BASE}/_title`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: snippet }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data = await r.json();
+      if (r.ok && data.title) {
+        const s = this.chatSessions.find(s => s.id === sessionId);
+        if (s) { s.title = data.title; this.saveChatHistory(); }
+      }
+    } catch (e) {}
+  },
   newChatSession() {
-    const session = { id: this._newChatSessionId(), title: 'New chat', messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    const session = { id: this._newChatSessionId(), title: 'New chat', messages: [], createdAt: Date.now(), updatedAt: Date.now(), aiTitled: false };
     this.chatSessions.unshift(session);
     this.activeChatSessionId = session.id;
     this.chatMessages = session.messages;
@@ -195,6 +279,7 @@ export const assistantMethods = {
     this.chatMessages = session.messages;
     this.chatAttachments = [];
     this.chatError = '';
+    this.renamingSessionId = null;
     this.$nextTick(() => this.scrollChatToBottom());
   },
   deleteChatSession(id) {
@@ -242,9 +327,10 @@ export const assistantMethods = {
 
     const squad = (this.allPlayers || []).filter(p => p.Club === MY_CLUB);
     if (squad.length) {
-      lines.push(`\nMy squad (${squad.length} players) — Name | Pos | Age | Rating | TrueVal (source):`);
+      lines.push(`\nMy squad (${squad.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source):`);
       squad.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
-        lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)})${p.injured ? ' [INJURED]' : ''}${p.suspended ? ' [SUSPENDED]' : ''}`);
+        const fit = p.fitnessPct != null ? `${p.fitnessPct}%` : '?';
+        lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fit} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)})${p.injured ? ' [INJURED]' : ''}${p.suspended ? ' [SUSPENDED]' : ''}`);
       });
     }
 
@@ -309,6 +395,7 @@ export const assistantMethods = {
   async sendChatMessage() {
     const text = (this.chatInput || '').trim();
     if ((!text && !this.chatAttachments.length) || this.chatLoading) return;
+    const sessionId = this.activeChatSessionId;
     const content = [];
     if (text) content.push({ type: 'text', text });
     this.chatAttachments.forEach(a => content.push(this.attachmentToBlock(a)));
@@ -317,7 +404,7 @@ export const assistantMethods = {
     this.chatAttachments = [];
     this.chatError = '';
     this.chatLoading = true;
-    this.saveChatHistory();
+    this.saveChatHistory(sessionId);
     this.$nextTick(() => this.scrollChatToBottom());
 
     try {
@@ -336,11 +423,12 @@ export const assistantMethods = {
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || `Request failed (${r.status})`);
       this.chatMessages.push({ role: 'assistant', content: data.reply || '(no response)', ts: Date.now() });
+      this._maybeGenerateAiTitle(sessionId); // fire-and-forget — replaces the truncated fallback title
     } catch(e) {
       this.chatError = e.message || 'Failed to reach assistant';
     } finally {
       this.chatLoading = false;
-      this.saveChatHistory();
+      this.saveChatHistory(sessionId);
       this.$nextTick(() => this.scrollChatToBottom());
     }
   },
