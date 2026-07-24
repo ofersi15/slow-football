@@ -12,10 +12,21 @@
       </div>
     </div>
 
+    <!-- Everything below the header lives in its own positioned body, so the chat-list overlay
+         (position:absolute;inset:0 relative to THIS div) only ever covers the thread/input area —
+         never the header. Previously the overlay was a sibling of the header and covered it too,
+         so ☰ became unclickable once open and the only way back to the chat was toggling the whole
+         dock closed and open. -->
+    <div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden">
+
     <!-- Chat list overlay — the 400px dock has no room for a persistent sidebar, so this temporarily
          covers the thread instead. Shares chatSessionGroups()/rename/delete with the full-tab sidebar. -->
     <div v-if="assistantDockListOpen" class="assistant-dock-list">
-      <div class="chat-session-list" style="padding:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 8px 4px;flex-shrink:0">
+        <span style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.5px">Chats</span>
+        <button class="btn" style="font-size:10px;padding:3px 8px;min-height:auto" @click="assistantDockListOpen=false">✕ Close</button>
+      </div>
+      <div class="chat-session-list" style="padding:0 8px 8px">
         <div v-for="g in chatSessionGroups()" :key="g.label">
           <div class="chat-session-group-label">{{g.label}}</div>
           <div v-for="s in g.sessions" :key="s.id" class="chat-session-row" :class="{active: s.id===activeChatSessionId}"
@@ -84,6 +95,8 @@
         @click="chatLoading ? stopChatMessage() : sendChatMessage()">
         {{chatLoading ? '■' : 'Send'}}
       </button>
+    </div>
+
     </div>
 
       </div>
