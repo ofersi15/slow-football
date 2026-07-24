@@ -177,6 +177,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 
 - `retiring` → retiring, `homegrown` → homegrown, `slowIcon` → icon, `inAcademy` → academy
 - 32 players have `_incompleteStats` (partial badge) — null-ID or custom-transfer players
+- **Real player positions**: `GK, FB, CB, DM, AM, WF, CF` — confirmed against a full game-state export (1449 players), no player ever has position `CM`. `CM` only exists as a central-mid slot in tactic-screen `FORMATIONS` (filled by real DM/AM-position players via `SLOT_COMPAT`) — kept there, but removed from `ALL_POSITIONS`/`OUTFIELD_POSITIONS`/`GAME_ATTRS`/`GAME_ATTR_LABELS` so it can't appear as a player's own position (Scout filter, alt-position calc, Squad-by-position grouping)
 - `FULL_ATTR_KEYS = ['Speed','Passing','Marking','Heading','Tackling','Stamina','Dribbling','Shooting','Handling','Reflexes','Strength','Vision']`
 - Derived scoring fields (computed in `src/methods/data.js`, 3 spots — cache load, stats enrich, fresh fetch): `_gc` (Goals+Assists), `_gc90`, `_gDiff`/`_aDiff` (Goals-xG / Assists-xA), `_gDiff90`/`_aDiff90` — rendered via `fmtDiff()` in `src/utils.js`
 
