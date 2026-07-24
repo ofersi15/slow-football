@@ -114,6 +114,11 @@ async function handleChat(request, env, cors) {
         system,
         messages: cachedMessages,
         output_config: { effort: 'low' },
+        // claude-sonnet-5 runs adaptive thinking by default when `thinking` is omitted (unlike
+        // sonnet-4-6, which defaulted to no thinking) — thinking output shares the max_tokens
+        // budget with the reply, so it was silently eating most of our 1500 tokens and truncating
+        // the actual answer. Disable it explicitly to keep this a fast, terse chat assistant.
+        thinking: { type: 'disabled' },
       }),
     });
     const data = await r.json();
@@ -123,7 +128,7 @@ async function handleChat(request, env, cors) {
         { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
     if (data.usage) {
-      console.log('[chat] usage:', JSON.stringify(data.usage));
+      console.log('[chat] usage:', JSON.stringify(data.usage), 'stop_reason:', data.stop_reason);
     }
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
     return new Response(JSON.stringify({ reply: text, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
