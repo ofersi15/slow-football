@@ -79,7 +79,7 @@ async function handleChat(request, env, cors) {
         .map(m => ({ role: m.role, content: sanitizeChatContent(m.content) }))
         .filter(m => m.content.length)
     : [];
-  const context = typeof body.context === 'string' ? body.context.slice(0, 16000) : '';
+  const context = typeof body.context === 'string' ? body.context.slice(0, 120000) : '';
   if (!messages.length) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
