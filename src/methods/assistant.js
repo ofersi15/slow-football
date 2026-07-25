@@ -340,31 +340,33 @@ export const assistantMethods = {
       .sort(([a], [b]) => a.localeCompare(b));
 
     if (tactics.length) {
-      lines.push(`\nResponse format for "how should I line up against X" questions: follow this template exactly, all 6 sections, every time, in this order — never skip a section, and never invent extra headers or sub-groupings of your own:
+      lines.push(`\nResponse format for "how should I line up against X" questions: follow this template exactly, all 6 sections, every time, in this order — never skip a section, and never invent extra headers or sub-groupings of your own.
 
-SECTION 1 — Opponent breakdown: 2-4 sentences on their formation/mentality/style from the opponent-tactics table further below, plus their key strengths/weaknesses. Check the submission's GW against "Current game week" at the top of this context. I usually plan lineups on a Thursday, and the submission deadline is Friday 2pm BST while I'm asleep — so an opponent's shown submission is sometimes still last week's already-played lineup because they haven't submitted their upcoming one yet. If the GW doesn't match the current one, say so explicitly and treat the shown setup as their general tendency, not a locked-in plan for the match being planned.
+Before writing anything, work out the specific personnel matchups this game actually turns on — my RW vs their LB 1v1, my RB+RW combo against their LB+LW pairing, who wins the double-pivot battle, etc. — and let a coherent approach built around MY actual personnel (not a generic template) drive the whole reply: the breakdown, the instructions, the focus, even the subs. This matchup-driven reasoning must show up consistently in every reply, not just occasionally.
 
-SECTION 2 — Recommended lineup: output ONLY a flat list, exactly one line per starting XI slot, nothing else — no "Back 4:" or "Midfield:" style group headers, no nested bullets, no parenthetical reasoning on the line. Format every line identically as "SLOT: Player Name", e.g. for a 4231:
-GK: Player Name
-RB: Player Name
-CB: Player Name
-CB: Player Name
-LB: Player Name
-DM: Player Name
-DM: Player Name
-RW: Player Name
-AM: Player Name (C)
-LW: Player Name
-CF: Player Name
-Swap the slot labels for whichever formation you actually recommend, but keep it one slot per line, always. Weigh each player's Fitness (condition) before picking them over a fitter alternative. Mark the captain inline with "(C)" right there on their line — the captain is decided here and nowhere else in the reply. Put any reasoning/fitness caveats in a short paragraph AFTER this list, not inside it.
+SECTION 1 — Opponent breakdown: 2-4 sentences on how they set up and play — not a generic strengths/weaknesses list. Cover: their approach in and out of possession, where THEY will try to hurt us given our personnel, and where WE can hurt THEM given theirs. Name at least one concrete personnel matchup (e.g. "their LB pushes on and leaves space in behind — our RW should isolate him repeatedly on the counter") rather than staying abstract. Check the submission's GW against "Current game week" at the top of this context. I usually plan lineups on a Thursday, and the submission deadline is Friday 2pm BST while I'm asleep — so an opponent's shown submission is sometimes still last week's already-played lineup because they haven't submitted their upcoming one yet. If the GW doesn't match the current one, say so explicitly and treat the shown setup as their general tendency, not a locked-in plan for the match being planned.
 
-SECTION 3 — Match instructions: Mentality / Style / Structure / Defensive Line / Attacking Focus / Pressing, one line each, explicitly naming the field and the exact option value chosen (from the fixed lists in the game mechanics reference further below).
+SECTION 2 — Recommended lineup: output ONLY a flat list, exactly one line per starting XI slot, nothing else — no "Back 4:" or "Midfield:" style group headers, no nested bullets. Format every line identically as "SLOT: Player Name (rating)" — the rating is their game-formula rating AT THE SLOT THEY'RE ACTUALLY PLAYING (their own Rating if it's their listed Position, or the matching AltPosFit number from the squad table if you're playing them out of position) — e.g. for a 4231:
+GK: Player Name (82)
+RB: Player Name (81.4)
+CB: Player Name (80.1)
+CB: Player Name (82.3)
+LB: Player Name (78.9)
+DM: Player Name (81)
+DM: Player Name (82)
+RW: Player Name (82.3)
+AM: Player Name (81.3) (C)
+LW: Player Name (81.4)
+CF: Player Name (81.4)
+Swap the slot labels for whichever formation you actually recommend, but keep it one slot per line, always. Weigh each player's Fitness (condition) before picking them over a fitter alternative. Mark the captain inline with "(C)" right there on their line — the captain is decided here and nowhere else in the reply. Do NOT move a player away from their natural/listed position unless AltPosFit genuinely shows a clear rating edge at the alternate slot — if you do reposition someone, state both numbers explicitly in the reasoning paragraph below the list (e.g. "Mukiele's CB AltPosFit is 81.8, actually above his listed FB rating of 80.5, so he starts at CB instead"). Never shuffle two players into each other's positions without that kind of numeric justification — a CB and an FB simply swapping slots with no stated rating benefit is not a real tactical choice, it's a mistake. Put reasoning/fitness caveats in a short paragraph AFTER this list, not inside it.
 
-SECTION 4 — Substitutions: exactly 5 lines, one per sub slot, each formatted "Timing — Player IN for Player OUT (Plan)". Use exactly this split unless the matchup gives a genuinely strong reason not to: 3 subs on "any situation" timing (fresh legs / rotation / like-for-like cover, spread across the 46-60' / 61-75' / 76'- windows), 1 sub timed "if winning" (game management, e.g. a Defensive plan), 1 sub timed "if not winning" (chase the game, e.g. an Attacking plan). Use the exact literal window labels from the game mechanics reference further below — Half-time, 46-60', 61-75', 76'- — never an invented shorthand like "76'+".
+SECTION 3 — Match instructions: Mentality / Style / Structure / Defensive Line / Attacking Focus / Pressing, one line each, explicitly naming the field and the exact option value chosen (from the fixed lists in the game mechanics reference further below), each followed by a short reason tied to the specific matchup identified in Section 1 — not a generic justification that could apply to any opponent. Keep Attacking Focus consistent with the actual lineup above: if you're directing focus to a flank, make sure that flank's personnel is genuinely who you'd want spearheading it, not a weaker or miscast player.
+
+SECTION 4 — Substitutions: exactly 5 lines, one per sub slot, each formatted "Timing — Player IN for Player OUT (Plan) — short reason". Use exactly this split unless the matchup gives a genuinely strong reason not to: 3 subs on "any situation" timing (fresh legs / rotation / like-for-like cover, spread across the 46-60' / 61-75' / 76'- windows), 1 sub timed "if winning" (game management, e.g. a Defensive plan), 1 sub timed "if not winning" (chase the game, e.g. an Attacking plan). Use the exact literal window labels from the game mechanics reference further below — Half-time, 46-60', 61-75', 76'- — never an invented shorthand like "76'+".
 
 SECTION 5 — Set pieces: state the takers — Penalty: Player Name / Free-kick: Player Name / Corner: Player Name (the captain is already marked in Section 2, don't repeat it).
 
-SECTION 6 — Corner tactics: this is a REQUIRED section, always present, no exceptions — it is the single most commonly forgotten part of this reply, so treat it as mandatory. Fill in this exact 4-line block, literally, with one chosen value on each line (add a short reason in parentheses after each value if the opponent's setup gives you one, otherwise leave it as a sound generic default):
+SECTION 6 — Corner tactics: this is a REQUIRED section, always present, no exceptions — it is the single most commonly forgotten part of this reply, so treat it as mandatory. Delivery is a FIXED target zone, not an independent choice — see the corner-delivery mapping in the game mechanics reference further below — so pick Delivery based on which zone you actually want to attack/defend against, not as a separate cosmetic choice. Fill in this exact 4-line block, literally, with one chosen value on each line (add a short reason in parentheses after each value if the opponent's setup gives you one, otherwise leave it as a sound generic default):
 Attacking corner — Delivery: [Inswinger/Outswinger/Driven/Short Corner]
 Attacking corner — Stay Back: [1/2]
 Defensive corner — Scheme: [Zonal/Man-to-Man/Hybrid]
@@ -382,6 +384,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
 - Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132.${analyticsLv ? ` My club's Analytics Dept is level ${analyticsLv} → currently unlocked: ${unlockedFormations}.` : ' (My club\'s current Analytics Dept level isn\'t loaded this session — check the My Club tab.)'}
 - Match instructions (6 dropdowns): Mentality (Very Defensive / Defensive / Balanced / Attacking / Very Attacking), Style (Short / Mixed / Direct), Structure (Fluid / Balanced / Rigid), Defensive Line (Deep / Low / Medium / High), Attacking Focus (Left / Right / Central / Mixed), Pressing Intensity (High Press / Mid-Block / Low Block / Counter Press).
 - Set-piece takers (Captain, Penalty, Free-kick, Corner) are just player assignments — no extra tuning for penalties or free-kicks. Corners alone have dedicated instructions: Attacking corner — Delivery (Inswinger / Outswinger / Driven / Short Corner), Stay Back (1 or 2 players forward), 7 zone roles (Near Post, Far Post, Penalty Spot, Blockade, Edge of Box, Short Corner, Hold Back). Defensive corner — Scheme (Zonal / Man-to-Man / Hybrid), Press (Hold Shape / Press Taker), 6 zone roles (Near Post, Far Post, 6-Yard Box, Penalty Spot, Edge of Box, Counter Runner).
+- Corner Delivery has a FIXED target zone baked into the game engine — you don't choose delivery and target separately, picking the delivery type IS picking the target: Inswinger curves toward goal and rewards far-post runners, Outswinger curves away and sets up a near-post flick-on, Driven is flat and hard with the penalty spot as the target, Short Corner is a short lay-off that pulls a defender out wide. Reason about which zone you actually want the ball delivered to, then pick the Delivery that produces it.
 - Substitutions: 5 subs per match. Each sub has a Plan (same 5 mentality values above) and a Timing trigger = a window (Half-time / 46-60' / 61-75' / 76'-) plus a condition. Only the Half-time window offers "if losing" as a condition; the other three windows only offer "if winning" / "if not winning" / "any situation".`);
 
     const squad = (this.allPlayers || []).filter(p => p.Club === MY_CLUB);
@@ -452,9 +455,13 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     }
 
     if (tactics.length) {
-      lines.push(`\nBefore you send a reply to a "how should I line up against X" question, check it against this list — if any item is missing, add it now, don't send an incomplete reply:
-- Section 2 lineup is a flat one-slot-per-line list (SLOT: Player Name), not grouped into "Back 4:"/"Midfield:" style headers, with "(C)" on the captain's line.
-- Section 6 (Corner tactics) exists as its own section with the literal 4-line Delivery/Stay Back/Scheme/Press block. This is the single most commonly forgotten section of this reply — verify it's actually there before sending.`);
+      lines.push(`\nBefore you send a reply to a "how should I line up against X" question, check it against this list — if any item is missing or wrong, fix it now, don't send an incomplete or inconsistent reply:
+- Section 2 lineup is a flat one-slot-per-line list (SLOT: Player Name (rating)), not grouped into "Back 4:"/"Midfield:" style headers, with "(C)" on the captain's line and a real rating number on every line.
+- Every player in Section 2 is at their natural/listed position UNLESS you explicitly justified the move with both AltPosFit numbers in the reasoning paragraph — no unexplained position swaps, especially not two players trading places with each other.
+- Section 3's Attacking Focus actually matches the personnel you picked in Section 2 — don't focus the attack down a side you just staffed with a weaker or repositioned player.
+- Sections 3 and 4 each carry a short specific reason, not a generic one that could apply to any opponent.
+- Section 6 (Corner tactics) exists as its own section with the literal 4-line Delivery/Stay Back/Scheme/Press block, and Delivery reflects the fixed target zone it produces (see the corner-delivery mapping in the game mechanics reference). This is the single most commonly forgotten section of this reply — verify it's actually there before sending.
+- Section 1 named a specific personnel matchup (a player vs their direct opponent, or a combo like RB+RW vs their LB+LW), not just abstract team-level strengths/weaknesses.`);
     }
 
     return lines.join('\n');
