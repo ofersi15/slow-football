@@ -325,8 +325,18 @@ export const assistantMethods = {
       lines.push(`Transfer budget: ${fmtVal(this.clubBudget)}${this.clubWageBudget != null ? `, wage budget: ${fmtVal(this.clubWageBudget)}/wk` : ''}.`);
     }
 
-    const tactics = Object.entries(this.espionageSubmissions || {})
+    // Read directly from submissionsCache (not the separately-maintained espionageSubmissions
+    // snapshot, which is only recomputed once during the bulk prewarm) so any club fetched via
+    // any path this session — prewarm, retry pass, or just browsing its Clubs-tab detail page,
+    // which does one single reliable fetch via openClubDetail() — shows up here immediately,
+    // without needing the full ~55-club prewarm to have succeeded.
+    const tactics = Object.entries(this.submissionsCache || {})
       .filter(([club]) => club !== MY_CLUB)
+      .map(([club, byGw]) => {
+        const latest = Object.values(byGw || {}).sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0))[0];
+        return latest ? [club, latest] : null;
+      })
+      .filter(Boolean)
       .sort(([a], [b]) => a.localeCompare(b));
 
     if (tactics.length) {

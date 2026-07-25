@@ -17305,7 +17305,10 @@ Assistant: ${i(n[0])}`.trim().slice(0, 2e3);
     var h, u;
     const t = [`My club: ${Ot}. Current game week: ~${this.asOfWeek || "?"}.`];
     this.clubBudget != null && t.push(`Transfer budget: ${Hs(this.clubBudget)}${this.clubWageBudget != null ? `, wage budget: ${Hs(this.clubWageBudget)}/wk` : ""}.`);
-    const e = Object.entries(this.espionageSubmissions || {}).filter(([d]) => d !== Ot).sort(([d], [p]) => d.localeCompare(p));
+    const e = Object.entries(this.submissionsCache || {}).filter(([d]) => d !== Ot).map(([d, p]) => {
+      const f = Object.values(p || {}).sort((g, m) => (m.submittedAt || 0) - (g.submittedAt || 0))[0];
+      return f ? [d, f] : null;
+    }).filter(Boolean).sort(([d], [p]) => d.localeCompare(p));
     e.length && t.push(`
 Response format for "how should I line up against X" questions: follow this template exactly, all 6 sections, every time, in this order — never skip a section, and never invent extra headers or sub-groupings of your own:
 
