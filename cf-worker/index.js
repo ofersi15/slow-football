@@ -144,8 +144,13 @@ const LINEUP_SCHEMA = {
     },
     set_pieces: {
       type: 'object',
-      properties: { penalty: { type: 'string' }, freekick: { type: 'string' }, corner: { type: 'string' } },
-      required: ['penalty', 'freekick', 'corner'], additionalProperties: false,
+      description: 'Pick each taker by comparing the Penalties / Free kicks / Corners attributes (from the squad table) independently across the whole XI — these are three different specialties and usually different players.',
+      properties: {
+        penalty: { type: 'string' }, penalty_rating: { type: 'number', description: "That player's Penalties attribute." },
+        freekick: { type: 'string' }, freekick_rating: { type: 'number', description: "That player's Free kicks attribute." },
+        corner: { type: 'string' }, corner_rating: { type: 'number', description: "That player's Corners attribute." },
+      },
+      required: ['penalty', 'penalty_rating', 'freekick', 'freekick_rating', 'corner', 'corner_rating'], additionalProperties: false,
     },
     corner_tactics: {
       type: 'object',
@@ -188,13 +193,15 @@ function formatLineupReply(d) {
   if (cleanText(d.gw_status_note)) lines.push(cleanText(d.gw_status_note), '');
   const breakdown = cleanText(d.opponent_breakdown);
   if (breakdown) lines.push('**Opponent breakdown**', breakdown, '');
+  // Reasoning goes BEFORE the flat list, not after — matches the free-text template's rule and
+  // was a real bug: this used to render after the list, the opposite of what was asked for.
+  const lineupReasoning = cleanText(d.lineup_reasoning);
   lines.push(`**Recommended lineup — ${d.formation || '?'}**`);
+  if (lineupReasoning) lines.push(lineupReasoning, '');
   (d.lineup || []).forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}`);
   });
-  const lineupReasoning = cleanText(d.lineup_reasoning);
-  if (lineupReasoning) lines.push('', lineupReasoning);
   const ins = d.instructions || {};
   lines.push('', '**Match instructions**');
   [['Mentality', 'mentality'], ['Style', 'style'], ['Structure', 'structure'], ['Defensive Line', 'defensive_line'], ['Attacking Focus', 'attacking_focus'], ['Pressing', 'pressing']].forEach(([label, key]) => {
@@ -211,7 +218,11 @@ function formatLineupReply(d) {
   });
   const sp = d.set_pieces || {};
   lines.push('', '**Set pieces**');
-  lines.push(`Penalty: ${cleanText(sp.penalty) || '?'}`, `Free-kick: ${cleanText(sp.freekick) || '?'}`, `Corner: ${cleanText(sp.corner) || '?'}`);
+  lines.push(
+    `Penalty: ${cleanText(sp.penalty) || '?'} (${sp.penalty_rating ?? '?'} Pen)`,
+    `Free-kick: ${cleanText(sp.freekick) || '?'} (${sp.freekick_rating ?? '?'} FK)`,
+    `Corner: ${cleanText(sp.corner) || '?'} (${sp.corner_rating ?? '?'} Cor)`,
+  );
   const ct = d.corner_tactics || {};
   lines.push('', '**Corner tactics**');
   lines.push(`Attacking corner — Delivery: ${ct.attacking_delivery || '?'}`);
