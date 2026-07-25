@@ -110,15 +110,19 @@ async function handleChat(request, env, cors) {
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        max_tokens: 2500,
+        max_tokens: 6500,
         system,
         messages: cachedMessages,
         output_config: { effort: 'low' },
-        // claude-sonnet-5 runs adaptive thinking by default when `thinking` is omitted (unlike
-        // sonnet-4-6, which defaulted to no thinking) — thinking output shares the max_tokens
-        // budget with the reply, so it was silently eating most of our 1500 tokens and truncating
-        // the actual answer. Disable it explicitly to keep this a fast, terse chat assistant.
-        thinking: { type: 'disabled' },
+        // Adaptive thinking, re-enabled 2026-07-24 — verified directly this fixes the precision
+        // failures seen with thinking disabled (self-contradictory sub timing, visible "actually
+        // check: ..." scratch-work leaking into the reply, incomplete attribute cross-checks):
+        // without a thinking pass, verification-heavy work happened inline in the visible
+        // response instead of off-stage. A real test run used ~2500 thinking tokens + ~1550
+        // visible-reply tokens (~4000 total) for a full 6-section lineup reply — 6500 leaves
+        // headroom without being wasteful. budget_tokens is removed on claude-sonnet-5 (400s
+        // if sent) — adaptive is the only on-mode, depth is tuned via output_config.effort.
+        thinking: { type: 'adaptive' },
       }),
     });
     const data = await r.json();
