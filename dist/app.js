@@ -17442,24 +17442,24 @@ Before you send a reply to a "how should I line up against X" question, check it
     this.chatError = "", this.chatLoading = !0, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
     const e = new AbortController();
     this._chatAbortController = e;
-    const s = setTimeout(() => e.abort(), 45e3);
+    const s = [...this.chatMessages].reverse().find((r) => r.role === "user"), n = s ? Li(s.content).filter((r) => r.type === "text").map((r) => r.text).join(" ") : "", i = this._isLineupVsOpponentQuestion(n), o = setTimeout(() => e.abort(), i ? 11e4 : 9e4);
     try {
-      const n = [...this.chatMessages].reverse().find((l) => l.role === "user"), i = n ? Li(n.content).filter((l) => l.type === "text").map((l) => l.text).join(" ") : "", a = {
+      const r = {
         context: this.buildChatContext(),
-        lineupMode: this._isLineupVsOpponentQuestion(i),
-        messages: this.chatMessages.filter((l) => l.role === "user" || l.role === "assistant").map((l) => ({ role: l.role, content: l.content }))
-      }, o = await fetch(`${na}/_chat`, {
+        lineupMode: i,
+        messages: this.chatMessages.filter((h) => h.role === "user" || h.role === "assistant").map((h) => ({ role: h.role, content: h.content }))
+      }, l = await fetch(`${na}/_chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(a),
+        body: JSON.stringify(r),
         signal: e.signal
-      }), r = await o.json();
-      if (!o.ok || r.error) throw new Error(r.error || `Request failed (${o.status})`);
-      this.chatMessages.push({ role: "assistant", content: r.reply || "(no response)", ts: Date.now() }), this._maybeGenerateAiTitle(t);
-    } catch (n) {
-      n.name === "AbortError" ? this._chatStoppedByUser || (this.chatError = "Request timed out") : this.chatError = n.message || "Failed to reach assistant";
+      }), c = await l.json();
+      if (!l.ok || c.error) throw new Error(c.error || `Request failed (${l.status})`);
+      this.chatMessages.push({ role: "assistant", content: c.reply || "(no response)", ts: Date.now() }), this._maybeGenerateAiTitle(t);
+    } catch (r) {
+      r.name === "AbortError" ? this._chatStoppedByUser || (this.chatError = "Request timed out") : this.chatError = r.message || "Failed to reach assistant";
     } finally {
-      clearTimeout(s), this._chatAbortController = null, this._chatStoppedByUser = !1, this.chatLoading = !1, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
+      clearTimeout(o), this._chatAbortController = null, this._chatStoppedByUser = !1, this.chatLoading = !1, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
     }
   }
 }, BC = {

@@ -538,15 +538,25 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
 
     const controller = new AbortController();
     this._chatAbortController = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const lastUserMsg = [...this.chatMessages].reverse().find(m => m.role === 'user');
+    const lastUserText = lastUserMsg
+      ? blocksOf(lastUserMsg.content).filter(b => b.type === 'text').map(b => b.text).join(' ')
+      : '';
+    const lineupMode = this._isLineupVsOpponentQuestion(lastUserText);
+    // Adaptive thinking (re-enabled 2026-07-24) means every reply now does a real reasoning
+    // pass before answering, not just lineupMode ones — 45s was tuned for the old
+    // thinking-disabled config and was cutting off in-progress replies well before they
+    // finished. Real testing this session regularly saw 60-90s for lineupMode (thinking +
+    // JSON schema generation), occasionally more — 110s leaves margin without waiting forever
+    // on a genuinely stuck request. Non-lineup messages still think but skip the schema, so
+    // they're typically faster; kept on a generous timeout too rather than a separate shorter
+    // one, since a false-positive abort is worse than a few extra seconds of patience.
+    const timeoutMs = lineupMode ? 110000 : 90000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const lastUserMsg = [...this.chatMessages].reverse().find(m => m.role === 'user');
-      const lastUserText = lastUserMsg
-        ? blocksOf(lastUserMsg.content).filter(b => b.type === 'text').map(b => b.text).join(' ')
-        : '';
       const payload = {
         context: this.buildChatContext(),
-        lineupMode: this._isLineupVsOpponentQuestion(lastUserText),
+        lineupMode,
         messages: this.chatMessages
           .filter(m => m.role === 'user' || m.role === 'assistant')
           .map(m => ({ role: m.role, content: m.content })),
