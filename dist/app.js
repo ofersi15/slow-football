@@ -17453,7 +17453,7 @@ Before you send a reply to a "how should I line up against X" question, check it
     this.chatError = "", this.chatLoading = !0, this.saveChatHistory(t), this.$nextTick(() => this.scrollChatToBottom());
     const e = new AbortController();
     this._chatAbortController = e;
-    const s = [...this.chatMessages].reverse().find((r) => r.role === "user"), n = s ? Li(s.content).filter((r) => r.type === "text").map((r) => r.text).join(" ") : "", i = this._isLineupVsOpponentQuestion(n), o = setTimeout(() => e.abort(), i ? 11e4 : 9e4);
+    const s = [...this.chatMessages].reverse().find((r) => r.role === "user"), n = s ? Li(s.content).filter((r) => r.type === "text").map((r) => r.text).join(" ") : "", i = this._isLineupVsOpponentQuestion(n), o = setTimeout(() => e.abort(), i ? 24e4 : 9e4);
     try {
       const r = {
         context: this.buildChatContext(),

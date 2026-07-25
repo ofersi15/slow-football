@@ -79,18 +79,20 @@ const LINEUP_SCHEMA = {
   type: 'object',
   properties: {
     gw_status_note: { type: 'string', description: 'One sentence on whether the shown opponent submission is current/stale/future for this match, based on the GW status already computed in the context.' },
-    formation: { type: 'string', description: 'The recommended formation code, e.g. "4231".' },
+    formation: { type: 'string', minLength: 1, description: 'The recommended formation code, e.g. "4231".' },
     lineup: {
       // minItems/maxItems above 0/1 aren't supported by Claude's structured-outputs schema
       // subset ("complex array constraints") — the exact-11 count here is prompt-level guidance
       // only; what's schema-enforced is each item's shape, which is where the real bugs were.
+      // minItems:1 alone IS supported and forbids an empty array outright.
       type: 'array',
+      minItems: 1,
       description: 'Exactly 11 items — one per starting XI slot (GK, then 10 outfield slots for whichever formation is recommended).',
       items: {
         type: 'object',
         properties: {
-          slot: { type: 'string', description: 'e.g. GK, RB, CB, DM, RW, AM, CF' },
-          player: { type: 'string' },
+          slot: { type: 'string', minLength: 1, description: 'e.g. GK, RB, CB, DM, RW, AM, CF' },
+          player: { type: 'string', minLength: 1 },
           rating: { type: 'number', description: 'Their game-formula rating at this exact slot (own Rating if natural position, matching alt-position rating if not).' },
           fitness_pct: { type: 'number' },
           is_captain: { type: 'boolean' },
@@ -114,6 +116,11 @@ const LINEUP_SCHEMA = {
     },
     subs: {
       type: 'array',
+      // minItems:1 is the most this schema subset supports (comment above: anything above 0/1
+      // is rejected as an unsupported "complex array constraint") — it can't enforce exactly 5,
+      // but it does structurally forbid the empty-array failure mode seen in live testing (the
+      // model returning subs:[] , which is schema-valid with no minItems set at all).
+      minItems: 1,
       description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning". IMPORTANT: a sub\'s "plan" changes the team\'s overall mentality from that point on and persists until a later sub changes it again — it is not a description of that player. The 3 "any situation" subs should use the SAME plan as instructions.mentality (routine rotation shouldn\'t silently change the team\'s approach); only the "if winning" sub (step toward Defensive) and "if not winning" sub (step toward Attacking/Very Attacking) should actually change it.',
       items: {
         type: 'object',
@@ -135,8 +142,8 @@ const LINEUP_SCHEMA = {
             ],
           },
           plan: { enum: MENTALITY_ENUM },
-          player_in: { type: 'string' },
-          player_out: { type: 'string' },
+          player_in: { type: 'string', minLength: 1 },
+          player_out: { type: 'string', minLength: 1 },
         },
         required: ['timing', 'plan', 'player_in', 'player_out'],
         additionalProperties: false,
@@ -146,9 +153,14 @@ const LINEUP_SCHEMA = {
       type: 'object',
       description: 'Pick each taker by comparing the Penalties / Free kicks / Corners attributes (from the squad table) independently across the whole XI — these are three different specialties and usually different players.',
       properties: {
-        penalty: { type: 'string' }, penalty_rating: { type: 'number', description: "That player's Penalties attribute." },
-        freekick: { type: 'string' }, freekick_rating: { type: 'number', description: "That player's Free kicks attribute." },
-        corner: { type: 'string' }, corner_rating: { type: 'number', description: "That player's Corners attribute." },
+        // minLength rejects the exact empty-string garbage seen in live testing — a plain
+        // `type: 'string'` has no floor, so "" passed schema validation while being
+        // functionally broken content. (Anthropic's schema subset rejects `minimum` on
+        // number types outright — "not supported" — so the 0-rating case relies on the
+        // isLineupReplyBroken() runtime check + retry below instead.)
+        penalty: { type: 'string', minLength: 1 }, penalty_rating: { type: 'number', description: "That player's Penalties attribute." },
+        freekick: { type: 'string', minLength: 1 }, freekick_rating: { type: 'number', description: "That player's Free kicks attribute." },
+        corner: { type: 'string', minLength: 1 }, corner_rating: { type: 'number', description: "That player's Corners attribute." },
       },
       required: ['penalty', 'penalty_rating', 'freekick', 'freekick_rating', 'corner', 'corner_rating'], additionalProperties: false,
     },
@@ -280,8 +292,29 @@ async function handleChat(request, env, cors) {
     return { role: m.role, content };
   });
 
-  try {
-    const r = await fetch(ANTHROPIC_API, {
+  // 2026-07-25 live testing (5 real requests against a real squad/opponent): 3/5 came back
+  // broken even with a schema-valid response — stop_reason was "end_turn" every time (well
+  // under the 8500 token cap, so this was never max_tokens truncation), but the model twice
+  // returned subs:[] (empty array — nothing in the schema forbade it before minItems:1 was
+  // added above) and once returned genuinely corrupted trailing JSON (garbled text + a
+  // trailing comma) that failed JSON.parse outright. Schema hardening (minItems/minLength —
+  // Anthropic's schema subset rejects `minimum` on numbers outright, so a 0 rating can't be
+  // blocked at the schema level) should make the empty-array/blank-string case impossible
+  // going forward, but can't guarantee exactly 5 subs, catch a 0 rating, or rule out a
+  // decoding hiccup producing invalid JSON — so this also retries the whole request once,
+  // live, if the first attempt is detected as broken, rather than silently handing the user a
+  // half-empty reply.
+  function isLineupReplyBroken(parsed) {
+    if (!parsed || typeof parsed !== 'object') return true;
+    if (!Array.isArray(parsed.lineup) || parsed.lineup.length < 9) return true;
+    if (!Array.isArray(parsed.subs) || parsed.subs.length < 3) return true;
+    const sp = parsed.set_pieces;
+    if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
+    return false;
+  }
+
+  async function callAnthropic() {
+    return fetch(ANTHROPIC_API, {
       method: 'POST',
       headers: {
         'x-api-key': env.ANTHROPIC_API_KEY,
@@ -317,24 +350,39 @@ async function handleChat(request, env, cors) {
         thinking: { type: 'adaptive' },
       }),
     });
-    const data = await r.json();
-    if (!r.ok) {
-      console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
-      return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
-        { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
-    }
-    if (data.usage) {
-      console.log('[chat] usage:', JSON.stringify(data.usage), 'stop_reason:', data.stop_reason);
-    }
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    let reply = text;
-    if (lineupMode) {
-      // Format server-side into the same markdown look a free-text reply would have — the
-      // frontend needs no changes, it just stops seeing malformed mechanical fields. Fall back
-      // to the raw JSON text on a parse failure rather than erroring the whole request; a schema
-      // violation from the model itself is already a 400 caught above, so this only guards
-      // against something like a max_tokens cutoff mid-JSON.
-      try { reply = formatLineupReply(JSON.parse(text)); } catch (e) { console.error('[chat] lineup JSON parse failed:', e.message); }
+  }
+
+  try {
+    let data, text, parsed, reply;
+    const maxAttempts = lineupMode ? 2 : 1;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const r = await callAnthropic();
+      data = await r.json();
+      if (!r.ok) {
+        console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
+        return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
+          { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      if (data.usage) {
+        console.log('[chat] usage (attempt', attempt, '):', JSON.stringify(data.usage), 'stop_reason:', data.stop_reason);
+      }
+      text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+      reply = text;
+      if (!lineupMode) break;
+      parsed = null;
+      try { parsed = JSON.parse(text); } catch (e) { console.error('[chat] lineup JSON parse failed (attempt', attempt, '):', e.message); }
+      if (parsed && !isLineupReplyBroken(parsed)) {
+        reply = formatLineupReply(parsed);
+        break;
+      }
+      if (attempt === maxAttempts) {
+        // Out of retries — format whatever we've got (parsed) rather than erroring outright,
+        // or fall back to the raw JSON text if it never parsed at all.
+        console.error('[chat] lineup reply still broken after', attempt, 'attempt(s), returning best effort');
+        if (parsed) reply = formatLineupReply(parsed);
+      } else {
+        console.error('[chat] lineup reply broken on attempt', attempt, '— retrying');
+      }
     }
     return new Response(JSON.stringify({ reply, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch(e) {

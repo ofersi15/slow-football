@@ -559,11 +559,15 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     // pass before answering, not just lineupMode ones — 45s was tuned for the old
     // thinking-disabled config and was cutting off in-progress replies well before they
     // finished. Real testing this session regularly saw 60-90s for lineupMode (thinking +
-    // JSON schema generation), occasionally more — 110s leaves margin without waiting forever
-    // on a genuinely stuck request. Non-lineup messages still think but skip the schema, so
-    // they're typically faster; kept on a generous timeout too rather than a separate shorter
-    // one, since a false-positive abort is worse than a few extra seconds of patience.
-    const timeoutMs = lineupMode ? 110000 : 90000;
+    // JSON schema generation), occasionally more. 2026-07-25: the worker now retries the whole
+    // Anthropic call once, server-side, if the first structured-output attempt comes back
+    // broken (see the isLineupReplyBroken/maxAttempts logic in cf-worker/index.js) — a live
+    // test hit 101s on a single successful attempt, so two sequential attempts can plausibly
+    // approach 200s+. 240s leaves real margin for that worst case without waiting forever on a
+    // genuinely stuck request. Non-lineup messages never retry server-side, so they keep the
+    // shorter timeout — kept generous rather than tight either way, since a false-positive
+    // abort is worse than a few extra seconds of patience.
+    const timeoutMs = lineupMode ? 240000 : 90000;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const payload = {
