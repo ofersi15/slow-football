@@ -59,6 +59,170 @@ function sanitizeChatContent(content) {
   return blocks.map(sanitizeChatBlock).filter(Boolean).slice(0, MAX_CHAT_BLOCKS_PER_MESSAGE);
 }
 
+// JSON schema for "how should I line up against X" replies (see LINEUP_MODE below). Mechanical
+// fields (timing, delivery, scheme...) are enums matching the game's actual dropdown options —
+// scraped 2026-07-24 straight from the live submit-team-v2 JS bundle — so e.g. a sub timed
+// "any situation" paired with "if winning" (both seen in real replies before this) is now
+// structurally impossible, not just discouraged by prompt wording. The 5-mentality-value enum
+// backs both "instructions.mentality" and each sub's "plan", matching the real game where sub
+// plans are just the mentality scale, not a separate freeform field.
+const MENTALITY_ENUM = ['Very Defensive', 'Defensive', 'Balanced', 'Attacking', 'Very Attacking'];
+// Property order matters: two real tests showed the model filling everything correctly up to
+// a point, then degrading to literal "placeholder" text for whatever came after — always
+// starting right after the "instructions" object, regardless of remaining token budget. So (1)
+// the properties the app actually depends on being mechanically correct — lineup, instructions,
+// subs, set pieces, corner tactics — are all declared before any of the "nice to have" free-text
+// reasoning fields, and (2) every reasoning/overview field is optional (not in its object's
+// `required`), so a degraded generation can legitimately omit them instead of filling them with
+// garbage that passes schema validation. The formatter below already treats them as optional.
+const LINEUP_SCHEMA = {
+  type: 'object',
+  properties: {
+    gw_status_note: { type: 'string', description: 'One sentence on whether the shown opponent submission is current/stale/future for this match, based on the GW status already computed in the context.' },
+    formation: { type: 'string', description: 'The recommended formation code, e.g. "4231".' },
+    lineup: {
+      // minItems/maxItems above 0/1 aren't supported by Claude's structured-outputs schema
+      // subset ("complex array constraints") — the exact-11 count here is prompt-level guidance
+      // only; what's schema-enforced is each item's shape, which is where the real bugs were.
+      type: 'array',
+      description: 'Exactly 11 items — one per starting XI slot (GK, then 10 outfield slots for whichever formation is recommended).',
+      items: {
+        type: 'object',
+        properties: {
+          slot: { type: 'string', description: 'e.g. GK, RB, CB, DM, RW, AM, CF' },
+          player: { type: 'string' },
+          rating: { type: 'number', description: 'Their game-formula rating at this exact slot (own Rating if natural position, matching alt-position rating if not).' },
+          fitness_pct: { type: 'number' },
+          is_captain: { type: 'boolean' },
+        },
+        required: ['slot', 'player', 'rating', 'fitness_pct', 'is_captain'],
+        additionalProperties: false,
+      },
+    },
+    instructions: {
+      type: 'object',
+      properties: {
+        mentality: { enum: MENTALITY_ENUM },
+        style: { enum: ['Short', 'Mixed', 'Direct'] },
+        structure: { enum: ['Fluid', 'Balanced', 'Rigid'] },
+        defensive_line: { enum: ['Deep', 'Low', 'Medium', 'High'] },
+        attacking_focus: { enum: ['Left', 'Right', 'Central', 'Mixed'] },
+        pressing: { enum: ['High Press', 'Mid-Block', 'Low Block', 'Counter Press'] },
+      },
+      required: ['mentality', 'style', 'structure', 'defensive_line', 'attacking_focus', 'pressing'],
+      additionalProperties: false,
+    },
+    subs: {
+      type: 'array',
+      description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning".',
+      items: {
+        type: 'object',
+        properties: {
+          // Only the Half-time window offers "if losing" — the other 3 windows are winning /
+          // not-winning / any-situation only. This mirrors $5e in the real submit-team-v2 bundle.
+          timing: {
+            anyOf: [
+              {
+                type: 'object',
+                properties: { window: { const: 'Half-time' }, condition: { enum: ['any situation', 'if losing', 'if winning', 'if not winning'] } },
+                required: ['window', 'condition'], additionalProperties: false,
+              },
+              {
+                type: 'object',
+                properties: { window: { enum: ["46-60'", "61-75'", "76'-"] }, condition: { enum: ['any situation', 'if winning', 'if not winning'] } },
+                required: ['window', 'condition'], additionalProperties: false,
+              },
+            ],
+          },
+          plan: { enum: MENTALITY_ENUM },
+          player_in: { type: 'string' },
+          player_out: { type: 'string' },
+        },
+        required: ['timing', 'plan', 'player_in', 'player_out'],
+        additionalProperties: false,
+      },
+    },
+    set_pieces: {
+      type: 'object',
+      properties: { penalty: { type: 'string' }, freekick: { type: 'string' }, corner: { type: 'string' } },
+      required: ['penalty', 'freekick', 'corner'], additionalProperties: false,
+    },
+    corner_tactics: {
+      type: 'object',
+      properties: {
+        attacking_delivery: { enum: ['Inswinger', 'Outswinger', 'Driven', 'Short Corner'] },
+        attacking_stay_back: { enum: [1, 2] },
+        defensive_scheme: { enum: ['Zonal', 'Man-to-Man', 'Hybrid'] },
+        defensive_press: { enum: ['Hold Shape', 'Press Taker'] },
+      },
+      required: ['attacking_delivery', 'attacking_stay_back', 'defensive_scheme', 'defensive_press'],
+      additionalProperties: false,
+    },
+    // Everything below is free-text reasoning — optional (not in top-level `required`), the
+    // part most likely to degrade under pressure, and least harmful to lose since the mechanical
+    // decision it explains is already locked in above regardless.
+    opponent_breakdown: { type: 'string', description: '2-4 sentences on how the opponent sets up and plays, including at least one specific personnel matchup (e.g. "my RW vs their LB") — not a generic strengths/weaknesses list.' },
+    lineup_reasoning: { type: 'string', description: 'Plain-language paragraph on fitness/condition tradeoffs and any off-natural-position calls, citing both rating numbers for any such call. Never use the literal term "AltPosFit".' },
+    instructions_reasoning: { type: 'string', description: 'One short paragraph covering the reasoning for all 6 instructions together, tied to the specific opponent matchup identified in the breakdown — not generic justification.' },
+    subs_overview: { type: 'string', description: 'Brief note on the overall substitution strategy for this match — why this split of timings/plans.' },
+    corner_reasoning: { type: 'string', description: 'Only if the opponent setup gives a clear signal to react to — otherwise omit this field entirely rather than writing a generic filler sentence.' },
+  },
+  required: ['gw_status_note', 'formation', 'lineup', 'instructions', 'subs', 'set_pieces', 'corner_tactics'],
+  additionalProperties: false,
+};
+
+// Deterministic JSON -> the same 6-section markdown look the app already renders, so the
+// schema's mechanical guarantees are invisible to the user — they just stop seeing malformed
+// sub timing / dropped corner sections. Defensive against a field being missing/wrong-typed
+// (a schema violation from the model is a 400 before this ever runs, but individual field
+// oddities aren't schema-enforced, e.g. an empty string) — every interpolation has a fallback.
+// A free-text reasoning field passing schema validation with literal filler content (seen in
+// testing: "placeholder") is a real failure mode schema types alone don't catch — this is the
+// last line of defense so it never reaches the user. Mechanical fields (enums, numbers) aren't
+// checked here since an enum literally can't be "placeholder".
+const PLACEHOLDER_RE = /^\s*(placeholder|tbd|n\/?a|todo|xxx?)\s*\.?\s*$/i;
+const cleanText = (s) => (typeof s === 'string' && !PLACEHOLDER_RE.test(s)) ? s : '';
+
+function formatLineupReply(d) {
+  const lines = [];
+  if (cleanText(d.gw_status_note)) lines.push(cleanText(d.gw_status_note), '');
+  const breakdown = cleanText(d.opponent_breakdown);
+  if (breakdown) lines.push('**Opponent breakdown**', breakdown, '');
+  lines.push(`**Recommended lineup — ${d.formation || '?'}**`);
+  (d.lineup || []).forEach(p => {
+    const capt = p.is_captain ? ' (C)' : '';
+    lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}`);
+  });
+  const lineupReasoning = cleanText(d.lineup_reasoning);
+  if (lineupReasoning) lines.push('', lineupReasoning);
+  const ins = d.instructions || {};
+  lines.push('', '**Match instructions**');
+  [['Mentality', 'mentality'], ['Style', 'style'], ['Structure', 'structure'], ['Defensive Line', 'defensive_line'], ['Attacking Focus', 'attacking_focus'], ['Pressing', 'pressing']].forEach(([label, key]) => {
+    lines.push(`${label}: ${ins[key] || '?'}`);
+  });
+  const instrReasoning = cleanText(d.instructions_reasoning);
+  if (instrReasoning) lines.push('', instrReasoning);
+  lines.push('', '**Substitutions**');
+  const subsOverview = cleanText(d.subs_overview);
+  if (subsOverview) lines.push(subsOverview, '');
+  (d.subs || []).forEach(s => {
+    const t = s.timing || {};
+    lines.push(`${t.window || '?'} (${t.condition || '?'}) — ${s.player_in || '?'} IN for ${s.player_out || '?'} (${s.plan || '?'})`);
+  });
+  const sp = d.set_pieces || {};
+  lines.push('', '**Set pieces**');
+  lines.push(`Penalty: ${cleanText(sp.penalty) || '?'}`, `Free-kick: ${cleanText(sp.freekick) || '?'}`, `Corner: ${cleanText(sp.corner) || '?'}`);
+  const ct = d.corner_tactics || {};
+  lines.push('', '**Corner tactics**');
+  lines.push(`Attacking corner — Delivery: ${ct.attacking_delivery || '?'}`);
+  lines.push(`Attacking corner — Stay Back: ${ct.attacking_stay_back ?? '?'}`);
+  lines.push(`Defensive corner — Scheme: ${ct.defensive_scheme || '?'}`);
+  lines.push(`Defensive corner — Press: ${ct.defensive_press || '?'}`);
+  const cornerReasoning = cleanText(d.corner_reasoning);
+  if (cornerReasoning) lines.push(cornerReasoning);
+  return lines.join('\n');
+}
+
 // Proxies chat messages to the Claude API server-side (keeps ANTHROPIC_API_KEY off the client).
 async function handleChat(request, env, cors) {
   if (!env.ANTHROPIC_API_KEY) {
@@ -80,6 +244,11 @@ async function handleChat(request, env, cors) {
         .filter(m => m.content.length)
     : [];
   const context = typeof body.context === 'string' ? body.context.slice(0, 120000) : '';
+  // Client-detected "how should I line up against X" question (see _isLineupVsOpponentQuestion
+  // in assistant.js) — routes to JSON-schema-constrained output so mechanical fields (sub
+  // timing, corner delivery, etc.) can't come back malformed, instead of just being asked to
+  // format them correctly in free text. Every other question type is unaffected.
+  const lineupMode = body.lineupMode === true;
   if (!messages.length) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
@@ -110,10 +279,21 @@ async function handleChat(request, env, cors) {
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        max_tokens: 6500,
+        // lineupMode gets extra headroom for JSON's structural overhead (repeated keys, quotes)
+        // on top of the same content a free-text reply would carry.
+        max_tokens: lineupMode ? 8500 : 6500,
         system,
         messages: cachedMessages,
-        output_config: { effort: 'low' },
+        // EXPERIMENT: the original per-field schema (6 instruction reasons + 5 sub reasons) at
+        // effort 'low' produced schema-valid but garbage content in several required fields —
+        // literal "placeholder" strings. Tried effort 'medium' next: thinking ballooned to ~7950
+        // of the 8500 token budget, truncating the JSON entirely — too expensive to be the fix.
+        // Testing whether the schema consolidation above (one instructions_reasoning paragraph,
+        // one subs_plan.overview, instead of ~13 separate required prose fields) resolves the
+        // placeholder problem on its own back at the cheaper 'low' effort.
+        output_config: lineupMode
+          ? { effort: 'low', format: { type: 'json_schema', schema: LINEUP_SCHEMA } }
+          : { effort: 'low' },
         // Adaptive thinking, re-enabled 2026-07-24 — verified directly this fixes the precision
         // failures seen with thinking disabled (self-contradictory sub timing, visible "actually
         // check: ..." scratch-work leaking into the reply, incomplete attribute cross-checks):
@@ -122,6 +302,7 @@ async function handleChat(request, env, cors) {
         // visible-reply tokens (~4000 total) for a full 6-section lineup reply — 6500 leaves
         // headroom without being wasteful. budget_tokens is removed on claude-sonnet-5 (400s
         // if sent) — adaptive is the only on-mode, depth is tuned via output_config.effort.
+        // Structured outputs (lineupMode) are documented as compatible with thinking.
         thinking: { type: 'adaptive' },
       }),
     });
@@ -135,7 +316,16 @@ async function handleChat(request, env, cors) {
       console.log('[chat] usage:', JSON.stringify(data.usage), 'stop_reason:', data.stop_reason);
     }
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    return new Response(JSON.stringify({ reply: text, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    let reply = text;
+    if (lineupMode) {
+      // Format server-side into the same markdown look a free-text reply would have — the
+      // frontend needs no changes, it just stops seeing malformed mechanical fields. Fall back
+      // to the raw JSON text on a parse failure rather than erroring the whole request; a schema
+      // violation from the model itself is already a 400 caught above, so this only guards
+      // against something like a max_tokens cutoff mid-JSON.
+      try { reply = formatLineupReply(JSON.parse(text)); } catch (e) { console.error('[chat] lineup JSON parse failed:', e.message); }
+    }
+    return new Response(JSON.stringify({ reply, usage: data.usage || null }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch(e) {
     console.error('[chat] request failed:', e.message);
     return new Response(JSON.stringify({ error: 'Request failed: ' + e.message }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });

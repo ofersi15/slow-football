@@ -519,6 +519,17 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
   },
   // Shared by sendChatMessage (after the new user turn) and regenerateLastResponse (after
   // popping the old reply) — both just need "ask for the next assistant message and handle it".
+  // Heuristic, not an LLM call: cheap client-side check for "how should I line up against X"
+  // style questions, so the worker can request JSON-schema-constrained output (guaranteed-valid
+  // sub timing, corner fields, etc.) only for this question type — every other kind of question
+  // (transfers, scouting, general squad talk) keeps the normal free-form reply.
+  _isLineupVsOpponentQuestion(text) {
+    const t = (text || '').toLowerCase();
+    if (!/\b(line[\s-]?up|starting xi|predicted xi|team news)\b/.test(t)) return false;
+    if (!/\b(against|vs\.?|versus)\b/.test(t)) return false;
+    const clubs = new Set((this.allPlayers || []).map(p => p.Club).filter(Boolean));
+    return [...clubs].some(c => c && c !== MY_CLUB && t.includes(c.toLowerCase()));
+  },
   async _requestAssistantReply(sessionId) {
     this.chatError = '';
     this.chatLoading = true;
@@ -529,8 +540,13 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     this._chatAbortController = controller;
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     try {
+      const lastUserMsg = [...this.chatMessages].reverse().find(m => m.role === 'user');
+      const lastUserText = lastUserMsg
+        ? blocksOf(lastUserMsg.content).filter(b => b.type === 'text').map(b => b.text).join(' ')
+        : '';
       const payload = {
         context: this.buildChatContext(),
+        lineupMode: this._isLineupVsOpponentQuestion(lastUserText),
         messages: this.chatMessages
           .filter(m => m.role === 'user' || m.role === 'assistant')
           .map(m => ({ role: m.role, content: m.content })),
