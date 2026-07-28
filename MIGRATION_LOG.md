@@ -1,7 +1,7 @@
 # Refactor Migration Log — ARCHIVED
 
 Migration complete as of 2026-05-01. Do not update this file.
-Current architecture is documented in SESSION_CONTEXT.md and CLAUDE.md.
+Current architecture is documented in CLAUDE.md.
 
 ## Phase A — Extract utilities ✅
 - [DONE] src/constants.js, src/utils.js, src/cache.js extracted from app.js

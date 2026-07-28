@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'cf-worker/index.js'
+      - 'cf-worker/wrangler.toml'
 
 jobs:
   deploy:
