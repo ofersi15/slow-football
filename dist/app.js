@@ -18673,6 +18673,48 @@ Ko({
     fmtWage: yC,
     fmtDiff: bC,
     renderMarkdown: mC,
+    async clearSiteDataAndReload() {
+      try {
+        localStorage.clear();
+      } catch {
+      }
+      try {
+        sessionStorage.clear();
+      } catch {
+      }
+      try {
+        document.cookie.split(";").forEach((t) => {
+          const e = t.split("=")[0].trim();
+          e && (document.cookie = e + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/");
+        });
+      } catch {
+      }
+      try {
+        if ("caches" in window) {
+          const t = await caches.keys();
+          await Promise.all(t.map((e) => caches.delete(e)));
+        }
+      } catch {
+      }
+      try {
+        if ("indexedDB" in window && indexedDB.databases) {
+          const t = await indexedDB.databases();
+          await Promise.all(t.map((e) => e.name && new Promise((s) => {
+            const n = indexedDB.deleteDatabase(e.name);
+            n.onsuccess = n.onerror = n.onblocked = s;
+          })));
+        }
+      } catch {
+      }
+      try {
+        if ("serviceWorker" in navigator) {
+          const t = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(t.map((e) => e.unregister()));
+        }
+      } catch {
+      }
+      location.reload();
+    },
     ratingClass(t) {
       return t ? t >= 84 ? "rating-high" : t >= 77 ? "rating-mid" : "rating-low" : "c-gray";
     },

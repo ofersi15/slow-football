@@ -331,6 +331,41 @@ createApp({
     ...helperMethods,
     ...assistantMethods,
     fmtVal,fmtWage,fmtDiff,renderMarkdown,
+    async clearSiteDataAndReload() {
+      // Best-effort wipe of everything JS is allowed to touch for this origin —
+      // mirrors what Chrome's "Clear cookies and site data" does, which fixes
+      // the case where a full/corrupted storage quota makes localStorage writes fail silently.
+      try { localStorage.clear(); } catch(e) {}
+      try { sessionStorage.clear(); } catch(e) {}
+      try {
+        document.cookie.split(';').forEach(c => {
+          const name = c.split('=')[0].trim();
+          if (name) document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+        });
+      } catch(e) {}
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch(e) {}
+      try {
+        if ('indexedDB' in window && indexedDB.databases) {
+          const dbs = await indexedDB.databases();
+          await Promise.all(dbs.map(db => db.name && new Promise(res => {
+            const req = indexedDB.deleteDatabase(db.name);
+            req.onsuccess = req.onerror = req.onblocked = res;
+          })));
+        }
+      } catch(e) {}
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+      } catch(e) {}
+      location.reload();
+    },
     ratingClass(r) { if(!r) return 'c-gray'; return r>=84?'rating-high':r>=77?'rating-mid':'rating-low'; },
     attrBarColor(v) { return (v||0)>=80?'#7ee787':(v||0)>=65?'#ffa657':'#ff7b72'; },
     isKeyAttr(attrKey, position) { const pos=this.highlightedPos||position; const a=GAME_ATTRS[pos]; return a?a.includes(attrKey):false; },
