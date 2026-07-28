@@ -123,6 +123,11 @@ tr.clickable:hover td.scout-sticky{background:#1c2128}
 .modal-close{position:absolute;top:6px;right:8px;background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;line-height:1;padding:8px}
 /* Pitch + subs: mobile stack */
 .pitch-detail-row{display:flex;gap:12px;align-items:flex-start}
+/* Squad table + set-pieces panel inside a club's Latest XI view */
+.club-squad-panels-row{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.club-setpieces-panel{width:280px;flex-shrink:0}
+/* Generic 2-col grid that collapses to 1 col on mobile (saved lineup, modal attr/chemistry panes) */
+.stack-mobile-grid{display:grid;grid-template-columns:1fr 1fr}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:#161b22}::-webkit-scrollbar-thumb{background:#30363d;border-radius:3px}
 @media(max-width:768px){
   .layout{height:auto;min-height:100vh;overflow:auto}
@@ -141,6 +146,9 @@ tr.clickable:hover td.scout-sticky{background:#1c2128}
   .mobile-filter-btn{display:flex;align-items:center;gap:6px;min-height:40px}
   .pitch-detail-row{flex-direction:column}
   .clubs-grid{grid-template-columns:1fr}
+  .club-squad-panels-row{flex-direction:column}
+  .club-setpieces-panel{width:100%}
+  .stack-mobile-grid{grid-template-columns:1fr}
   .mb-sub-bar{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .assistant-dock{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;min-width:0;z-index:50;border-left:none}
   .assistant-sidebar.expanded{position:fixed;top:0;left:0;bottom:0;width:80vw;max-width:280px;z-index:60;box-shadow:2px 0 16px rgba(0,0,0,.5)}

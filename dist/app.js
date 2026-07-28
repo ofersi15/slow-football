@@ -18256,7 +18256,9 @@ Ko({
       posRatingUseWeighted: !1,
       // filter by weighted rating instead of game rating
       posRatingsOpen: !1,
-      scoutFiltersOpen: !0,
+      // Filters panel stacks above the table on mobile (not a side column), so default it
+      // closed on narrow screens or it fills the whole viewport before the player table.
+      scoutFiltersOpen: typeof window > "u" || window.innerWidth > 768,
       // Stats enrichment state
       statsEnriching: !1,
       statsProgress: 0,

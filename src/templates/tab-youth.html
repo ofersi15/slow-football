@@ -219,7 +219,7 @@
           <!-- Show my club's own history while waiting -->
           <div v-if="youthRejected.length">
             <div style="font-size:11px;color:#8b949e;margin-bottom:6px">My scouts ({{youthRejected.length}}) — load league history for all clubs</div>
-            <div class="card" style="padding:0;overflow:hidden">
+            <div class="card" style="padding:0;overflow-x:auto">
               <table>
                 <thead><tr style="cursor:pointer">
                   <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th><th @click="youthSortBy('pos')">Pos{{youthSortIcon('pos')}}</th><th @click="youthSortBy('age')">Age{{youthSortIcon('age')}}</th><th @click="youthSortBy('bestpos')">Best Pos{{youthSortIcon('bestpos')}}</th><th @click="youthSortBy('value')">Value{{youthSortIcon('value')}}</th><th @click="youthSortBy('buyNow')">Buy Now{{youthSortIcon('buyNow')}}</th><th @click="youthSortBy('men')">Men{{youthSortIcon('men')}}</th><th @click="youthSortBy('wr')">WR{{youthSortIcon('wr')}}</th><th @click="youthSortBy('potential')">Potential{{youthSortIcon('potential')}}</th><th @click="youthSortBy('date')">Scouted{{youthSortIcon('date')}}</th><th @click="youthSortBy('status')">Status{{youthSortIcon('status')}}</th><th></th>
@@ -289,7 +289,7 @@
           </div>
 
           <!-- History table (uses pre-computed fields, paginated) -->
-          <div class="card" style="padding:0;overflow:hidden">
+          <div class="card" style="padding:0;overflow-x:auto">
             <table>
               <thead><tr style="cursor:pointer">
                 <th @click="youthSortBy('name')">Player{{youthSortIcon('name')}}</th>
