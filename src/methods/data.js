@@ -1,4 +1,4 @@
-import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, OUTFIELD_POSITIONS } from '../constants.js'
+import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, OUTFIELD_POSITIONS } from '../constants.js'
 import { parseAsync, stringifyAsync, serverCacheGet, serverCacheSet, serverCacheDelete } from '../cache.js'
 import { calcGameRating, calcWeightedRating, calcEstValue, fmtVal } from '../utils.js'
 
@@ -116,7 +116,6 @@ export const dataMethods = {
             this.playersCacheDate = new Date(ts).toLocaleDateString();
             this.progress = 100; this.loaded = true;
             this.buildBookmarklet();
-            this.checkTacticsCache();
             const stale = (Date.now()-ts) > PLAYERS_CACHE_TTL;
             if (stale) {
               this.playersRefreshing = true;
@@ -140,14 +139,6 @@ export const dataMethods = {
       } catch(e) { console.warn('Cache read failed:', e); }
       // No cache — full foreground fetch
       await this.fetchFreshData(true);
-    },
-
-    async checkTacticsCache() {
-      try {
-        let cached = await serverCacheGet(TACTICS_CACHE_KEY);
-        if (!cached) cached = localStorage.getItem(TACTICS_CACHE_KEY);
-        if (cached) { const {ts}=JSON.parse(cached); this.tacticsCacheDate=new Date(ts).toLocaleDateString(); }
-      } catch(e){}
     },
 
     clearPlayersCache() {
@@ -495,7 +486,7 @@ export const dataMethods = {
         this.allPlayers=players;
         this.playersCacheDate=new Date().toLocaleDateString();
         this.playersRefreshing=false;
-        if (foreground) { this.progress=100; this.loadMsg='Done!'; this.loaded=true; this.buildBookmarklet(); this.checkTacticsCache(); }
+        if (foreground) { this.progress=100; this.loadMsg='Done!'; this.loaded=true; this.buildBookmarklet(); }
         // Kick off stats enrichment after squads loaded
         setTimeout(() => this.enrichStats(), 800);
         // Pre-warm other tabs in background so they load instantly when opened
@@ -569,159 +560,4 @@ export const dataMethods = {
       }
     },
 
-    async loadTactics(forceRefresh=false) {
-      // Try cache first (KV then localStorage fallback)
-      if (!forceRefresh) {
-        try {
-          let cached = await serverCacheGet(TACTICS_CACHE_KEY);
-          if (!cached) cached = localStorage.getItem(TACTICS_CACHE_KEY);
-          if (cached) {
-            const {data,ts}=JSON.parse(cached);
-            if (Date.now()-ts < TACTICS_CACHE_TTL) {
-              this.tacticsData=data;
-              this.tacticsCacheDate=new Date(ts).toLocaleDateString();
-              this.tacticsLoaded=true; return;
-            }
-          }
-        } catch(e){}
-      }
-
-      this.tacticsLoading=true; this.tacticsLoaded=false;
-
-      // Step 1: collect fixture IDs
-      this.tacticsMsg='Collecting fixture IDs…'; this.tacticsProgress=2;
-      const clubsRes=await fetch(`${API}/admin/squads/public/clubs`).then(r=>r.json());
-      const clubs=clubsRes.clubs;
-      const fixtureIds=new Set();
-
-      for (let i=0; i<clubs.length; i++) {
-        this.tacticsMsg=`Collecting fixtures… ${i+1}/${clubs.length}`;
-        this.tacticsProgress=Math.round(10*(i+1)/clubs.length);
-        try {
-          const d=await fetch(`${API}/matches?club=${encodeURIComponent(clubs[i])}&limit=8`).then(r=>r.json());
-          (d.matches||[]).forEach(m=>fixtureIds.add(m.fixtureId));
-        } catch(e){}
-        await new Promise(r=>setTimeout(r,60));
-      }
-
-      // Step 2: fetch each individual match report
-      const ids=[...fixtureIds];
-      const fmRe=/\b(\d-\d[-\d]*)\b/;
-      const byFormation={}, byStyle={};
-      const myClubForms={}, myClubStyles={}, myClubRecord={W:0,D:0,L:0,n:0,gf:0,ga:0};
-      let withFormation=0, totalMatches=0;
-
-      // Normalise a raw style keyword to a game-canonical label
-      const normaliseStyle = raw => {
-        const r = raw.toLowerCase();
-        if (r.includes('tiki')) return 'Tiki-taka';
-        if (r.includes('counter')) return 'Counter';
-        if (r.includes('relentless') || r.includes('press')) return 'Pressing';
-        if (r.includes('direct')) return 'Direct';
-        if (r.includes('attack')) return 'Attacking';
-        if (r.includes('defen')) return 'Defensive';
-        if (r.includes('fluid')) return 'Fluid';
-        if (r.includes('rigid')) return 'Rigid';
-        return r.charAt(0).toUpperCase() + r.slice(1);
-      };
-
-      for (let i=0; i<ids.length; i++) {
-        this.tacticsProgress=10+Math.round(88*(i+1)/ids.length);
-        this.tacticsMsg=`Analysing match reports… ${i+1}/${ids.length}`;
-        try {
-          const d=await fetch(`${API}/matches/${ids[i]}`).then(r=>r.json());
-          const m=d.match; if (!m) continue;
-          totalMatches++;
-          const events=m.events||[];
-          const homeClub=m.home?.club, awayClub=m.away?.club;
-
-          [{side:'home',club:homeClub},{side:'away',club:awayClub}].forEach(({side,club})=>{
-            if (!club) return;
-            const preEvents=events.filter(e=>e.minute===0&&e.type==='other'&&e.team===club);
-            let formation=null, style=null;
-            const narrative=(m.reportNarrative||[]).slice(0,3).join(' ');
-
-            for (const e of preEvents) {
-              const desc=e.description||'';
-              // Match game's actual tactic labels + common narrative equivalents
-              const sm=desc.match(/tiki[- ]?taka|counter[- ]?attack|\b(attacking|defensive|balanced|fluid|rigid|direct|pressing|relentless|compact|aggressive)\b/i);
-              if (sm) style=normaliseStyle(sm[0]);
-              if (desc.toLowerCase().includes(' in ')) {
-                const fm=desc.match(fmRe);
-                if (fm) {
-                  const parts=fm[1].split('-').map(Number);
-                  if (parts.length>=2&&parts.reduce((a,b)=>a+b,0)>=9) { formation=fm[1]; break; }
-                }
-              }
-            }
-
-            if (!formation) {
-              const narClub=narrative.toLowerCase();
-              if (narClub.includes(club.toLowerCase())) {
-                const nm=narrative.match(/lined up[^.]*?(\d-\d[-\d]*)/i)||narrative.match(/in (?:an? )?[\w ]+?(\d-\d[-\d]*)/i);
-                if (nm) { const parts=nm[1].split('-').map(Number); if (parts.reduce((a,b)=>a+b,0)>=9) formation=nm[1]; }
-              }
-            }
-
-            if (!formation) return;
-            withFormation++;
-            const isHome=side==='home';
-            const gf=isHome?(m.score?.home||0):(m.score?.away||0);
-            const ga=isHome?(m.score?.away||0):(m.score?.home||0);
-            const result=gf>ga?'W':gf<ga?'L':'D';
-
-            // Formation stats
-            if (!byFormation[formation]) byFormation[formation]={formation,W:0,D:0,L:0,gf:0,ga:0,n:0,styles:{}};
-            byFormation[formation][result]++;
-            byFormation[formation].gf+=gf; byFormation[formation].ga+=ga; byFormation[formation].n++;
-            if (style) byFormation[formation].styles[style]=(byFormation[formation].styles[style]||0)+1;
-
-            // Style stats (independent of formation)
-            if (style) {
-              if (!byStyle[style]) byStyle[style]={style,W:0,D:0,L:0,gf:0,ga:0,n:0};
-              byStyle[style][result]++; byStyle[style].gf+=gf; byStyle[style].ga+=ga; byStyle[style].n++;
-            }
-
-            // My club's own data
-            if (club===MY_CLUB) {
-              if (!myClubForms[formation]) myClubForms[formation]={W:0,D:0,L:0,gf:0,ga:0,n:0};
-              myClubForms[formation][result]++; myClubForms[formation].gf+=gf; myClubForms[formation].ga+=ga; myClubForms[formation].n++;
-              myClubRecord[result]++; myClubRecord.gf+=gf; myClubRecord.ga+=ga; myClubRecord.n++;
-              if (style) myClubStyles[style]=(myClubStyles[style]||0)+1;
-            }
-          });
-        } catch(e){}
-        await new Promise(r=>setTimeout(r,60));
-      }
-
-      const formations=Object.values(byFormation)
-        .filter(f=>f.n>=2)
-        .map(f=>{
-          const topStyle=Object.entries(f.styles).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
-          return {...f,topStyle,winPct:Math.round(100*f.W/f.n),ppg:((f.W*3+f.D)/f.n).toFixed(2),avgGF:(f.gf/f.n).toFixed(2),avgGA:(f.ga/f.n).toFixed(2)};
-        })
-        .sort((a,b)=>b.n-a.n);
-
-      const styles=Object.values(byStyle)
-        .filter(s=>s.n>=3)
-        .map(s=>({...s,winPct:Math.round(100*s.W/s.n),ppg:((s.W*3+s.D)/s.n).toFixed(2),avgGF:(s.gf/s.n).toFixed(2),avgGA:(s.ga/s.n).toFixed(2)}))
-        .sort((a,b)=>b.n-a.n);
-
-      const myClubData = myClubRecord.n > 0 ? {
-        record: myClubRecord,
-        forms: Object.entries(myClubForms).sort((a,b)=>b[1].n-a[1].n).map(([f,v])=>({formation:f,...v,winPct:Math.round(100*v.W/v.n)})),
-        topStyle: Object.entries(myClubStyles).sort((a,b)=>b[1]-a[1])[0]?.[0] || null,
-        styleBreakdown: myClubStyles,
-      } : null;
-
-      const data={totalMatches,fixturesAnalysed:ids.length,withFormation,formations,styles,myClubData};
-      this.tacticsData=data;
-      const ts=Date.now();
-      this.tacticsCacheDate=new Date(ts).toLocaleDateString();
-      const tacticsStr = JSON.stringify({data,ts});
-      serverCacheSet(TACTICS_CACHE_KEY, tacticsStr);
-      try { localStorage.setItem(TACTICS_CACHE_KEY, tacticsStr); } catch(e){}
-      this.tacticsMsg='Done!'; this.tacticsProgress=100;
-      this.tacticsLoading=false; this.tacticsLoaded=true;
-    },
 }

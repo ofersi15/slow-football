@@ -1,6 +1,6 @@
 import { createApp, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
-import { API, MY_CLUB, PROXY_TOKEN_URL, ALL_LEAGUES, AI_CLUBS, ALL_POSITIONS, OUTFIELD_POSITIONS, PAGE_SIZE, TACTICS_CACHE_KEY, TACTICS_CACHE_TTL, PLAYERS_CACHE_KEY, STATS_CACHE_KEY, PLAYERS_CACHE_TTL, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY, GAME_ATTRS, GAME_ATTR_LABELS, FORMATIONS, FORMATION_SLOT_POS, POS_ORDER, POS_COLORS, SLOT_COMPAT, SLOT_ATTRS, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, GAME_START, WEEK_MS } from './src/constants.js'
+import { API, MY_CLUB, PROXY_TOKEN_URL, ALL_LEAGUES, AI_CLUBS, ALL_POSITIONS, OUTFIELD_POSITIONS, PAGE_SIZE, PLAYERS_CACHE_KEY, STATS_CACHE_KEY, PLAYERS_CACHE_TTL, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY, GAME_ATTRS, GAME_ATTR_LABELS, FORMATIONS, FORMATION_SLOT_POS, POS_ORDER, POS_COLORS, SLOT_COMPAT, SLOT_ATTRS, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, GAME_START, WEEK_MS } from './src/constants.js'
 import { calcGameRating, calcWeightedRating, calcEstValue, fmtVal, fmtWage, fmtDiff, gameWeekNow, playerArrivalWeeks, computeTraits, computeBonds, computeClubChem, computeDislikes, renderMarkdown } from './src/utils.js'
 import { parseAsync, stringifyAsync, getAuthToken, authHeaders, SF_CACHE_BASE, SF_WORKER_BASE, serverCacheGet, serverCacheSet, serverCacheDelete } from './src/cache.js'
 import { youthMethods } from './src/methods/youth.js'
@@ -67,8 +67,6 @@ createApp({
       ],
       activeChartDef: {title:'',desc:'',listLabel:'',listFmt:()=>'',listColor:'#ffa657'},
       charts: {},
-      tacticsLoaded: false, tacticsLoading: false, tacticsProgress: 0, tacticsMsg: '',
-      tacticsData: null, tacticsCacheDate: null,
       // Youth tab state
       youthLoaded: false, youthLoading: false, youthMsg: '',
       youthCap: {}, youthScouts: [], youthAcademy: [], youthFacilities: {}, youthStaff: {},
@@ -286,11 +284,6 @@ createApp({
       if (newVal==='top-lists') return;
       await nextTick();
       this.drawMoneyballChart(newVal);
-    },
-    async tacticsLoaded(v) {
-      if (!v) return;
-      await nextTick();
-      this.drawTacticsCharts();
     },
     activeTab: {
       immediate: true,
