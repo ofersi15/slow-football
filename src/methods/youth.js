@@ -208,18 +208,6 @@ export const youthMethods = {
       job._refreshing = false;
     },
 
-    // ── All-clubs history methods ──
-    youthClubMaxRating(club) {
-      const jobs = this.youthAllHistoryJobs.filter(j=>j._club===club);
-      if (!jobs.length) return 0;
-      return Math.max(...jobs.map(j=>j.player?.rating||0));
-    },
-    youthClubAvgRating(club) {
-      const jobs = this.youthAllHistoryJobs.filter(j=>j._club===club&&j.player?.rating);
-      if (!jobs.length) return 0;
-      return jobs.reduce((s,j)=>s+(j.player.rating||0),0)/jobs.length;
-    },
-
     async loadYouthHistory(forceRefresh=false) {
       const HIST_CACHE_KEY = 'sf_youth_hist_v2';
       const HIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -370,41 +358,6 @@ export const youthMethods = {
         medical:  {1:"A magic sponge. Better be pretty bloody magical...",2:"Tape, ice, and a rolly table in a cupboard.",3:"Dedicated room with ultrasound and rehab kit.",4:"Sports science staff and protocols.",5:"Full sports medicine suite and monitoring."},
       };
       return jk[key]?.[lv] || '';
-    },
-    facBonus(key, level) {
-      const lv = Math.max(1, Math.min(5, level || 1));
-      if (key === 'training') {
-        const xpCap = Math.round((1 + 0.2*(lv-1) - 1)*100);
-        const capStr = xpCap === 0 ? 'No XP cap bonus' : `Up to +${xpCap}% XP cap`;
-        return `${capStr} · live XP & fatigue recovery rates shown below`;
-      }
-      if (key === 'scouting') {
-        const slots = 3 + (lv >= 5 ? 2 : lv >= 4 ? 1 : 0);
-        const qualityBump = lv >= 5 ? 2 : lv >= 3 ? 1 : 0;
-        const speedPct = lv * 5;
-        return `${slots} active scout slots · +${qualityBump} quality boost · +${speedPct}% scouting speed`;
-      }
-      if (key === 'academy') {
-        const o = lv - 1;
-        const i = 0.03 + 0.01*o, a = 0.12 + 0.02*o, r = 0.30, n = 0.55;
-        const total = n + r + a + i;
-        const bigJump = ((a + i) / total * 100).toFixed(1);
-        const expected = (2*n/total + 3*r/total + 4*a/total + 5*i/total).toFixed(2);
-        return `${bigJump}% big-jump chance · ${expected} avg training score`;
-      }
-      if (key === 'stadium') {
-        const caps = {1:'30,000',2:'40,000',3:'50,000',4:'60,000',5:'80,000'};
-        return `${caps[lv]} seat capacity → matchday income · CEO quality via staff`;
-      }
-      if (key === 'medical') {
-        const det = {1:'No bonus',2:'-3% weekly injury chance · +4% rehab speed',3:'-6% weekly injury chance · +8% rehab speed',4:'-10% weekly injury chance · +12% rehab speed',5:'-14% weekly injury chance · +16% rehab speed'};
-        return det[lv] + ' · Physio staff drives actual effect';
-      }
-      if (key === 'analytics') {
-        const fms = {1:'442 · 433 · 4231 · 532 · 343',2:'+352 · 541 · 4411',3:'+4321 · 451',4:'+4141 · 442 D · 3421',5:'+3241 · 4222 · 4132'};
-        return `Formations unlocked: ${fms[lv]} · automation via Responsibilities tab`;
-      }
-      return 'Effects from staff quality';
     },
     facRef(key, lv) {
       lv = Math.max(1, Math.min(5, lv || 1));

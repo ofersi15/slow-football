@@ -78,21 +78,6 @@ export const helperMethods = {
       if (s === desc[col]) return ' ▼';
       return '';
     },
-    // ── Espionage table sort helpers ──────────────────────────────────────────
-    espSortBy(col) {
-      const keyMap = { club:'club', mgr:'mgr_a', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
-      const togMap = { club:'club_d', club_d:'club', mgr_a:'mgr_d', mgr_d:'mgr_a', ceo_d:'ceo_a', ceo_a:'ceo_d', td_d:'td_a', td_a:'td_d', asst_d:'asst_a', asst_a:'asst_d', physio_d:'physio_a', physio_a:'physio_d', training_d:'training_a', training_a:'training_d', scouting_d:'scouting_a', scouting_a:'scouting_d', academy_d:'academy_a', academy_a:'academy_d', medical_d:'medical_a', medical_a:'medical_d', analytics_d:'analytics_a', analytics_a:'analytics_d', stadium_d:'stadium_a', stadium_a:'stadium_d', ads_d:'ads_a', ads_a:'ads_d' };
-      const target = keyMap[col]; if (!target) return;
-      this.espionageSort = this.espionageSort === target ? (togMap[target] || target) : target;
-    },
-    espSortIcon(col) {
-      const s = this.espionageSort;
-      const aKeys = { club:'club', mgr:'mgr_a', ceo:'ceo_a', td:'td_a', asst:'asst_a', physio:'physio_a', training:'training_a', scouting:'scouting_a', academy:'academy_a', medical:'medical_a', analytics:'analytics_a', stadium:'stadium_a', ads:'ads_a' };
-      const dKeys = { club:'club_d', mgr:'mgr_d', ceo:'ceo_d', td:'td_d', asst:'asst_d', physio:'physio_d', training:'training_d', scouting:'scouting_d', academy:'academy_d', medical:'medical_d', analytics:'analytics_d', stadium:'stadium_d', ads:'ads_d' };
-      if (s === aKeys[col]) return ' ▲';
-      if (s === dKeys[col]) return ' ▼';
-      return '';
-    },
     // ── Negotiations sort helpers ─────────────────────────────────────────────
     negoSortBy(col) {
       const keyMap = { player:'player_d', parties:'parties_d', fee:'fee_d', status:'status_a', date:'date_d' };

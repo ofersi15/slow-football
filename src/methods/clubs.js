@@ -46,17 +46,6 @@ export const clubsMethods = {
       return parts.join('-');
     },
 
-    // L/R/C position label given position code, index within that position, total count
-    posLabel(pos, idx, total) {
-      if (total <= 1 || pos === 'GK') return pos;
-      const sides2 = { FB:['LB','RB'], CB:['LCB','RCB'], DM:['LDM','RDM'], CM:['LCM','RCM'],
-                       WM:['LWM','RWM'], AM:['LAM','RAM'], WF:['LW','RW'], CF:['LCF','RCF'] };
-      const sides3 = { CB:['LCB','CB','RCB'], DM:['LDM','DM','RDM'], CM:['LCM','CM','RCM'],
-                       AM:['LAM','AM','RAM'] };
-      const labels = total >= 3 && sides3[pos] ? sides3[pos] : sides2[pos];
-      return labels?.[idx] ?? pos;
-    },
-
     // Strip L/R/C side prefix from API position codes → base game position
     basePos(pos) {
       if (!pos) return pos;
@@ -401,12 +390,5 @@ export const clubsMethods = {
       const recentGws = Object.keys(byGw).map(Number).sort((a,b)=>b-a).slice(0,3);
       this.mySubmissions = recentGws.map(gw => byGw[gw]);
       this.mySubmissionLoading = false;
-    },
-
-    matchResultFor(match, club) {
-      const isHome = match.home?.club === club;
-      const hs = match.score?.home ?? 0, as = match.score?.away ?? 0;
-      const gs = isHome ? hs : as, gc = isHome ? as : hs;
-      return gs > gc ? 'W' : gs < gc ? 'L' : 'D';
     },
 }

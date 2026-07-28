@@ -1,6 +1,6 @@
 import { API, ESPIONAGE_CACHE_TTL } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync } from '../cache.js'
-import { fmtSubStatus, fmtNegoDate } from '../utils.js'
+import { fmtNegoDate } from '../utils.js'
 
 export const espionageMethods = {
     espRatingClass(r) { if (!r) return 'c-gray'; return r >= 85 ? 'c-green' : r >= 75 ? 'c-orange' : 'c-gray'; },
@@ -62,15 +62,6 @@ export const espionageMethods = {
     fitColor(pct) {
       return pct == null ? '#8b949e' : pct >= 85 ? '#7ee787' : pct >= 70 ? '#ffa657' : '#ff7b72';
     },
-    roleAttrs(role) {
-      const map = {
-        captain:  ['Mentality','Leadership'],
-        penalty:  ['Shooting','Mentality'],
-        freekick: ['Passing','Vision'],
-        corner:   ['Passing','Vision'],
-      };
-      return map[(role||'').toLowerCase()] || [];
-    },
     spZoneAttrs(side, zoneKey) {
       if (side === 'taker') return ['Passing', 'Vision'];
       const map = {
@@ -109,28 +100,6 @@ export const espionageMethods = {
       const n = parseInt(v, 10);
       return !n ? '#8b949e' : n >= 80 ? '#3fb950' : n >= 70 ? '#ffa657' : '#e6edf3';
     },
-    negoStatusStyle(status) {
-      const map = {
-        active:   {background:'#1a4a2e', color:'#7ee787'},
-        offered:  {background:'#3a2a6b', color:'#d2a8ff'},
-        countered:{background:'#4a3a10', color:'#ffa657'},
-        counter:  {background:'#4a3a10', color:'#ffa657'},
-        pending:  {background:'#1f3a5a', color:'#79c0ff'},
-        accepted: {background:'#1a4a2e', color:'#7ee787'},
-        rejected: {background:'#3a1212', color:'#ff7b72'},
-        withdrawn:{background:'#21262d', color:'#8b949e'},
-      };
-      const s = map[status] || {background:'#21262d', color:'#8b949e'};
-      return {...s, borderRadius:'8px', padding:'1px 7px', fontSize:'10px', fontWeight:'700'};
-    },
-    negoSubStatusStyle(sub) {
-      if (!sub) return {color:'#8b949e'};
-      if (['agreed','finalised','won'].includes(sub)) return {color:'#7ee787', fontWeight:'600'};
-      if (['declined','withdrawn','counter_rejected','moved_elsewhere','outbid','insufficient_funds'].includes(sub)) return {color:'#ff7b72'};
-      if (['offer','finalising','adjusted','auction-bid'].includes(sub)) return {color:'#ffa657'};
-      return {color:'#8b949e'};
-    },
-    fmtSubStatus,
     fmtNegoDate,
     computeTrueValues() {
       if (!this.allPlayers.length) return;
@@ -270,11 +239,6 @@ export const espionageMethods = {
       if (subStatus === 'insufficient_funds') return { icon:'', label:'⚠ Funds issue', detail:'next bidder wins', color:'#ffa657', bg:'#3a2810' };
       if (subStatus === 'won') return { icon:'✓', label:'Won', detail:'', color:'#7ee787', bg:'#1a4a2e' };
       return { icon:'', label:status||'—', detail:subStatus||'', color:'#8b949e', bg:'#21262d' };
-    },
-    // Highest bid amount visible for an auction nego
-    auctionHighestBid(n) {
-      if (!n.history?.length) return n.amount;
-      return Math.max(n.amount || 0, ...n.history.map(h => h.amount || 0));
     },
     async pullBudgetNow() {
       if (this.pullingBudget) return;
