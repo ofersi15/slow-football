@@ -442,25 +442,4 @@ export const espionageMethods = {
         this.espionageLoading = false;
       }
     },
-
-    drawTacticsCharts() {
-      this.destroyChart('formations'); this.destroyChart('form-pop');
-      const ctx1=document.getElementById('chart-formations');
-      if (ctx1&&this.tacticsData) {
-        const sorted=[...this.tacticsData.formations].sort((a,b)=>b.winPct-a.winPct).slice(0,12);
-        this.charts['formations']=new Chart(ctx1,{type:'bar',
-          data:{labels:sorted.map(f=>f.formation),datasets:[
-            {label:'Win %',data:sorted.map(f=>f.winPct),backgroundColor:'#238636',borderRadius:4},
-            {label:'Draw %',data:sorted.map(f=>Math.round(100*f.D/f.n)),backgroundColor:'#d2982280',borderRadius:4},
-          ]},
-          options:{plugins:{legend:{labels:{color:'#8b949e'}}},scales:{x:{stacked:false,ticks:{color:'#8b949e'}},y:{max:80,ticks:{color:'#8b949e'}}}}});
-      }
-      const ctx2=document.getElementById('chart-form-pop');
-      if (ctx2&&this.tacticsData) {
-        const top=this.tacticsData.formations.slice(0,12);
-        this.charts['form-pop']=new Chart(ctx2,{type:'bar',
-          data:{labels:top.map(f=>f.formation),datasets:[{label:'Times used',data:top.map(f=>f.n),backgroundColor:'#1f6feb',borderRadius:4}]},
-          options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#8b949e'}},y:{ticks:{color:'#e6edf3',font:{weight:'bold'}}}}}});
-      }
-    },
 }

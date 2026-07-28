@@ -163,7 +163,6 @@ Full history/root-causes/verification detail: **`AI-ASSISTANT-CHANGELOG.md`** (n
 | `sf_stats_v1` | Player stats | 7 days stale | Browser |
 | `sf_espionage_v3` | Staff + facilities (all clubs) + negos snapshot | 6h stale | CF cron 4×/day + browser |
 | `sf_youth_idx_v2` | Scouts, academy, facilities, staff (Arsenal) | 10min live / 1h static | CF cron 4×/day + browser |
-| `sf_tactics_v4` | Formation/style analysis | 7 days stale | Browser only |
 | `sf_negos_history_v1` | All-time nego history | permanent, never delete | CF cron every 5–15min |
 | `sf_auctions_v1` | Auction items | — | CF cron 4×/day + `⟳ Refresh` button in Transfers tab (worker `/_budget` route also re-fetches auctions now, not just budget) |
 | `sf_arsenal_fin_v1` | Arsenal budget | — | CF cron 4×/day |

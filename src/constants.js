@@ -11,8 +11,6 @@ export const OUTFIELD_POSITIONS = ['FB','CB','DM','AM','WF','CF'];
 export const PAGE_SIZE = 100;
 
 // ── Cache keys & TTLs ─────────────────────────────────────────────────────────
-export const TACTICS_CACHE_KEY = 'sf_tactics_v4';
-export const TACTICS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 export const PLAYERS_CACHE_KEY = 'sf_players_v6';
 export const STATS_CACHE_KEY = 'sf_stats_v1';
 export const PLAYERS_CACHE_TTL = 6 * 60 * 60 * 1000;
