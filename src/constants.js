@@ -19,7 +19,6 @@ export const PLAYERS_CACHE_TTL = 6 * 60 * 60 * 1000;
 export const STATS_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 export const ESPIONAGE_CACHE_TTL = 6 * 60 * 60 * 1000;
 export const SUBMISSIONS_CACHE_KEY = 'sf_submissions_all_v1';
-export const SUBMISSIONS_CACHE_TTL = 2 * 60 * 60 * 1000;
 export const SUBMISSIONS_LS_KEY = 'sf_subs_ls';
 
 // ── Position attribute formulas ───────────────────────────────────────────────
@@ -94,12 +93,6 @@ export const FORMATION_SLOT_POS = {
   '352':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:61,y:58},{x:46,y:58},{x:34,y:58},{x:22,y:58},{x:7,y:58},{x:44,y:20},{x:24,y:20}],
   '343':  [{x:34,y:97},{x:51,y:78},{x:34,y:78},{x:17,y:78},{x:60,y:59},{x:43,y:59},{x:25,y:59},{x:8,y:59},{x:58,y:20},{x:34,y:13},{x:10,y:20}],
   '4321': [{x:34,y:97},{x:60,y:78},{x:45,y:78},{x:23,y:78},{x:8,y:78},{x:50,y:60},{x:34,y:60},{x:18,y:60},{x:44,y:37},{x:24,y:37},{x:34,y:13}],
-};
-
-// Key attribute to display per base position in club XI view
-export const MAIN_ATTR = {
-  GK:'Reflexes', FB:'Speed', CB:'Marking', DM:'Tackling',
-  CM:'Passing',  WM:'Dribbling', AM:'Vision', WF:'Dribbling', CF:'Shooting',
 };
 
 export const POS_ORDER = {GK:0,CB:1,FB:2,DM:3,CM:4,WM:5,AM:6,WF:7,CF:8};

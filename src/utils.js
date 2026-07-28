@@ -1,13 +1,4 @@
-import { FORMATIONS, GAME_ATTRS, GAME_START, WEEK_MS } from './constants.js'
-
-// ── Slot / formation helpers ──────────────────────────────────────────────────
-// Build slot key array for a formation: '433' → ['GK1','FB1','CB1','CB2','FB2',...]
-export function buildSlotKeys(code) {
-  const slots = FORMATIONS[code];
-  if (!slots) return [];
-  const counts = {};
-  return slots.map(s => { counts[s] = (counts[s]||0)+1; return `${s}${counts[s]}`; });
-}
+import { GAME_ATTRS, GAME_START, WEEK_MS } from './constants.js'
 
 // ── Rating calculations ───────────────────────────────────────────────────────
 export function calcGameRating(p, pos) {
