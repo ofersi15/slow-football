@@ -4,6 +4,16 @@ Detailed history of non-trivial bugs/fixes outside the AI Assistant feature (see
 
 ---
 
+## UI/UX review fixes (2026-07-28)
+
+Manual walkthrough of every tab at desktop (1440px) and mobile (768px), driven via Playwright with real game data seeded into localStorage (browser→game-API calls were blocked by this sandbox's TLS proxy, so data was fetched via curl and injected). Found and fixed:
+
+- **Moneyball scatter charts all silently broken**: `drawMoneyballChart()` in `data.js` calls `new Chart(...)` but the file never imports Chart.js — it relied on `app.js`'s `import Chart from 'chart.js/auto'`, which is module-scoped and doesn't leak across files. Threw `ReferenceError: Chart is not defined` in the console with a blank canvas, easy to miss without opening devtools. Fixed by adding the import to `data.js` directly.
+- **Moneyball sub-views all rendering at once**: the Market/Gems/Overperformers/Top-Lists/scatter-chart blocks in `tab-moneyball.html` were independent sibling `v-if`s instead of a `v-else-if` chain, so the (empty) scatter-chart section rendered underneath every other view regardless of which tab was selected. Fixed by chaining them.
+- **Scout table columns unreachable on mobile**: at the 768px breakpoint, `.content{overflow:visible}` (needed so tall tabs flow into page-level scroll instead of double-scrolling) makes `.content` a flex item whose automatic min-width defaults to its widest descendant — Scout's bare `<table>` (no wrapper) dragged `.content` open to ~2455px with no scrollbar anywhere, clipped by `.main`'s row `overflow:hidden`. Verified via `getBoundingClientRect`/`scrollWidth` in a headless probe, not just visually. Fixed with **both** `min-width:0` on `.content` at 768px *and* a local `overflow-x:auto` wrapper around the table — confirmed neither alone was sufficient.
+- **Assistant dock leaking background scroll on mobile**: the dock becomes a `position:fixed` full-screen overlay at 768px, but nothing locked the page behind it — scrolling while the dock was open silently scrolled the hidden tab underneath (confirmed via `window.scrollY` before/after a wheel event). Fixed with a `watch` on `assistantDockOpen` in `app.js` toggling `document.body.style.overflow` on mobile only; desktop (inline dock, not an overlay) is unaffected.
+- **Analysis tab's dead-end empty state**: read "Loading match archive…" forever when no archive existed yet (the branch only renders once loading has already finished with nothing found) — reworded to point at Matches → "⚡ Build Archive".
+
 ## Removed dead code, incl. the old "Tactics" formation/style analysis feature (2026-07-28)
 
 Code-quality review found ~21 methods/computed props with zero callers anywhere in the app (confirmed via repo-wide grep before and after each removal) — mostly small superseded helpers, but one full subsystem:
