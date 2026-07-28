@@ -55,5 +55,12 @@ change (restructuring how methods/computed are wired, touching the
 derived-fields-in-3-places pattern), don't execute it — describe the tradeoff
 in your report and let Ofer decide.
 
+CLAUDE.md must stay thin (it's auto-loaded every session — every line costs
+tokens). Only touch it if a current-state fact actually changed (a file
+moved, a pattern was consolidated); state the new fact in place of the old
+one. The cleanup itself — what was removed/simplified and why — goes in the
+commit message and, if it has real debugging value, `CHANGELOG.md`, never as
+a logged entry in CLAUDE.md.
+
 End with a short markdown summary: what you found, what you fixed (with
 commit refs), and anything left for Ofer to decide.
