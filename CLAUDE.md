@@ -2,7 +2,7 @@
 
 Personal fantasy football analytics app for slowfootball.club. Owner: Ofer (ofersi15@gmail.com), non-developer — keep everything simple, commit and push after every change.
 
-This file is auto-loaded into every Claude Code session — keep it to durable, current-state facts only. Detailed narrative history (root causes, abandoned approaches, live-test verification) belongs in `AI-ASSISTANT-CHANGELOG.md` (Assistant-specific) or `CHANGELOG.md` (everything else), neither of which is auto-loaded — link to them from here rather than inlining the story.
+This file is auto-loaded into every Claude Code session — every line here costs tokens on every single session, so keep it **thin**: only durable, current-state facts actually needed for ongoing work, not a record of what changed. Detailed narrative history (root causes, abandoned approaches, live-test verification, "fixed X on date Y") belongs in `AI-ASSISTANT-CHANGELOG.md` (Assistant-specific) or `CHANGELOG.md` (everything else), neither of which is auto-loaded — link to them from here rather than inlining the story. That applies to every skill/command that edits this repo, not just manual edits.
 
 ---
 
@@ -255,4 +255,4 @@ Full history: **`CHANGELOG.md`** (not auto-loaded).
 
 ## MD File Rule
 
-After any meaningful change, update CLAUDE.md in the same or a follow-up commit — but keep additions short and current-state-only (a fact, not a story). If the change has real debugging history worth preserving (root cause, what was tried and rejected, live-test verification), put that in `AI-ASSISTANT-CHANGELOG.md` or `CHANGELOG.md` instead and link to it, rather than inlining it here.
+After any meaningful change, update CLAUDE.md in the same or a follow-up commit **only if the current-state facts above actually changed** (e.g. a file moved, a rule changed, a new tab/endpoint/cache key exists) — state the new fact in place of the old one, don't append a dated log line. The change itself — what was fixed, why, what was tried — always gets logged, but in `AI-ASSISTANT-CHANGELOG.md` or `CHANGELOG.md`, never in CLAUDE.md, even briefly. If nothing durable changed (a pure bugfix that restores documented behavior), CLAUDE.md may need no edit at all.

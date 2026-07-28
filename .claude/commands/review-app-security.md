@@ -46,5 +46,11 @@ Agent API, the auto-merge workflow, or any secret is handled in a way that's
 ambiguous or hard to reverse, **don't change it** — describe the risk and the
 options in your final report instead and let Ofer decide.
 
+CLAUDE.md must stay thin (it's auto-loaded every session — every line costs
+tokens). Only touch it if a current-state fact actually changed; state the
+new fact in place of the old one. The "what was found/fixed and why" always
+goes in the commit message and, if it has real debugging value, `CHANGELOG.md`
+— never as a logged entry in CLAUDE.md.
+
 End with a short markdown summary: what you found, what you fixed (with
 commit refs), and what still needs a decision, ranked by severity.

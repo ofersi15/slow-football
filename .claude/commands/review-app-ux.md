@@ -48,6 +48,12 @@ matter of taste or a bigger redesign (not a bug, just "could be nicer"),
 don't pick a direction unilaterally — describe 1-2 concrete options in your
 report instead.
 
+CLAUDE.md must stay thin (it's auto-loaded every session — every line costs
+tokens). Only touch it if a current-state fact actually changed (e.g. a new
+mobile-layout pattern to watch for); state the new fact in place of the old
+one, don't log the fix itself there — that belongs in the commit message and,
+if it has real debugging value, `CHANGELOG.md`.
+
 End with a short markdown summary organized by tab: what you found, what you
 fixed (with commit refs and before/after screenshots if easy), and anything
 left for Ofer to decide.

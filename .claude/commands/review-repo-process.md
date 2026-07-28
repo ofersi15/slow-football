@@ -44,5 +44,13 @@ behave (editing workflow permissions/triggers), you can implement it, but
 explain the behavior change clearly in both the commit message and your final
 report, since it changes the pipeline itself.
 
+CLAUDE.md must stay thin (it's auto-loaded every session — every line costs
+tokens, so this applies with extra force to a *process* review, which
+otherwise tends to generate a lot of "here's what we checked" prose). Only
+touch it if a current-state fact actually changed; state the new fact in
+place of the old one, don't append a log line. The review's findings — what
+was checked, what was fixed, what's left — belong in the commit messages and
+your final report, never inlined into CLAUDE.md itself.
+
 End with a short markdown summary: what you found, what you fixed (with
 commit refs), and anything left for Ofer to decide.
