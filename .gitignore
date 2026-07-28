@@ -1,6 +1,9 @@
 # dependencies
 node_modules/
 
+# build output — CF Pages rebuilds this itself (npm run build) on every push
+dist/
+
 # credentials & browser session — never commit
 .game-creds.json
 tools/.session.json
