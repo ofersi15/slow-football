@@ -155,18 +155,23 @@ export function computeTraits(player) {
   return traits.slice(0, 4);
 }
 
+// Weeks shared with each squadmate (same order as squadPlayers) — shared by computeBonds
+// and computeDislikes, which each then apply their own threshold/slice/labeling on top.
+function sharedWeeksWith(player, squadPlayers, deals) {
+  const now = gameWeekNow();
+  const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
+  return (squadPlayers || [])
+    .filter(m => m.Player !== player.Player && m.Position)
+    .map(m => ({ m, shared: Math.min(playerWeeks, playerArrivalWeeks(m.Player, player.Club, deals) ?? now) }));
+}
+
 // Compute chemistry bonds between a player and their squadmates (ported from game source lG function)
 export function computeBonds(player, squadPlayers, deals) {
   if (!player || !player.Player || !player.Club) return [];
-  const now = gameWeekNow();
-  const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
   const nat = player.Nationality || '';
-  return (squadPlayers||[])
-    .filter(m => m.Player !== player.Player && m.Position)
+  return sharedWeeksWith(player, squadPlayers, deals)
     .slice(0, 12)
-    .map(m => {
-      const mWeeks = playerArrivalWeeks(m.Player, player.Club, deals) ?? now;
-      const shared = Math.min(playerWeeks, mWeeks);
+    .map(({ m, shared }) => {
       if (shared < 13) return null;
       const sameNat = !!(nat && nat === (m.Nationality || ''));
       const category = (shared >= 30 || (sameNat && shared >= 25)) ? 'great' : 'good';
@@ -192,13 +197,8 @@ function pairDislikeSeed(a, b) {
 // ~7% of player pairs who have shared 13+ weeks dislike each other (deterministic seed)
 export function computeDislikes(player, squadPlayers, deals) {
   if (!player || !player.Player || !player.Club) return [];
-  const now = gameWeekNow();
-  const playerWeeks = playerArrivalWeeks(player.Player, player.Club, deals) ?? now;
-  return (squadPlayers || [])
-    .filter(m => m.Player !== player.Player && m.Position)
-    .map(m => {
-      const mWeeks = playerArrivalWeeks(m.Player, player.Club, deals) ?? now;
-      const shared = Math.min(playerWeeks, mWeeks);
+  return sharedWeeksWith(player, squadPlayers, deals)
+    .map(({ m, shared }) => {
       if (shared < 13) return null;
       if (pairDislikeSeed(player.Player, m.Player) >= 7) return null;
       return { name: m.Player, pos: m.Position, weeks: shared };
