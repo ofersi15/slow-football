@@ -8,7 +8,7 @@ export const ALL_LEAGUES = ['north','south','europa','world','conference','hipst
 export const AI_CLUBS = new Set(['Barcelona','Bayern Munich','Juventus','Damac','Saudi All-Stars','Inter Miami']);
 export const ALL_POSITIONS = ['GK','FB','CB','DM','AM','WF','CF'];
 export const OUTFIELD_POSITIONS = ['FB','CB','DM','AM','WF','CF'];
-export const PAGE_SIZE = 100;
+export const PAGE_SIZE = 50;  // Scout table only — measured render cost scales with rows×columns; 100 caused a visible hang on tab switch
 
 // ── Cache keys & TTLs ─────────────────────────────────────────────────────────
 export const PLAYERS_CACHE_KEY = 'sf_players_v6';

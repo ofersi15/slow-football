@@ -4,6 +4,12 @@ Detailed history of non-trivial bugs/fixes outside the AI Assistant feature (see
 
 ---
 
+## Scout tab switch hang (2026-07-28)
+
+Owner reported a hang of a few seconds when opening/re-opening the Scout tab, then continued sluggishness. Confirmed and measured: every tab in the app mounts/unmounts its entire DOM tree on switch (`v-if="activeTab==='X'"`, not `v-show`), and the Scout tab is by far the heaviest — a 100-row × ~35-column table (with several conditional badge spans per row) rebuilt from scratch on every switch into the tab, on top of all the other tabs' baseline switch cost.
+
+Verified via a Playwright harness seeded with ~1450 synthetic players (matching the real player count) and a `MutationObserver`-based settle timer: with `PAGE_SIZE=100`, switching into Scout cost ~100–200ms of actual render work above the baseline cost of switching to any other tab; with `PAGE_SIZE=50` that delta essentially disappeared (Scout switch time matched the baseline). Fixed by halving `PAGE_SIZE` (`src/constants.js`) from 100 to 50 — only used by the Scout table's pagination, no effect elsewhere. On a real (non-headless-server) machine the effect scales further, so this should meaningfully reduce the perceived hang; if it's still noticeable, the next lever is virtualizing the table (only rendering rows near the viewport) rather than shrinking pages further.
+
 ## UI/UX review fixes (2026-07-28)
 
 Manual walkthrough of every tab at desktop (1440px) and mobile (768px), driven via Playwright with real game data seeded into localStorage (browser→game-API calls were blocked by this sandbox's TLS proxy, so data was fetched via curl and injected). Found and fixed:
