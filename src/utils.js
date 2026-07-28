@@ -77,17 +77,6 @@ export function fmtWage(v) { return v?`£${(v/1000).toFixed(0)}k/w`:'—'; }
 export function fmtDiff(v) { return v==null?'—':(v>=0?'+':'')+v.toFixed(2); }
 export function fmtFormation(code) { return code ? String(code).split('').join('-') : null; }
 export function stripDashes(s) { return s ? String(s).replace(/-/g, '') : null; }
-export function fmtSubStatus(sub) {
-  if (!sub) return '—';
-  const map = {
-    withdrawn:'↩ Withdrawn', declined:'✗ Declined', agreed:'✓ Agreed',
-    offer:'Offer out', finalised:'✓ Done', moved_elsewhere:'Went elsewhere',
-    adjusted:'Adjusted', closed:'Closed', finalising:'Finalising…',
-    outbid:'Outbid', counter_rejected:'Counter rejected', won:'✓ Won',
-    insufficient_funds:'$ Insufficient', 'auction-bid':'Auction bid',
-  };
-  return map[sub] || sub;
-}
 export function fmtNegoDate(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
