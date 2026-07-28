@@ -23,19 +23,6 @@ export const youthComputed = {
     });
   },
 
-  // Per-club active/total counts, derived from enriched jobs (no template-level .filter calls)
-  youthClubStatsMap() {
-    const map = {};
-    for (const job of this.youthHistJobsEnriched) {
-      const c = job._club;
-      if (!c) continue;
-      if (!map[c]) map[c] = { active: 0, total: 0 };
-      map[c].total++;
-      if ((job._jobStatus || job.status) === 'active') map[c].active++;
-    }
-    return map;
-  },
-
   youthAcademySorted() {
     return [...this.youthAcademy].sort((a,b)=>(b.Rating||b.rating||0)-(a.Rating||a.rating||0));
   },
@@ -47,9 +34,6 @@ export const youthComputed = {
   youthAcademyTopRating() {
     if (!this.youthAcademy.length) return 0;
     return Math.max(...this.youthAcademy.map(p=>p.Rating||p.rating||0));
-  },
-  youthHistPositions() {
-    return [...new Set(this.youthRejected.map(j=>j.player.position||j.player.Position))].filter(Boolean).sort();
   },
   youthFilteredHistory() {
     let items = this.youthRejected;
@@ -80,14 +64,6 @@ export const youthComputed = {
     if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[b.player?.potential]||0)-(m[a.player?.potential]||0); return pd!==0?pd:(b.player?.potentialCap||0)-(a.player?.potentialCap||0); }); }
     if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[a.player?.potential]||0)-(m[b.player?.potential]||0); return pd!==0?pd:(a.player?.potentialCap||0)-(b.player?.potentialCap||0); }); }
     return items;
-  },
-  youthHistMaxRating() {
-    if (!this.youthRejected.length) return 0;
-    return Math.max(...this.youthRejected.map(j=>j.player.rating||j.player.Rating||0));
-  },
-  youthHistAvgRating() {
-    if (!this.youthRejected.length) return 0;
-    return this.youthRejected.reduce((s,j)=>s+(j.player.rating||j.player.Rating||0),0)/this.youthRejected.length;
   },
   youthHistClubs() {
     return [...new Set(this.youthAllHistoryJobs.map(j=>j._club))].filter(Boolean).sort();
@@ -137,17 +113,5 @@ export const youthComputed = {
   },
   youthHistTotalPages() {
     return Math.max(1, Math.ceil(this.youthHistFiltered.length / HIST_PAGE_SIZE));
-  },
-  youthDaysUntilUpgrade() {
-    if (!this.youthFacilities.project) return null;
-    const ms = new Date(this.youthFacilities.project.completeAt) - new Date();
-    return Math.max(0, Math.round(ms/86400000));
-  },
-  youthUpgradeProgress() {
-    if (!this.youthFacilities.project) return 0;
-    const start = new Date(this.youthFacilities.project.startedAt);
-    const end = new Date(this.youthFacilities.project.completeAt);
-    const now = new Date();
-    return Math.min(100, Math.max(0, (now-start)/(end-start)*100));
   },
 };
