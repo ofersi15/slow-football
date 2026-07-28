@@ -236,6 +236,7 @@ Full history: **`CHANGELOG.md`** (not auto-loaded).
 - `xiPlayerInfo(name)` guards `typeof name !== 'string'` — stale cache can store objects as names
 - `_normalizeSubs(s)` — called on both fresh fetch and localStorage load; fixes malformed subs entries
 - Subs normalization handles JSON strings, stringified objects in the `name` field
+- **Mobile**: `@media(max-width:768px)` in `style.css` is the one breakpoint for the whole app — match it rather than adding new ones. A `class="card" style="padding:0;overflow:hidden"` directly wrapping a `<table>` (no inner scroll div) silently clips columns on narrow screens with no way to scroll to them — always use `overflow-x:auto` (or add an inner `<div style="overflow:auto;max-height:...">`, see the espionage negos table) for any card/table pairing. A fixed-pixel-width flex child (`width:280px` etc.) sitting next to a `flex:1;min-width:0` sibling needs both a class (inline `grid-template-columns`/`width` beats a media-query override, so pull it into a CSS class instead) and a `flex-direction:column`/`width:100%` override in the 768px block, or it silently squeezes the sibling instead of stacking — see `.club-squad-panels-row`/`.club-setpieces-panel` and the generic `.stack-mobile-grid` (used for saved-lineup and modal 2-col panes).
 
 ---
 

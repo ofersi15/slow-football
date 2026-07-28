@@ -38,7 +38,9 @@ createApp({
       posRatingMax: 99,            // global max rating cap
       posRatingUseWeighted: false, // filter by weighted rating instead of game rating
       posRatingsOpen: false,
-      scoutFiltersOpen: true,
+      // Filters panel stacks above the table on mobile (not a side column), so default it
+      // closed on narrow screens or it fills the whole viewport before the player table.
+      scoutFiltersOpen: typeof window === 'undefined' || window.innerWidth > 768,
       // Stats enrichment state
       statsEnriching: false, statsProgress: 0, statsEnriched: false,
       activeTab: (() => {

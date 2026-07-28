@@ -90,7 +90,7 @@
             <!-- Pitch: auto-width column (direct grid child) -->
               
               <!-- Big interactive pitch -->
-              <div style="width:320px;position:relative">
+              <div style="width:min(320px,100%);position:relative">
                 <svg viewBox="-3 -3 74 111" style="width:100%;max-height:78vh;border-radius:8px;border:1px solid #2d3748;display:block" xmlns="http://www.w3.org/2000/svg">
                   <defs>
                     <marker id="arr" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
@@ -180,11 +180,11 @@
               </div>
 
             <!-- Squad + Panels: 1fr column, flex row internally -->
-            <div style="display:flex;gap:12px;align-items:flex-start;min-width:0">
+            <div class="club-squad-panels-row">
 
               <!-- Set Pieces · Subs · Roles panel -->
               <div v-if="selectedClubSubmissions[0].setPieces || selectedClubSubmissions[0].subs?.length || selectedClubSubmissions[0].roles"
-                   style="display:flex;flex-direction:column;gap:8px;width:280px;flex-shrink:0">
+                   class="club-setpieces-panel" style="display:flex;flex-direction:column;gap:8px">
                   
               <!-- Set Pieces (above subs) -->
               <div v-if="selectedClubSubmissions[0].setPieces" style="display:flex;flex-direction:column;gap:8px">
@@ -334,7 +334,7 @@
                   </template>
                 </div>
               </div>
-                            <div class="card" style="flex:1;min-width:0;padding:0;overflow:hidden">
+                            <div class="card" style="flex:1;min-width:0;padding:0;overflow-x:auto">
                 <div style="padding:10px 14px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   <span style="font-size:12px;font-weight:700;color:#e6edf3">Full Squad</span>
                   <span class="c-gray" style="font-size:11px">{{selectedClubPlayers.length}} players</span>
@@ -460,7 +460,7 @@
             </div>
 
             <!-- Academy players -->
-            <div class="card" style="padding:0;overflow:hidden">
+            <div class="card" style="padding:0;overflow-x:auto">
               <div style="padding:10px 14px;display:flex;align-items:center;gap:8px">
                 <span style="font-size:12px;font-weight:700;color:#e6edf3">Youth Academy</span>
                 <span class="c-gray" style="font-size:11px">{{(clubInfoCache[selectedClubName].academy||[]).length}} players</span>
@@ -573,7 +573,7 @@
 
         <!-- Transfers tab -->
         <div v-if="selectedClubSubTab==='transfers'">
-          <div v-if="selectedClubTransfers.length" class="card" style="padding:0;overflow:hidden">
+          <div v-if="selectedClubTransfers.length" class="card" style="padding:0;overflow-x:auto">
             <table style="font-size:11px">
               <thead>
                 <tr>
