@@ -118,38 +118,4 @@ export const matchesComputed = {
       coverage: { total, bothFormations, bothMentality, withInstr, withPress, withDefLine, withTrans },
     };
   },
-  subsDbStats() {
-    if (!this.subsDb || !this.matchArchive) return null;
-    const clubs = this.subsDb.clubs || {};
-    const byGw = {};
-    for (const m of this.matchArchive) {
-      const gw = m._gw;
-      if (gw == null) continue;
-      const hSub = clubs[m.home?.club]?.[gw];
-      const aSub = clubs[m.away?.club]?.[gw];
-      if (!byGw[gw]) byGw[gw] = { gw, n:0, hSub:0, aSub:0, bothSub:0, bothFm:0, bothMen:0, press:0, line:0, trans:0, sides:0 };
-      const row = byGw[gw];
-      row.n++;
-      if (hSub) row.hSub++;
-      if (aSub) row.aSub++;
-      if (hSub && aSub) row.bothSub++;
-      if (hSub?.formation && aSub?.formation) row.bothFm++;
-      if (hSub?.instructions?.mentality && aSub?.instructions?.mentality) row.bothMen++;
-      for (const sub of [hSub, aSub]) {
-        if (!sub) continue;
-        row.sides++;
-        if (sub.instructions?.pressing_intensity) row.press++;
-        if (sub.instructions?.defensive_line) row.line++;
-        if (sub.instructions?.transition_speed) row.trans++;
-      }
-    }
-    const rows = Object.values(byGw).sort((a,b) => b.gw - a.gw);
-    const total = this.matchArchive.length;
-    const totals = rows.reduce((acc, r) => {
-      acc.bothSub += r.bothSub; acc.bothFm += r.bothFm; acc.bothMen += r.bothMen;
-      acc.sides += r.sides; acc.press += r.press; acc.line += r.line; acc.trans += r.trans;
-      return acc;
-    }, { bothSub:0, bothFm:0, bothMen:0, sides:0, press:0, line:0, trans:0 });
-    return { rows, total, totals };
-  },
 };

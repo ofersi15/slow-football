@@ -519,50 +519,6 @@ export const matchesMethods = {
       this.analysisMsg = `${results.length} matches with full tactical data · ${backfilled} formations backfilled`;
     },
 
-    async loadSubsDb() {
-      if (this.subsDbLoading) return;
-      this.subsDbLoading = true;
-      this.subsDbMsg = 'Checking cache…';
-      const raw = await serverCacheGet('sf_submissions_db_v1');
-      if (raw) {
-        this.subsDb = await parseAsync(raw);
-        this.subsDbLoaded = true;
-        this.subsDbLoading = false;
-        const d = this.subsDb.builtAt ? new Date(this.subsDb.builtAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
-        this.subsDbMsg = `Loaded from cache · ${d}`;
-        return;
-      }
-      await this.buildSubsDb();
-    },
-
-    async buildSubsDb() {
-      this.subsDbLoading = true;
-      this.subsDbLoaded = false;
-      const clubList = [...new Set((this.allPlayers || []).map(p => p.Club).filter(Boolean))].sort();
-      const db = {};
-      for (let i = 0; i < clubList.length; i++) {
-        const club = clubList[i];
-        this.subsDbProgress = Math.round(i / clubList.length * 100);
-        this.subsDbMsg = `${i+1}/${clubList.length} · ${club}`;
-        try {
-          const d = await fetch(`${API}/submissions?club=${encodeURIComponent(club)}&limit=200`).then(r => r.json());
-          const byGw = {};
-          for (const s of (d?.items || [])) {
-            const key = s.gameweek ?? 'upcoming';
-            if (!byGw[key] || s.createdAt > byGw[key].createdAt) byGw[key] = s;
-          }
-          db[club] = byGw;
-        } catch(e) { db[club] = {}; }
-        if (i % 8 === 0) await new Promise(r => setTimeout(r, 20));
-      }
-      const result = { clubs: db, builtAt: new Date().toISOString() };
-      await serverCacheSet('sf_submissions_db_v1', JSON.stringify(result));
-      this.subsDb = result;
-      this.subsDbLoaded = true;
-      this.subsDbLoading = false;
-      this.subsDbMsg = `Built · ${clubList.length} clubs`;
-    },
-
     // Return formatted formation for a club/gameweek from submissions (fetches if not cached)
     async getClubFormation(club, gameweek) {
       if (!club || !gameweek) return null;

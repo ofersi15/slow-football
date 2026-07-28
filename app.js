@@ -107,7 +107,6 @@ createApp({
       analysisFilterStyle: '', analysisFilterStyleOpp: '',
       analysisFilterTrans: '', analysisFilterTransOpp: '',
       fmDrillDown: null,
-      subsDbLoading: false, subsDbLoaded: false, subsDbMsg: '', subsDbProgress: 0, subsDb: null,
       matchArchiveFmSrc: null,
       clubLineups: {}, clubLineupsLoaded: false,
       mySubmissions: [], mySubmissionLoading: false,
