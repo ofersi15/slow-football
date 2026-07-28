@@ -1,6 +1,7 @@
 import { API, MY_CLUB, ALL_LEAGUES, AI_CLUBS, PLAYERS_CACHE_KEY, PLAYERS_CACHE_TTL, STATS_CACHE_KEY, STATS_CACHE_TTL, DEFAULT_MENTAL_ATTRS, FULL_ATTR_KEYS, OUTFIELD_POSITIONS } from '../constants.js'
 import { parseAsync, stringifyAsync, serverCacheGet, serverCacheSet, serverCacheDelete } from '../cache.js'
 import { calcGameRating, calcWeightedRating, calcEstValue, fmtVal } from '../utils.js'
+import Chart from 'chart.js/auto'
 
 export const dataMethods = {
     async openModal(p, jobCtx=null) {

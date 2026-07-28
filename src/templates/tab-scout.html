@@ -8,6 +8,7 @@
           </button>
           <span class="c-gray" style="font-size:11px;margin-left:auto">{{filteredPlayers.length}} players · click a row to open profile</span>
         </div>
+        <div style="overflow-x:auto">
         <table>
           <thead>
             <tr>
@@ -98,6 +99,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
         <div style="padding:8px 12px;border-top:1px solid #21262d;display:flex;gap:6px;align-items:center;background:#0d1117">
           <template v-if="totalPages>1">
             <button class="btn" @click="page=Math.max(0,page-1)" :disabled="page===0">←</button>

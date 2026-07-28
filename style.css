@@ -133,7 +133,7 @@ tr.clickable:hover td.scout-sticky{background:#1c2128}
   .layout{height:auto;min-height:100vh;overflow:auto}
   .sidebar{width:100%;min-width:0;border-right:none;border-bottom:1px solid #21262d;padding:8px;gap:6px}
   .main{height:auto;overflow:visible}
-  .content{overflow:visible}
+  .content{overflow:visible;min-width:0}
   .card{padding:10px}
   .tab-bar{gap:4px;padding:5px 8px}
   .tab-bar .btn{min-height:44px;font-size:12px;padding:4px 10px}

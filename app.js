@@ -285,6 +285,14 @@ createApp({
       await nextTick();
       this.drawMoneyballChart(newVal);
     },
+    assistantDockOpen: {
+      immediate: true,
+      handler(open) {
+        // On mobile the dock becomes a full-screen fixed overlay (see .assistant-dock in the
+        // 768px media query) — without this, the tab underneath still scrolls with it.
+        document.body.style.overflow = (open && window.innerWidth <= 768) ? 'hidden' : '';
+      },
+    },
     activeTab: {
       immediate: true,
       handler(v) {
