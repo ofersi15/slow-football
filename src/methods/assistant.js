@@ -311,6 +311,12 @@ export const assistantMethods = {
     const el = this.$refs.chatScroll;
     if (el) el.scrollTop = el.scrollHeight;
   },
+  // Shared by every context section that lists a player's ratings at other compatible
+  // positions (squad, transfer targets, negotiation lookups) — one formula, one format.
+  _altFitStr(p) {
+    const altPositions = (SLOT_COMPAT[p.Position] || []).filter(pos => pos !== p.Position && pos !== 'GK');
+    return altPositions.map(pos => `${pos}:${calcGameRating(p, pos) ?? '?'}`).join(',') || '-';
+  },
   onChatKeydown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -406,6 +412,8 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
 
     lines.push(`\nPricing note: the raw "Value" field from the game API is NOT a reliable market price — quality players are scarce and in high demand, so real fees run well above it. Use "TrueVal" instead (shown below as value/source) — it's the last real transfer fee, the live transfer-list asking price, or recent negotiation activity where known, else a rating-scaled estimate off Value (marked "formula"). Ground any pricing discussion in TrueVal plus the recent transfers and transfer-list sections below, not the raw Value field.`);
 
+    lines.push(`\nTrade/negotiation guidance: when discussing a specific trade offer (my players vs. another club's players), weigh both sides on TrueVal and on "AltPosFit" — a player's rating at a different compatible position, using the same formula as their listed-position "Rating". A player can be a hidden bargain or a hidden overpay: e.g. a nominal fullback with an unusually high alternate-position rating elsewhere is worth more than their listed rating suggests, and vice versa. Call this out in plain language (what the numbers show), never by the literal column name "AltPosFit". If a player central to the discussion isn't showing up with full detail (Club/Age/Rating/TrueVal/AltPosFit) in the sections below, say so plainly instead of guessing at their attributes — don't invent numbers for a player you don't have data on.`);
+
     const FORMATION_TIERS = { 1: ['442', '433', '4231', '532', '343'], 2: ['352', '541', '4411'], 3: ['4321', '451'], 4: ['4141', '442 D', '3421'], 5: ['3241', '4222', '4132'] };
     const analyticsLv = this.clubFacData?.levels?.analytics;
     const unlockedFormations = analyticsLv
@@ -423,8 +431,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       lines.push(`\nMy squad (${squad.length} players) — Name | Pos | Age | Rating | Fitness | TrueVal (source) | AltPosFit | Ldr/Ment/Exp | FK/Pen/Cor:`);
       squad.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
         const fit = p.fitnessPct != null ? `${p.fitnessPct}%` : '?';
-        const altPositions = (SLOT_COMPAT[p.Position] || []).filter(pos => pos !== p.Position && pos !== 'GK');
-        const altFit = altPositions.map(pos => `${pos}:${calcGameRating(p, pos) ?? '?'}`).join(',') || '-';
+        const altFit = this._altFitStr(p);
         const capt = `${p.Leadership ?? '?'}/${p.Mentality ?? '?'}/${p.Experience ?? '?'}`;
         const setPiece = `${p['Free kicks'] ?? '?'}/${p.Penalties ?? '?'}/${p.Corners ?? '?'}`;
         lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fit} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${altFit} | ${capt} | ${setPiece}${p.injured ? ' [INJURED]' : ''}${p.suspended ? ' [SUSPENDED]' : ''}`);
@@ -437,9 +444,9 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       .sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0))
       .slice(0, 25);
     if (targets.length) {
-      lines.push(`\nTop-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source):`);
+      lines.push(`\nTop-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source) | AltPosFit:`);
       targets.forEach(p => {
-        lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)})`);
+        lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${this._altFitStr(p)}`);
       });
     }
 
@@ -460,6 +467,47 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       listed.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
         lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(p._listingAsk)} | ${p._listingBids || 0}`);
       });
+    }
+
+    // Negotiation support: when discussing a trade, the model needs full-position ratings and
+    // TrueVal for whichever specific players/clubs the conversation actually names — not just
+    // the top-25-by-rating pool above, which misses squad-depth pieces that routinely show up in
+    // real trade offers (e.g. a 77-rated throw-in). Scanning the user's own messages for club and
+    // player names keeps this targeted instead of dumping the whole league into every request.
+    const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const convoText = this.chatMessages
+      .filter(m => m.role === 'user')
+      .flatMap(m => blocksOf(m.content).filter(b => b.type === 'text' && b.text).map(b => b.text))
+      .join('\n');
+    const alreadyShown = new Set([...squad, ...targets, ...listed].map(p => p.Player));
+
+    if (convoText) {
+      const otherClubs = [...new Set((this.allPlayers || []).map(p => p.Club).filter(c => c && c !== MY_CLUB))];
+      const mentionedClubs = otherClubs.filter(c => new RegExp(`\\b${escapeRe(c)}\\b`, 'i').test(convoText)).slice(0, 5);
+      mentionedClubs.forEach(club => {
+        const roster = (this.allPlayers || []).filter(p => p.Club === club).sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).slice(0, 30);
+        if (!roster.length) return;
+        lines.push(`\n${club} squad (club named in this conversation) — Name | Pos | Age | Rating | TrueVal (source) | AltPosFit:`);
+        roster.forEach(p => {
+          alreadyShown.add(p.Player);
+          lines.push(`${p.Player} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${this._altFitStr(p)}`);
+        });
+      });
+
+      const mentionedPlayers = (this.allPlayers || [])
+        .filter(p => p.Player && p.Club && p.Club !== MY_CLUB && !alreadyShown.has(p.Player))
+        .filter(p => {
+          const surname = p.Player.trim().split(/\s+/).slice(-1)[0];
+          return surname && surname.length >= 3 && new RegExp(`\\b${escapeRe(surname)}\\b`, 'i').test(convoText);
+        })
+        .sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0))
+        .slice(0, 30);
+      if (mentionedPlayers.length) {
+        lines.push(`\nOther players named in this conversation — Name | Club | Pos | Age | Rating | TrueVal (source) | AltPosFit:`);
+        mentionedPlayers.forEach(p => {
+          lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${this._altFitStr(p)}`);
+        });
+      }
     }
 
     if (tactics.length) {
