@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "scripts": {
     "assemble": "node scripts/assemble.js",
     "predev": "npm run assemble",
