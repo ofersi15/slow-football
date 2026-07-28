@@ -1,5 +1,41 @@
 const HIST_PAGE_SIZE = 50;
 
+// Shared sort ladder for the youth-history views. `youthFilteredHistory` (compact, sorts raw
+// job rows) and `youthHistFiltered` (full, sorts youthHistJobsEnriched rows) both drive off the
+// same `youthHistSort` state and column set, differing only in which rows already carry
+// precomputed bestpos/men/wr fields — the `??` fallback below calls the live scout methods for
+// whichever view doesn't have them, matching what each view's original ladder did.
+function youthHistSortValue(item, key, ctx) {
+  switch (key) {
+    case 'date':      return new Date(item.createdAt).getTime() || 0;
+    case 'rating':    return item.player?.rating ?? item.player?.Rating ?? 0;
+    case 'age':       return item.player?.age ?? item.player?.Age ?? 0;
+    case 'value':     return item.player?.value ?? item.player?.Value ?? 0;
+    case 'name':      return item.player?.name ?? item.player?.Player ?? '';
+    case 'pos':       return item.player?.position ?? item.player?.Position ?? '';
+    case 'buynow':    return item.buyNow || 0;
+    case 'status':    return item._jobStatus ?? item.status ?? '';
+    case 'sclub':     return item._club ?? '';
+    case 'bestpos':   return item._bestPosRating ?? ctx.scoutBestPos(item.player)?.rating ?? 0;
+    case 'men':       return item._mentality ?? ctx.getYouthAttr(item.player, 'Mentality') ?? 0;
+    case 'wr':        return item._workRate ?? ctx.getYouthAttr(item.player, 'Work rate') ?? 0;
+    case 'potential': { const m = {high:3, medium:2, low:1}; return [m[item.player?.potential]||0, item.player?.potentialCap||0]; }
+    default:          return 0;
+  }
+}
+function sortYouthHist(items, sortKey, ctx) {
+  if (!sortKey) return items;
+  const asc = sortKey.endsWith('_a');
+  const key = (asc || sortKey.endsWith('_d')) ? sortKey.slice(0, -2) : sortKey;
+  const val = item => youthHistSortValue(item, key, ctx);
+  const cmpScalar = (x, y) => typeof x === 'string' ? x.localeCompare(y) : x - y;
+  return [...items].sort((a, b) => {
+    const av = val(a), bv = val(b);
+    let c = Array.isArray(av) ? (cmpScalar(av[0], bv[0]) || cmpScalar(av[1], bv[1])) : cmpScalar(av, bv);
+    return asc ? c : -c;
+  });
+}
+
 export const youthComputed = {
   // Pre-compute all expensive per-row derived values once, cached by Vue
   youthHistJobsEnriched() {
@@ -38,32 +74,7 @@ export const youthComputed = {
   youthFilteredHistory() {
     let items = this.youthRejected;
     if (this.youthHistPos) items = items.filter(j=>(j.player.position||j.player.Position)===this.youthHistPos);
-    const s = this.youthHistSort;
-    if (s==='date') return [...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-    if (s==='date_a') return [...items].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-    if (s==='rating_d') return [...items].sort((a,b)=>(b.player.rating||b.player.Rating||0)-(a.player.rating||a.player.Rating||0));
-    if (s==='rating_a') return [...items].sort((a,b)=>(a.player.rating||a.player.Rating||0)-(b.player.rating||b.player.Rating||0));
-    if (s==='age_a') return [...items].sort((a,b)=>(a.player.age||a.player.Age||0)-(b.player.age||b.player.Age||0));
-    if (s==='age_d') return [...items].sort((a,b)=>(b.player.age||b.player.Age||0)-(a.player.age||a.player.Age||0));
-    if (s==='value_d') return [...items].sort((a,b)=>(b.player.value||b.player.Value||0)-(a.player.value||a.player.Value||0));
-    if (s==='value_a') return [...items].sort((a,b)=>(a.player.value||a.player.Value||0)-(b.player.value||b.player.Value||0));
-    if (s==='name_a') return [...items].sort((a,b)=>(a.player.name||a.player.Player||'').localeCompare(b.player.name||b.player.Player||''));
-    if (s==='name_d') return [...items].sort((a,b)=>(b.player.name||b.player.Player||'').localeCompare(a.player.name||a.player.Player||''));
-    if (s==='pos_a') return [...items].sort((a,b)=>(a.player.position||a.player.Position||'').localeCompare(b.player.position||b.player.Position||''));
-    if (s==='pos_d') return [...items].sort((a,b)=>(b.player.position||b.player.Position||'').localeCompare(a.player.position||a.player.Position||''));
-    if (s==='buynow_d') return [...items].sort((a,b)=>(b.buyNow||0)-(a.buyNow||0));
-    if (s==='buynow_a') return [...items].sort((a,b)=>(a.buyNow||0)-(b.buyNow||0));
-    if (s==='status_a') return [...items].sort((a,b)=>(a._jobStatus||a.status||'').localeCompare(b._jobStatus||b.status||''));
-    if (s==='status_d') return [...items].sort((a,b)=>(b._jobStatus||b.status||'').localeCompare(a._jobStatus||a.status||''));
-    if (s==='bestpos_d') return [...items].sort((a,b)=>(this.scoutBestPos(b.player)?.rating||0)-(this.scoutBestPos(a.player)?.rating||0));
-    if (s==='bestpos_a') return [...items].sort((a,b)=>(this.scoutBestPos(a.player)?.rating||0)-(this.scoutBestPos(b.player)?.rating||0));
-    if (s==='men_d') return [...items].sort((a,b)=>(this.getYouthAttr(b.player,'Mentality')||0)-(this.getYouthAttr(a.player,'Mentality')||0));
-    if (s==='men_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Mentality')||0)-(this.getYouthAttr(b.player,'Mentality')||0));
-    if (s==='wr_d') return [...items].sort((a,b)=>(this.getYouthAttr(b.player,'Work rate')||0)-(this.getYouthAttr(a.player,'Work rate')||0));
-    if (s==='wr_a') return [...items].sort((a,b)=>(this.getYouthAttr(a.player,'Work rate')||0)-(this.getYouthAttr(b.player,'Work rate')||0));
-    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[b.player?.potential]||0)-(m[a.player?.potential]||0); return pd!==0?pd:(b.player?.potentialCap||0)-(a.player?.potentialCap||0); }); }
-    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[a.player?.potential]||0)-(m[b.player?.potential]||0); return pd!==0?pd:(a.player?.potentialCap||0)-(b.player?.potentialCap||0); }); }
-    return items;
+    return sortYouthHist(items, this.youthHistSort, this);
   },
   youthHistClubs() {
     return [...new Set(this.youthAllHistoryJobs.map(j=>j._club))].filter(Boolean).sort();
@@ -78,34 +89,7 @@ export const youthComputed = {
     if (this.youthHistPos) items = items.filter(j=>(j.player?.position||j.player?.Position)===this.youthHistPos);
     if (this.youthHistClubFilter) items = items.filter(j=>j._club===this.youthHistClubFilter);
     if (this.youthHistStatusFilter) items = items.filter(j=>(j._jobStatus||j.status)===this.youthHistStatusFilter);
-    const s = this.youthHistSort;
-    if (s==='date')     return [...items].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
-    if (s==='date_a')   return [...items].sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-    if (s==='rating_d') return [...items].sort((a,b)=>(b.player?.rating||0)-(a.player?.rating||0));
-    if (s==='rating_a') return [...items].sort((a,b)=>(a.player?.rating||0)-(b.player?.rating||0));
-    if (s==='age_a')    return [...items].sort((a,b)=>(a.player?.age||0)-(b.player?.age||0));
-    if (s==='age_d')    return [...items].sort((a,b)=>(b.player?.age||0)-(a.player?.age||0));
-    if (s==='value_d')  return [...items].sort((a,b)=>(b.player?.value||0)-(a.player?.value||0));
-    if (s==='value_a')  return [...items].sort((a,b)=>(a.player?.value||0)-(b.player?.value||0));
-    if (s==='name_a')   return [...items].sort((a,b)=>(a.player?.name||'').localeCompare(b.player?.name||''));
-    if (s==='name_d')   return [...items].sort((a,b)=>(b.player?.name||'').localeCompare(a.player?.name||''));
-    if (s==='pos_a')    return [...items].sort((a,b)=>(a.player?.position||'').localeCompare(b.player?.position||''));
-    if (s==='pos_d')    return [...items].sort((a,b)=>(b.player?.position||'').localeCompare(a.player?.position||''));
-    if (s==='buynow_d') return [...items].sort((a,b)=>(b.buyNow||0)-(a.buyNow||0));
-    if (s==='buynow_a') return [...items].sort((a,b)=>(a.buyNow||0)-(b.buyNow||0));
-    if (s==='status_a') return [...items].sort((a,b)=>(a._jobStatus||a.status||'').localeCompare(b._jobStatus||b.status||''));
-    if (s==='status_d') return [...items].sort((a,b)=>(b._jobStatus||b.status||'').localeCompare(a._jobStatus||a.status||''));
-    if (s==='sclub_a')  return [...items].sort((a,b)=>(a._club||'').localeCompare(b._club||''));
-    if (s==='sclub_d')  return [...items].sort((a,b)=>(b._club||'').localeCompare(a._club||''));
-    if (s==='bestpos_d') return [...items].sort((a,b)=>(b._bestPosRating||0)-(a._bestPosRating||0));
-    if (s==='bestpos_a') return [...items].sort((a,b)=>(a._bestPosRating||0)-(b._bestPosRating||0));
-    if (s==='men_d') return [...items].sort((a,b)=>(b._mentality||0)-(a._mentality||0));
-    if (s==='men_a') return [...items].sort((a,b)=>(a._mentality||0)-(b._mentality||0));
-    if (s==='wr_d') return [...items].sort((a,b)=>(b._workRate||0)-(a._workRate||0));
-    if (s==='wr_a') return [...items].sort((a,b)=>(a._workRate||0)-(b._workRate||0));
-    if (s==='potential_d') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[b.player?.potential]||0)-(m[a.player?.potential]||0); return pd!==0?pd:(b.player?.potentialCap||0)-(a.player?.potentialCap||0); }); }
-    if (s==='potential_a') { const m={'high':3,'medium':2,'low':1}; return [...items].sort((a,b)=>{ const pd=(m[a.player?.potential]||0)-(m[b.player?.potential]||0); return pd!==0?pd:(a.player?.potentialCap||0)-(b.player?.potentialCap||0); }); }
-    return items;
+    return sortYouthHist(items, this.youthHistSort, this);
   },
   youthHistPaged() {
     const start = this.youthHistPage * HIST_PAGE_SIZE;
