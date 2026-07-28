@@ -25,15 +25,6 @@ export const dataMethods = {
     },
     closeModal() { this.selectedPlayer=null; this.selectedJobCtx=null; this.selectedPlayerStats=null; },
 
-    // Return stats object for the selected tab in the player modal
-    playerStatsForTab(tab) {
-      const d = this.selectedPlayerStats;
-      if (!d) return null;
-      if (tab === 'season') return d.seasonStats || null;
-      if (tab === 'career') return d.career || d.seasonStats || null;
-      return null; // 'form' handled separately
-    },
-
     async loadData() {
       // Managers can change independent of the (up to 6h stale) players cache, so always
       // refresh this in the background regardless of which cache path below is taken.

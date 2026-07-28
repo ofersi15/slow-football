@@ -29,8 +29,4 @@ export const clubsComputed = {
     if (!this.selectedClubName) return [];
     return (this.clubTransferMap[this.selectedClubName] || []).slice(0, 20);
   },
-  selectedClubEspData() {
-    if (!this.selectedClubName) return null;
-    return this.espionageClubs.find(c => c.club === this.selectedClubName) || null;
-  },
 };
