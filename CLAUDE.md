@@ -19,9 +19,8 @@ This file is auto-loaded into every Claude Code session — keep it to durable, 
 
 ## Build & Deploy
 
-- **Any frontend change**: `git push origin main` → CF Pages auto-deploys in ~60s
-- **Build command**: `npm run build` (runs assemble + Vite — do this before checking dist/)
-- CF Pages serves from `dist/` (wrangler.jsonc)
+- **Any frontend change**: `git push origin main` → Cloudflare Worker "sf" project rebuilds and deploys itself (Build command `npm run build`, Deploy command `npx wrangler deploy`, configured in the CF dashboard's Git integration) — `dist/` is gitignored, not committed, since CF builds it fresh every time
+- **Build command**: `npm run build` (runs assemble + Vite)
 - **Cache worker**: deployed separately via `cd cf-worker && npx wrangler deploy -c wrangler.toml`
 
 ---
