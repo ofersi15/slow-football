@@ -247,7 +247,10 @@ function formatLineupReply(d) {
   const lineupReasoning = cleanText(d.lineup_reasoning);
   lines.push(`**Recommended lineup — ${d.formation || '?'}**`);
   if (lineupReasoning) lines.push(lineupReasoning, '');
-  (d.lineup || []).forEach(p => {
+  // Filter out the exact garbage shape isLineupReplyBroken() checks for — belt-and-suspenders
+  // for the best-effort fallback path, where a still-broken reply gets rendered anyway after
+  // retries run out rather than erroring outright.
+  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?').forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
     const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
@@ -347,9 +350,18 @@ async function handleChat(request, env, cors) {
   // decoding hiccup producing invalid JSON — so this also retries the whole request once,
   // live, if the first attempt is detected as broken, rather than silently handing the user a
   // half-empty reply.
+  // 2026-07-29: a live test against a real matchup (Arsenal away at Liverpool) produced a
+  // schema-valid but broken lineup array — 11 real starters plus a 12th "ghost" entry
+  // ({slot:"?", player:"?", rating:0, fitness_pct:0, role:"Poacher"}) that this check didn't
+  // catch since it only guarded against too FEW items, not a garbage extra one (nothing in the
+  // schema forbids more than 11 — minItems/maxItems above 0/1 aren't supported, see LINEUP_SCHEMA
+  // comments above). Tightened from "at least 9" to "exactly 11", plus a per-item check for the
+  // exact garbage shape observed (empty/placeholder-like player or slot, or a 0 rating/fitness —
+  // no real player in this game has either).
   function isLineupReplyBroken(parsed) {
     if (!parsed || typeof parsed !== 'object') return true;
-    if (!Array.isArray(parsed.lineup) || parsed.lineup.length < 9) return true;
+    if (!Array.isArray(parsed.lineup) || parsed.lineup.length !== 11) return true;
+    if (parsed.lineup.some(p => !p || !p.player || !p.slot || p.player === '?' || p.slot === '?' || !p.rating || !p.fitness_pct)) return true;
     if (!Array.isArray(parsed.subs) || parsed.subs.length < 3) return true;
     const sp = parsed.set_pieces;
     if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
@@ -366,9 +378,17 @@ async function handleChat(request, env, cors) {
       },
       body: JSON.stringify({
         model: CHAT_MODEL,
-        // lineupMode gets extra headroom for JSON's structural overhead (repeated keys, quotes)
-        // on top of the same content a free-text reply would carry.
-        max_tokens: lineupMode ? 8500 : 6500,
+        // 2026-07-29: free-text mode raised 6500->8500 (now matching lineupMode) after live
+        // testing against a real matchup (Arsenal away at Liverpool, a real submission with
+        // Player Roles + a full Plan B set) hit stop_reason:"max_tokens" 3/5 times, cutting the
+        // reply off mid-Section-4 with Plan B/Set pieces/Corner tactics never generated.
+        // wrangler tail showed thinking alone varying 3787-4870 tokens run to run for the exact
+        // same prompt — the extra per-line Role tag and the Plan B block (new content this
+        // session) pushed adaptive thinking's variance past the old 6500 cap often enough to be
+        // a real failure mode, not just a rare fluke. lineupMode already carried headroom for
+        // JSON's structural overhead on top of the same content, so the two modes now share the
+        // same budget rather than free-text staying tighter.
+        max_tokens: 8500,
         system,
         messages: cachedMessages,
         // EXPERIMENT: the original per-field schema (6 instruction reasons + 5 sub reasons) at
@@ -397,7 +417,15 @@ async function handleChat(request, env, cors) {
 
   try {
     let data, text, parsed, reply;
-    const maxAttempts = lineupMode ? 2 : 1;
+    // 2026-07-29: a live test (Arsenal away at Liverpool, a real submission carrying Player
+    // Roles + a full Plan B set) hit a free-text reply that came back completely empty —
+    // ok:true, zero content — even after raising max_tokens above. Adaptive thinking's token
+    // usage varies run to run for the identical prompt (3787-4966 seen in testing) and can,
+    // rarely, consume the entire max_tokens budget before any visible text block starts. That
+    // failure mode isn't unique to lineupMode's JSON-schema path, so both modes now get a retry
+    // — free text only retries on a truly empty reply (never on a short-but-real one, e.g. a
+    // one-line answer to a simple question), lineupMode keeps its existing broken-schema check.
+    const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const r = await callAnthropic();
       data = await r.json();
@@ -411,7 +439,15 @@ async function handleChat(request, env, cors) {
       }
       text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
       reply = text;
-      if (!lineupMode) break;
+      if (!lineupMode) {
+        if (text.trim().length > 0) break;
+        if (attempt === maxAttempts) {
+          console.error('[chat] free-text reply still empty after', attempt, 'attempt(s), returning empty');
+        } else {
+          console.error('[chat] free-text reply came back empty on attempt', attempt, '— retrying');
+        }
+        continue;
+      }
       parsed = null;
       try { parsed = JSON.parse(text); } catch (e) { console.error('[chat] lineup JSON parse failed (attempt', attempt, '):', e.message); }
       if (parsed && !isLineupReplyBroken(parsed)) {
