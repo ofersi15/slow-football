@@ -488,7 +488,22 @@ async function handleChat(request, env, cors) {
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const r = await callAnthropic();
-      data = await r.json();
+      const bodyText = await r.text();
+      try {
+        data = JSON.parse(bodyText);
+      } catch (e) {
+        // A transient gateway timeout (Cloudflare 524) or similar infra hiccup between us and
+        // Anthropic returns a plain-text/HTML error page, not JSON — this used to throw straight
+        // past the whole retry loop into the outer catch, burning the request on attempt 1 even
+        // though the retry budget below exists for exactly this kind of transient failure.
+        // Treat it the same as any other broken-attempt case: retry once, then give up.
+        console.error('[chat] non-JSON response from Anthropic (attempt', attempt, '):', bodyText.slice(0, 200));
+        if (attempt === maxAttempts) {
+          return new Response(JSON.stringify({ error: 'Anthropic API returned an invalid response (likely a transient gateway timeout) — please try again' }),
+            { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+        }
+        continue;
+      }
       if (!r.ok) {
         console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
         return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
