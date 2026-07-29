@@ -107,6 +107,38 @@ export const POS_COLORS = {
   CF: {fill:'#5a1010',stroke:'#ff7b72',text:'#ff7b72'},
 };
 
+// ── Player Roles (tactical role per XI slot, added to submissions alongside Plan B) ──────────
+// Options are gated by base position — same list the live /submit-team-v2 form offers.
+export const PLAYER_ROLES = {
+  GK: ['Shot Stopper','Sweeper Keeper','Box Commander'],
+  FB: ['Defensive Full Back','Inverted Full Back','Overlapper','Two-Way Full Back'],
+  CB: ['No-Nonsense CB','Ball Player','Man Marker'],
+  DM: ['Deep-Lying Playmaker','Destroyer','Anchor','Box-to-Box Midfielder'],
+  AM: ['Advanced Playmaker','Shadow Striker','Trickster'],
+  WF: ['Traditional Winger','Inside Forward','Wide Playmaker'],
+  CF: ['Target Man','Poacher','False 9','Complete Forward'],
+};
+// Short codes for the tight space on pitch nodes — full name still shown in the hover tooltip.
+export const ROLE_ABBR = {
+  'Shot Stopper':'SHS', 'Sweeper Keeper':'SWK', 'Box Commander':'BXC',
+  'Defensive Full Back':'DFB', 'Inverted Full Back':'IFB', 'Overlapper':'OVL', 'Two-Way Full Back':'TWF',
+  'No-Nonsense CB':'NNC', 'Ball Player':'BPL', 'Man Marker':'MAN',
+  'Deep-Lying Playmaker':'DLP', 'Destroyer':'DES', 'Anchor':'ANC', 'Box-to-Box Midfielder':'B2B',
+  'Advanced Playmaker':'APM', 'Shadow Striker':'SST', 'Trickster':'TRK',
+  'Traditional Winger':'TRW', 'Inside Forward':'INF', 'Wide Playmaker':'WPM',
+  'Target Man':'TGM', 'Poacher':'POA', 'False 9':'F9', 'Complete Forward':'CPF',
+};
+
+// ── Plan B (scenario-triggered whole-team tactical shift, fires at most once per match) ──────
+export const PLAN_B_SCENARIOS = [
+  { key: 'down_to_ten_men',          label: 'Down to 10' },
+  { key: 'opponent_down_to_ten_men', label: 'Opp down to 10' },
+  { key: 'losing_by_two_or_more',    label: 'Losing by 2+' },
+  { key: 'winning_by_two_or_more',   label: 'Winning by 2+' },
+  { key: 'concede_in_first_ten',     label: 'Concede early' },
+  { key: 'score_in_first_ten',       label: 'Score early' },
+];
+
 // ── Chemistry constants ───────────────────────────────────────────────────────
 export const GAME_START = new Date("2025-08-23T00:00:00Z").getTime();
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;

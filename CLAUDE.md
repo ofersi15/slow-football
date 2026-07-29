@@ -123,6 +123,8 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 
 Full history/root-causes/verification detail: **`AI-ASSISTANT-CHANGELOG.md`** (not auto-loaded — read it when you need the *why* behind something below).
 
+⚠ **Known-stale as of 2026-07-29**: the game mechanics reference below (in `buildChatContext()`) still documents a sub's Plan as a 5-value mentality-override scale, and doesn't mention Player Roles or Plan B at all (see the Clubs Tab section above) — the game added both since that reference was written. Not yet fixed; see `CHANGELOG.md`'s "Clubs tab: Player Roles + Plan B" entry for what the live game bundle actually shows.
+
 - Chat UI: `src/templates/tab-assistant.html` (full tab, centered, 900px) + `assistant-dock.html` (400px right-docked panel, opened via 💬 in the header from any other tab). Only one is ever mounted at once — they share `ref="chatScroll"`. Logic in `src/methods/assistant.js`.
 - Frontend POSTs `{messages, context}` to `POST {SF_WORKER_BASE}/_chat` — `cf-worker/index.js` `handleChat` proxies to the Claude API server-side so the key never reaches the browser. No auth on the route (consistent with the worker's other admin routes) — relies on the URL not being published.
 - Model: `claude-sonnet-5`, `thinking: {type:'adaptive'}` (must stay on — thinking-disabled causes leaked scratch-work/precision errors on precision-heavy replies), `output_config.effort:'low'`, `max_tokens: 6500` (free text) / `8500` (lineup mode).
@@ -150,8 +152,12 @@ Full history/root-causes/verification detail: **`AI-ASSISTANT-CHANGELOG.md`** (n
 - SVG pitch with player nodes, run arrows, hover tooltips
 - `pitchLayout(submission)` — in `src/methods/clubs.js`
 - Run arrow coords (do not change): `runX = (run.x/90)*68` | slot1: `runY = (run.y-27.5)/95*105` | slot2: `runY = 105-(run.y/100)*105`
-- Formations: 16 total, gated by Analytics Dept facility level (cumulative) — Lv1 `442 433 4231 532 343`, Lv2 adds `352 541 4411`, Lv3 adds `4321 451`, Lv4 adds `4141 442D 3421`, Lv5 adds `3241 4222 4132`. Same tier table lives in `facRef()`/`facExplain()` in `src/methods/youth.js` (`analytics` key) and is now also in the Assistant's `buildChatContext()` — see AI Assistant section below
+- Formations: 16 total, gated by Analytics Dept facility level (cumulative) — Lv1 `442 433 4231 532 343`, Lv2 adds `352 541 4411`, Lv3 adds `4321 451`, Lv4 adds `4141 442D 3421`, Lv5 adds `3241 4222 4132`. Same tier table lives in `facRef()`/`facExplain()` in `src/methods/youth.js` (`analytics` key) and is now also in the Assistant's `buildChatContext()` — see AI Assistant section below. **`FORMATION_SLOT_POS`/`FORMATIONS` in `constants.js` only cover 8 of the 16** (442/4411/4231/433/4321/3421/352/343) — `pitchLayout()` silently returns `[]` for the other 8, a pre-existing gap, not addressed by the Player Roles/Plan B work below.
 - Clicking the Clubs tab always resets to club list (clears `selectedClubName`)
+- **Player Roles**: each `xi[]` entry can carry a `role` string (FM-style tactical role, e.g. "Overlapper", "Poacher" — gated by base position, full list in `PLAYER_ROLES`/`ROLE_ABBR` in `constants.js`). `pitchLayout()` passes it through; shown as a small abbreviated label under each pitch node, full name in the hover tooltip and in the "Player Roles" side panel. Empty/absent on submissions made before the game added this.
+- **Plan B**: a submission's top-level `planBs` array holds `{priority, scenario, plan}` for each *enabled* scenario only (6 fixed scenario keys in `PLAN_B_SCENARIOS`, e.g. "losing_by_two_or_more" → a named Plan like "Chase The Game" — fires at most once per match, no personnel changes). Rendered via `planBList(submission)`/`planBLabel(key)` (`clubs.js`) in a "Plan B" side panel, and as a "🅱 N" chip (hover for detail) on the All-Clubs grid card.
+- The pre-existing "Roles" object (`submission.roles` — captain/penalty/freekick/corner set-piece takers) is now labeled "Set-Piece Roles" in the UI to disambiguate from the new per-player "Player Roles" above — same underlying field, no data-shape change.
+- A sub's `plan` field (`subs[].plan`) is a fixed 5-value vocabulary (`Fresh legs`/`Plan B`/`Shut up shop`/`Waste time`/`Chase the game`) as of the same game update — **no longer** the 5-value mentality scale the Assistant's game-mechanics reference still documents (see AI Assistant section) — the Clubs tab itself needed no change since it already renders `plan` as a bare string. Full root-cause/verification: `CHANGELOG.md`.
 
 ---
 
