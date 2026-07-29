@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FORMATIONS, FORMATION_SLOT_POS, POS_COLORS, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY } from '../constants.js'
+import { API, MY_CLUB, FORMATIONS, FORMATION_SLOT_POS, POS_COLORS, ROLE_ABBR, PLAN_B_SCENARIOS, SUBMISSIONS_CACHE_KEY, SUBMISSIONS_LS_KEY } from '../constants.js'
 import { serverCacheGet, serverCacheSet, parseAsync, stringifyAsync } from '../cache.js'
 import { fmtFormation } from '../utils.js'
 
@@ -83,7 +83,7 @@ export const clubsMethods = {
         const slotType = player.slot || (FORMATIONS[code]||[])[i] || 'CM';
         const bp = this.basePos(player.position || slotType || 'CM');
         const colors = POS_COLORS[bp] || POS_COLORS.CM;
-        return { name: player.name, position: player.position || slotType,
+        return { name: player.name, position: player.position || slotType, role: player.role || null,
                  bp, slotType, x: pos.x, y: pos.y,
                  fill: colors.fill, stroke: colors.stroke, textColor: colors.text };
       });
@@ -158,6 +158,19 @@ export const clubsMethods = {
 
     // Format a formation code like "4231" → "4-2-3-1"
     fmtFormation,
+
+    // Short code for a Player Role (pitch-node space is tight) — falls back to the full name
+    roleAbbr(role) { return ROLE_ABBR[role] || role || ''; },
+
+    // Human label for a Plan B scenario key
+    planBLabel(key) { return PLAN_B_SCENARIOS.find(s => s.key === key)?.label || key; },
+
+    // Plan B entries sorted by priority (fires-at-most-once, lower priority wins on overlap)
+    planBList(submission) {
+      const arr = submission?.planBs;
+      if (!Array.isArray(arr) || !arr.length) return [];
+      return arr.filter(p => p?.scenario && p?.plan).slice().sort((a, b) => (a.priority || 0) - (b.priority || 0));
+    },
 
     // Extract tactical settings for a club from Pre-match narrative paragraphs
     // Maps free-form narrative language to actual game API instruction values
