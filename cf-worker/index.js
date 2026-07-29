@@ -238,7 +238,11 @@ const LINEUP_SCHEMA = {
 // testing: "placeholder") is a real failure mode schema types alone don't catch — this is the
 // last line of defense so it never reaches the user. Mechanical fields (enums, numbers) aren't
 // checked here since an enum literally can't be "placeholder".
-const PLACEHOLDER_RE = /^\s*(placeholder|tbd|n\/?a|todo|xxx?)\s*\.?\s*$/i;
+// 2026-07-29 (round 2): under visibly heavy Anthropic API load that same session, a real reply
+// had several reasoning fields come back containing the literal bare word "reason" (the schema's
+// own JSON Schema property name for that exact field, leaking out as if it were the content) —
+// a distinct filler pattern the original list didn't cover.
+const PLACEHOLDER_RE = /^\s*(placeholder|tbd|n\/?a|todo|xxx?|reason|reasoning|description|summary)\s*\.?\s*$/i;
 const cleanText = (s) => (typeof s === 'string' && !PLACEHOLDER_RE.test(s)) ? s : '';
 // Belt-and-suspenders for the best-effort fallback path (still-broken reply rendered anyway once
 // retries run out): truncates a reasoning-type field that's implausibly long for what it's meant
@@ -260,7 +264,7 @@ function formatLineupReply(d) {
   // Filter out the exact garbage shape isLineupReplyBroken() checks for — belt-and-suspenders
   // for the best-effort fallback path, where a still-broken reply gets rendered anyway after
   // retries run out rather than erroring outright.
-  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?').forEach(p => {
+  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?' && p.slot.length <= 6 && p.player.length <= 60).forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
     const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
@@ -384,7 +388,11 @@ async function handleChat(request, env, cors) {
   function isLineupReplyBroken(parsed) {
     if (!parsed || typeof parsed !== 'object') return true;
     if (!Array.isArray(parsed.lineup) || parsed.lineup.length !== 11) return true;
-    if (parsed.lineup.some(p => !p || !p.player || !p.slot || p.player === '?' || p.slot === '?' || !p.rating || !p.fitness_pct)) return true;
+    // 2026-07-29 (round 2): a corrupted reply under heavy API load had a `slot` field containing
+    // a whole run-on sentence of stray reasoning text instead of a real slot code (GK/RB/CB/...)
+    // — valid non-empty strings, so the placeholder-style checks above didn't catch them. Real
+    // slot codes and player names are always short; a wildly oversized one is corruption.
+    if (parsed.lineup.some(p => !p || !p.player || !p.slot || p.player === '?' || p.slot === '?' || !p.rating || !p.fitness_pct || p.slot.length > 6 || p.player.length > 60)) return true;
     if (!Array.isArray(parsed.subs) || parsed.subs.length < 3) return true;
     const sp = parsed.set_pieces;
     if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
