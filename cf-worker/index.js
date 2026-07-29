@@ -67,6 +67,24 @@ function sanitizeChatContent(content) {
 // backs both "instructions.mentality" and each sub's "plan", matching the real game where sub
 // plans are just the mentality scale, not a separate freeform field.
 const MENTALITY_ENUM = ['Very Defensive', 'Defensive', 'Balanced', 'Attacking', 'Very Attacking'];
+// Player Roles (PLAYER_ROLES in src/constants.js, duplicated here since the worker doesn't share
+// a build with the frontend) — flattened into one enum so the model can only pick a real role
+// name; which of these 24 is valid for a given player's own base position is prompt guidance
+// only (the schema has no way to make that conditional on a sibling field's value).
+const ROLE_ENUM = [
+  'Shot Stopper', 'Sweeper Keeper', 'Box Commander',
+  'Defensive Full Back', 'Inverted Full Back', 'Overlapper', 'Two-Way Full Back',
+  'No-Nonsense CB', 'Ball Player', 'Man Marker',
+  'Deep-Lying Playmaker', 'Destroyer', 'Anchor', 'Box-to-Box Midfielder',
+  'Advanced Playmaker', 'Shadow Striker', 'Trickster',
+  'Traditional Winger', 'Inside Forward', 'Wide Playmaker',
+  'Target Man', 'Poacher', 'False 9', 'Complete Forward',
+];
+// Plan B scenarios (PLAN_B_SCENARIOS in src/constants.js) — fires at most once per match, no
+// personnel changes. The scenario→Mentality/Style mapping isn't confirmed (see CHANGELOG.md's
+// "Clubs tab: Player Roles + Plan B" entry), so this only names the scenario — the model gives a
+// plausible reaction DIRECTION in free text, never a specific named Plan or instruction value.
+const PLAN_B_SCENARIO_ENUM = ['Down to 10', 'Opp down to 10', 'Losing by 2+', 'Winning by 2+', 'Concede early', 'Score early'];
 // Property order matters: two real tests showed the model filling everything correctly up to
 // a point, then degrading to literal "placeholder" text for whatever came after — always
 // starting right after the "instructions" object, regardless of remaining token budget. So (1)
@@ -96,8 +114,9 @@ const LINEUP_SCHEMA = {
           rating: { type: 'number', description: 'Their game-formula rating at this exact slot (own Rating if natural position, matching alt-position rating if not).' },
           fitness_pct: { type: 'number' },
           is_captain: { type: 'boolean' },
+          role: { enum: ROLE_ENUM, description: "Tactical role for this player, valid ONLY for their own base position (not whichever slot they're filling if playing out of position) — see the Player Roles list in the context's game mechanics reference." },
         },
-        required: ['slot', 'player', 'rating', 'fitness_pct', 'is_captain'],
+        required: ['slot', 'player', 'rating', 'fitness_pct', 'is_captain', 'role'],
         additionalProperties: false,
       },
     },
@@ -175,6 +194,24 @@ const LINEUP_SCHEMA = {
       required: ['attacking_delivery', 'attacking_stay_back', 'defensive_scheme', 'defensive_press'],
       additionalProperties: false,
     },
+    // Optional — short Plan B block appended at the end of the Substitutions section (not a new
+    // section of its own, matching the free-text template). Not in top-level `required`: Plan B
+    // is a real game mechanic but its scenario→setting mapping isn't confirmed (see CHANGELOG.md),
+    // so the model should only ever name a scenario + a plausible reaction direction, and it's
+    // fine for the model to omit this rather than invent specifics.
+    plan_b: {
+      type: 'array',
+      description: '1-3 short Plan B notes worth calling out for THIS matchup (not all 6 scenarios). Each is a scenario name from the fixed list plus a plausible tactical reaction DIRECTION only (e.g. "push for goals", "shut up shop and protect the lead") — never a specific named Plan or exact Mentality/Style/etc. value, since that mapping is not confirmed. Omit this field entirely only if truly nothing stands out; otherwise give at least one sensible generic line.',
+      items: {
+        type: 'object',
+        properties: {
+          scenario: { enum: PLAN_B_SCENARIO_ENUM },
+          reaction: { type: 'string', minLength: 1, description: 'Plain-language tactical direction only — no specific instruction values.' },
+        },
+        required: ['scenario', 'reaction'],
+        additionalProperties: false,
+      },
+    },
     // Everything below is free-text reasoning — optional (not in top-level `required`), the
     // part most likely to degrade under pressure, and least harmful to lose since the mechanical
     // decision it explains is already locked in above regardless.
@@ -212,7 +249,8 @@ function formatLineupReply(d) {
   if (lineupReasoning) lines.push(lineupReasoning, '');
   (d.lineup || []).forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
-    lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}`);
+    const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
+    lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
   });
   const ins = d.instructions || {};
   lines.push('', '**Match instructions**');
@@ -228,6 +266,11 @@ function formatLineupReply(d) {
     const t = s.timing || {};
     lines.push(`${t.window || '?'} (${t.condition || '?'}) — ${s.player_in || '?'} IN for ${s.player_out || '?'} (${s.plan || '?'})`);
   });
+  const planB = (Array.isArray(d.plan_b) ? d.plan_b : []).filter(pb => pb && cleanText(pb.scenario) && cleanText(pb.reaction));
+  if (planB.length) {
+    lines.push('', '**Plan B**');
+    planB.forEach(pb => lines.push(`${pb.scenario}: ${pb.reaction}`));
+  }
   const sp = d.set_pieces || {};
   lines.push('', '**Set pieces**');
   lines.push(
