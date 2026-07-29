@@ -145,7 +145,7 @@ const LINEUP_SCHEMA = {
       // but it does structurally forbid the empty-array failure mode seen in live testing (the
       // model returning subs:[] , which is schema-valid with no minItems set at all).
       minItems: 1,
-      description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning". IMPORTANT: a sub\'s "plan" changes the team\'s overall mentality from that point on and persists until a later sub changes it again — it is not a description of that player. The 3 "any situation" subs should use the SAME plan as instructions.mentality (routine rotation shouldn\'t silently change the team\'s approach); only the "if winning" sub (step toward Defensive) and "if not winning" sub (step toward Attacking/Very Attacking) should actually change it.',
+      description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning". IMPORTANT: a sub\'s "plan" changes the team\'s overall mentality from that point on and persists until a later sub changes it again — it is not a description of that player. The 3 "any situation" subs should use the SAME plan as instructions.mentality (routine rotation shouldn\'t silently change the team\'s approach); only the "if winning" sub (step toward Defensive) and "if not winning" sub (step toward Attacking/Very Attacking) should actually change it. Any starter in the lineup array at meaningfully reduced fitness_pct (roughly under 70) needs an actual sub addressing them by name here — don\'t leave a tired starter with no plan. A player_in only counts as bringing "fresh legs" if their own fitness is genuinely higher than the player_out\'s — don\'t bring on another low-fitness player and call it fresh.',
       items: {
         type: 'object',
         properties: {
@@ -204,7 +204,7 @@ const LINEUP_SCHEMA = {
     // it's fine for the model to cover fewer scenarios when fewer are realistic for this match.
     plan_b: {
       type: 'array',
-      description: '2-4 scenarios genuinely realistic for THIS matchup (not necessarily all 6, but check the opponent\'s own Plan B awareness in context — if they\'ve configured most/all 6, be more thorough here rather than defaulting to 1-2). Each names the scenario plus ONE specific named Plan from the fixed 7-option list and a short reason tied to this match. Never invent a Plan name outside that list, and never substitute a vague direction for a real name.',
+      description: '2-4 scenarios genuinely realistic for THIS matchup (not necessarily all 6, but check the opponent\'s own Plan B awareness in context — if they\'ve configured most/all 6, be more thorough here rather than defaulting to 1-2). Each names the scenario plus ONE specific named Plan from the fixed 7-option list and a short reason tied to this match. Never invent a Plan name outside that list, and never substitute a vague direction for a real name. The same real event triggers both teams\' Plan B at once from opposite sides (our conceding early = their scoring early, our losing by 2+ = their winning by 2+, etc.) — if the opponent\'s own Plan B detail is available in context, cross-reference their mirrored-scenario reaction by name in at least one reason (e.g. our reaction to conceding early should account for what we know they\'ll do the moment they score), not just reason about our own scenario in isolation. Never frame this as something we can "engineer" (we don\'t choose scorelines) — only as knowing their reaction in advance so we are ready for it.',
       items: {
         type: 'object',
         properties: {
@@ -269,13 +269,9 @@ function formatLineupReply(d) {
     const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
   });
-  const ins = d.instructions || {};
-  lines.push('', '**Match instructions**');
-  [['Mentality', 'mentality'], ['Style', 'style'], ['Structure', 'structure'], ['Defensive Line', 'defensive_line'], ['Attacking Focus', 'attacking_focus'], ['Pressing', 'pressing']].forEach(([label, key]) => {
-    lines.push(`${label}: ${ins[key] || '?'}`);
-  });
-  const instrReasoning = cleanAndCap(d.instructions_reasoning, 900);
-  if (instrReasoning) lines.push('', instrReasoning);
+  // Substitutions (+ Plan B) now renders right after the lineup and BEFORE match instructions —
+  // reordered per owner feedback: the starting XI and sub plan are one decision, not two, and
+  // should read that way.
   lines.push('', '**Substitutions**');
   const subsOverview = cleanAndCap(d.subs_overview, 600);
   if (subsOverview) lines.push(subsOverview, '');
@@ -290,6 +286,13 @@ function formatLineupReply(d) {
     lines.push('', '**Plan B**');
     planB.forEach(pb => lines.push(`${pb.scenario}: ${pb.plan} — ${pb.reason}`));
   }
+  const ins = d.instructions || {};
+  lines.push('', '**Match instructions**');
+  [['Mentality', 'mentality'], ['Style', 'style'], ['Structure', 'structure'], ['Defensive Line', 'defensive_line'], ['Attacking Focus', 'attacking_focus'], ['Pressing', 'pressing']].forEach(([label, key]) => {
+    lines.push(`${label}: ${ins[key] || '?'}`);
+  });
+  const instrReasoning = cleanAndCap(d.instructions_reasoning, 900);
+  if (instrReasoning) lines.push('', instrReasoning);
   const sp = d.set_pieces || {};
   lines.push('', '**Set pieces**');
   lines.push(
