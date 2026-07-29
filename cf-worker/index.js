@@ -81,10 +81,15 @@ const ROLE_ENUM = [
   'Target Man', 'Poacher', 'False 9', 'Complete Forward',
 ];
 // Plan B scenarios (PLAN_B_SCENARIOS in src/constants.js) — fires at most once per match, no
-// personnel changes. The scenario→Mentality/Style mapping isn't confirmed (see CHANGELOG.md's
-// "Clubs tab: Player Roles + Plan B" entry), so this only names the scenario — the model gives a
-// plausible reaction DIRECTION in free text, never a specific named Plan or instruction value.
+// personnel changes.
 const PLAN_B_SCENARIO_ENUM = ['Down to 10', 'Opp down to 10', 'Losing by 2+', 'Winning by 2+', 'Concede early', 'Score early'];
+// 2026-07-29: the named-Plan vocabulary a manager assigns per scenario (PLAN_B_NAMED_PLANS in
+// src/constants.js) is confirmed directly off a real live opponent submission (Liverpool) — not
+// a guess — so the model names a SPECIFIC plan per scenario now, not a vague free-text
+// direction as originally shipped. What's still NOT confirmed is the exact underlying
+// Mentality/Style/etc. value each named Plan triggers under the hood (see CHANGELOG.md's "Clubs
+// tab: Player Roles + Plan B" entry) — so the schema only ever asserts the Plan's name.
+const PLAN_B_NAMED_PLAN_ENUM = ['Shut Up Shop', 'Sit Deeper', 'Hold Shape', 'Keep The Ball', 'Go Direct', 'Push On', 'Chase The Game'];
 // Property order matters: two real tests showed the model filling everything correctly up to
 // a point, then degrading to literal "placeholder" text for whatever came after — always
 // starting right after the "instructions" object, regardless of remaining token budget. So (1)
@@ -195,27 +200,26 @@ const LINEUP_SCHEMA = {
       additionalProperties: false,
     },
     // Optional — short Plan B block appended at the end of the Substitutions section (not a new
-    // section of its own, matching the free-text template). Not in top-level `required`: Plan B
-    // is a real game mechanic but its scenario→setting mapping isn't confirmed (see CHANGELOG.md),
-    // so the model should only ever name a scenario + a plausible reaction direction, and it's
-    // fine for the model to omit this rather than invent specifics.
+    // section of its own, matching the free-text template). Not in top-level `required` since
+    // it's fine for the model to cover fewer scenarios when fewer are realistic for this match.
     plan_b: {
       type: 'array',
-      description: '1-3 short Plan B notes worth calling out for THIS matchup (not all 6 scenarios). Each is a scenario name from the fixed list plus a plausible tactical reaction DIRECTION only (e.g. "push for goals", "shut up shop and protect the lead") — never a specific named Plan or exact Mentality/Style/etc. value, since that mapping is not confirmed. Omit this field entirely only if truly nothing stands out; otherwise give at least one sensible generic line.',
+      description: '2-4 scenarios genuinely realistic for THIS matchup (not necessarily all 6, but check the opponent\'s own Plan B awareness in context — if they\'ve configured most/all 6, be more thorough here rather than defaulting to 1-2). Each names the scenario plus ONE specific named Plan from the fixed 7-option list and a short reason tied to this match. Never invent a Plan name outside that list, and never substitute a vague direction for a real name.',
       items: {
         type: 'object',
         properties: {
           scenario: { enum: PLAN_B_SCENARIO_ENUM },
-          reaction: { type: 'string', minLength: 1, description: 'Plain-language tactical direction only — no specific instruction values.' },
+          plan: { enum: PLAN_B_NAMED_PLAN_ENUM },
+          reason: { type: 'string', minLength: 1, description: 'Short, match-specific reason this Plan suits this scenario.' },
         },
-        required: ['scenario', 'reaction'],
+        required: ['scenario', 'plan', 'reason'],
         additionalProperties: false,
       },
     },
     // Everything below is free-text reasoning — optional (not in top-level `required`), the
     // part most likely to degrade under pressure, and least harmful to lose since the mechanical
     // decision it explains is already locked in above regardless.
-    opponent_breakdown: { type: 'string', description: '2-4 sentences on how the opponent sets up and plays, including at least one specific personnel matchup (e.g. "my RW vs their LB") — not a generic strengths/weaknesses list.' },
+    opponent_breakdown: { type: 'string', description: 'Open like a real assistant manager\'s scouting brief, in two parts: (a) 2-3 sentences on the opponent themselves — their setup, genuine strengths, genuine weaknesses, and general threat profile, independent of our own squad; (b) 2-3 sentences tying that into OUR specific matchup — where they hurt us, where we hurt them, naming at least one concrete personnel matchup (e.g. "my RW vs their LB"). If their Plan B awareness (in context) shows most/all 6 scenarios configured, mention that as part of (a) — it signals a well-drilled, reactive side.' },
     lineup_reasoning: { type: 'string', description: 'Plain-language paragraph on fitness/condition tradeoffs and any off-natural-position calls, citing both rating numbers for any such call. Never use the literal term "AltPosFit".' },
     instructions_reasoning: { type: 'string', description: 'One short paragraph covering the reasoning for all 6 instructions together, tied to the specific opponent matchup identified in the breakdown — not generic justification.' },
     subs_overview: { type: 'string', description: 'Brief note on the overall substitution strategy for this match — why this split of timings/plans.' },
@@ -236,15 +240,21 @@ const LINEUP_SCHEMA = {
 // checked here since an enum literally can't be "placeholder".
 const PLACEHOLDER_RE = /^\s*(placeholder|tbd|n\/?a|todo|xxx?)\s*\.?\s*$/i;
 const cleanText = (s) => (typeof s === 'string' && !PLACEHOLDER_RE.test(s)) ? s : '';
+// Belt-and-suspenders for the best-effort fallback path (still-broken reply rendered anyway once
+// retries run out): truncates a reasoning-type field that's implausibly long for what it's meant
+// to hold (a real corruption seen in testing — see isLineupReplyBroken's isOverlong comment above
+// — was ~1900 garbled/duplicated characters in a field meant to be one short clause). The retry
+// above should catch this first; this is only a backstop if it still slips through.
+const cleanAndCap = (s, cap) => { const c = cleanText(s); return c && c.length > cap ? c.slice(0, cap) + '…' : c; };
 
 function formatLineupReply(d) {
   const lines = [];
   if (cleanText(d.gw_status_note)) lines.push(cleanText(d.gw_status_note), '');
-  const breakdown = cleanText(d.opponent_breakdown);
+  const breakdown = cleanAndCap(d.opponent_breakdown, 1500);
   if (breakdown) lines.push('**Opponent breakdown**', breakdown, '');
   // Reasoning goes BEFORE the flat list, not after — matches the free-text template's rule and
   // was a real bug: this used to render after the list, the opposite of what was asked for.
-  const lineupReasoning = cleanText(d.lineup_reasoning);
+  const lineupReasoning = cleanAndCap(d.lineup_reasoning, 1500);
   lines.push(`**Recommended lineup — ${d.formation || '?'}**`);
   if (lineupReasoning) lines.push(lineupReasoning, '');
   // Filter out the exact garbage shape isLineupReplyBroken() checks for — belt-and-suspenders
@@ -260,19 +270,21 @@ function formatLineupReply(d) {
   [['Mentality', 'mentality'], ['Style', 'style'], ['Structure', 'structure'], ['Defensive Line', 'defensive_line'], ['Attacking Focus', 'attacking_focus'], ['Pressing', 'pressing']].forEach(([label, key]) => {
     lines.push(`${label}: ${ins[key] || '?'}`);
   });
-  const instrReasoning = cleanText(d.instructions_reasoning);
+  const instrReasoning = cleanAndCap(d.instructions_reasoning, 900);
   if (instrReasoning) lines.push('', instrReasoning);
   lines.push('', '**Substitutions**');
-  const subsOverview = cleanText(d.subs_overview);
+  const subsOverview = cleanAndCap(d.subs_overview, 600);
   if (subsOverview) lines.push(subsOverview, '');
   (d.subs || []).forEach(s => {
     const t = s.timing || {};
     lines.push(`${t.window || '?'} (${t.condition || '?'}) — ${s.player_in || '?'} IN for ${s.player_out || '?'} (${s.plan || '?'})`);
   });
-  const planB = (Array.isArray(d.plan_b) ? d.plan_b : []).filter(pb => pb && cleanText(pb.scenario) && cleanText(pb.reaction));
+  const planB = (Array.isArray(d.plan_b) ? d.plan_b : [])
+    .map(pb => pb && cleanText(pb.scenario) && pb.plan ? { ...pb, reason: cleanAndCap(pb.reason, 350) } : null)
+    .filter(pb => pb && pb.reason);
   if (planB.length) {
     lines.push('', '**Plan B**');
-    planB.forEach(pb => lines.push(`${pb.scenario}: ${pb.reaction}`));
+    planB.forEach(pb => lines.push(`${pb.scenario}: ${pb.plan} — ${pb.reason}`));
   }
   const sp = d.set_pieces || {};
   lines.push('', '**Set pieces**');
@@ -287,7 +299,7 @@ function formatLineupReply(d) {
   lines.push(`Attacking corner — Stay Back: ${ct.attacking_stay_back ?? '?'}`);
   lines.push(`Defensive corner — Scheme: ${ct.defensive_scheme || '?'}`);
   lines.push(`Defensive corner — Press: ${ct.defensive_press || '?'}`);
-  const cornerReasoning = cleanText(d.corner_reasoning);
+  const cornerReasoning = cleanAndCap(d.corner_reasoning, 600);
   if (cornerReasoning) lines.push(cornerReasoning);
   return lines.join('\n');
 }
@@ -358,6 +370,17 @@ async function handleChat(request, env, cors) {
   // comments above). Tightened from "at least 9" to "exactly 11", plus a per-item check for the
   // exact garbage shape observed (empty/placeholder-like player or slot, or a 0 rating/fitness —
   // no real player in this game has either).
+  // 2026-07-29 (round 2): a live test — while the Anthropic API was visibly under heavy load
+  // (repeated transient "Overloaded"/Cloudflare 524 errors on other attempts that same session)
+  // — returned schema-valid JSON where `plan_b[0].reason` (meant to be one short clause) instead
+  // held ~1900 garbled, duplicated characters: what looked like a second near-complete copy of
+  // the entire reply (reasoning, lineup, subs, corner tactics) mashed together with corrupted
+  // text. Still parsed fine as JSON and passed every existing check, since none of them look at
+  // free-text field *length*. A short-reason field a real reply would never legitimately fill
+  // with thousands of characters is itself a corruption signal — capped every optional
+  // reasoning-type field generously above its realistic legitimate length and treat any overrun
+  // as broken (triggers the existing retry).
+  const isOverlong = (s, cap) => typeof s === 'string' && s.length > cap;
   function isLineupReplyBroken(parsed) {
     if (!parsed || typeof parsed !== 'object') return true;
     if (!Array.isArray(parsed.lineup) || parsed.lineup.length !== 11) return true;
@@ -365,6 +388,10 @@ async function handleChat(request, env, cors) {
     if (!Array.isArray(parsed.subs) || parsed.subs.length < 3) return true;
     const sp = parsed.set_pieces;
     if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
+    if (isOverlong(parsed.opponent_breakdown, 1500) || isOverlong(parsed.lineup_reasoning, 1500)
+        || isOverlong(parsed.instructions_reasoning, 900) || isOverlong(parsed.subs_overview, 600)
+        || isOverlong(parsed.corner_reasoning, 600)) return true;
+    if (Array.isArray(parsed.plan_b) && parsed.plan_b.some(pb => isOverlong(pb?.reason, 350))) return true;
     return false;
   }
 
@@ -387,8 +414,13 @@ async function handleChat(request, env, cors) {
         // session) pushed adaptive thinking's variance past the old 6500 cap often enough to be
         // a real failure mode, not just a rare fluke. lineupMode already carried headroom for
         // JSON's structural overhead on top of the same content, so the two modes now share the
-        // same budget rather than free-text staying tighter.
-        max_tokens: 8500,
+        // same budget rather than free-text staying tighter. Raised again 8500->10000 the same
+        // day after owner feedback made Section 1 two-part (a standalone opponent scouting read
+        // plus the matchup tie-in) and Plan B up to 4 lines with named plans + reasons — both
+        // add real visible-text length on top of the same thinking-token variance, and a live
+        // test still truncated mid-Section-6 at 8500. The stop_reason:"max_tokens" retry check
+        // just above is the real backstop; this raise just makes that retry less often necessary.
+        max_tokens: 10000,
         system,
         messages: cachedMessages,
         // EXPERIMENT: the original per-field schema (6 instruction reasons + 5 sub reasons) at
@@ -440,11 +472,16 @@ async function handleChat(request, env, cors) {
       text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
       reply = text;
       if (!lineupMode) {
-        if (text.trim().length > 0) break;
+        // 2026-07-29 (round 2): raising max_tokens alone didn't fully fix it — a live test with
+        // the richer two-part Section 1 + up-to-4-line Plan B block (added this round per owner
+        // feedback) still truncated mid-Section-6, cut off mid-word, even at the 8500 cap raised
+        // above earlier the same day. Checking stop_reason directly catches partial truncation
+        // that a text-emptiness check alone misses.
+        if (text.trim().length > 0 && data.stop_reason !== 'max_tokens') break;
         if (attempt === maxAttempts) {
-          console.error('[chat] free-text reply still empty after', attempt, 'attempt(s), returning empty');
+          console.error('[chat] free-text reply still incomplete after', attempt, 'attempt(s) (stop_reason:', data.stop_reason, '), returning best effort');
         } else {
-          console.error('[chat] free-text reply came back empty on attempt', attempt, '— retrying');
+          console.error('[chat] free-text reply truncated/empty on attempt', attempt, '(stop_reason:', data.stop_reason, ') — retrying');
         }
         continue;
       }
