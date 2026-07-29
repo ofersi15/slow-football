@@ -437,7 +437,15 @@ async function handleChat(request, env, cors) {
         // add real visible-text length on top of the same thinking-token variance, and a live
         // test still truncated mid-Section-6 at 8500. The stop_reason:"max_tokens" retry check
         // just above is the real backstop; this raise just makes that retry less often necessary.
-        max_tokens: 10000,
+        // 2026-07-29 (round 3): after the bench-naming/footedness/fitness-aware-subs/mirrored-
+        // Plan-B/close-call requirements were added (all real quality asks, not scope creep to
+        // walk back), thinking alone hit 8250 and then 9659 tokens on two consecutive attempts —
+        // both against the SAME 10000 cap, both stop_reason:"max_tokens", leaving only 897-1604
+        // chars of visible reply (cut off mid-Section-2). Retrying doesn't help this specific
+        // failure mode: thinking need itself had grown, not just its run-to-run variance, so both
+        // attempts hit the identical wall. Raised to 16000 for real headroom above the highest
+        // thinking usage observed (9659) plus a full visible reply (~2000-2500 tokens historically).
+        max_tokens: 16000,
         system,
         messages: cachedMessages,
         // EXPERIMENT: the original per-field schema (6 instruction reasons + 5 sub reasons) at
