@@ -619,10 +619,11 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     // broken (see the isLineupReplyBroken/maxAttempts logic in cf-worker/index.js) — a live
     // test hit 101s on a single successful attempt, so two sequential attempts can plausibly
     // approach 200s+. 240s leaves real margin for that worst case without waiting forever on a
-    // genuinely stuck request. Non-lineup messages never retry server-side, so they keep the
-    // shorter timeout — kept generous rather than tight either way, since a false-positive
-    // abort is worse than a few extra seconds of patience.
-    const timeoutMs = lineupMode ? 240000 : 90000;
+    // genuinely stuck request. 2026-07-29: free-text messages now retry server-side too (on a
+    // completely empty reply — see cf-worker/index.js), which a real test against a complex
+    // matchup (Arsenal away at Liverpool) actually hit, so they get the same generous timeout
+    // rather than the old tighter one, which could plausibly abort mid-retry.
+    const timeoutMs = 240000;
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const payload = {
