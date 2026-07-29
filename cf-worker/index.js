@@ -220,10 +220,10 @@ const LINEUP_SCHEMA = {
     // part most likely to degrade under pressure, and least harmful to lose since the mechanical
     // decision it explains is already locked in above regardless.
     opponent_breakdown: { type: 'string', description: 'Open like a real assistant manager\'s scouting brief, in two parts: (a) 2-3 sentences on the opponent themselves — their setup, genuine strengths, genuine weaknesses, and general threat profile, independent of our own squad; (b) 2-3 sentences tying that into OUR specific matchup — where they hurt us, where we hurt them, naming at least one concrete personnel matchup (e.g. "my RW vs their LB"). If their Plan B awareness (in context) shows most/all 6 scenarios configured, mention that as part of (a) — it signals a well-drilled, reactive side.' },
-    lineup_reasoning: { type: 'string', description: 'Plain-language paragraph on fitness/condition tradeoffs and any off-natural-position calls, citing both rating numbers for any such call. Never use the literal term "AltPosFit".' },
-    instructions_reasoning: { type: 'string', description: 'One short paragraph covering the reasoning for all 6 instructions together, tied to the specific opponent matchup identified in the breakdown — not generic justification.' },
+    lineup_reasoning: { type: 'string', description: 'Plain-language paragraph on fitness/condition tradeoffs and any off-natural-position calls, citing both rating numbers for any such call. Never use the literal term "AltPosFit". Must also explicitly name and explain every notable player who is NOT starting (any position, not just defense) — not just justify who was picked. For wide forwards, note each one\'s Foot (from the squad context) against their Role: an Inside Forward wants their stronger foot on the inside (cutting in), a Traditional Winger wants it on the outside (hugging the line) — check this per player, don\'t assume symmetric assignment.' },
+    instructions_reasoning: { type: 'string', description: 'One short paragraph, but it must touch EVERY ONE of the 6 instructions individually (mentality, style, structure, defensive_line, attacking_focus, pressing) with a real reason each, tied to the specific opponent matchup identified in the breakdown. A moderate-sounding value ("Balanced", "Mixed", "Medium") needs its own real reason just as much as an extreme one ("Very Attacking", "High Press") — do not skip explaining a field just because its value sounds self-evident, and do not give a generic justification that could apply to any opponent.' },
     subs_overview: { type: 'string', description: 'Brief note on the overall substitution strategy for this match — why this split of timings/plans.' },
-    corner_reasoning: { type: 'string', description: 'Only if the opponent setup gives a clear signal to react to — otherwise omit this field entirely rather than writing a generic filler sentence.' },
+    corner_reasoning: { type: 'string', description: 'If the opponent\'s own real corner zone assignments are available in context, name specific opposing players — a real aerial threat to mark on our defensive corner, a real weakness in their defensive-corner zones to target on our attacking corner. Otherwise omit this field entirely rather than writing a generic filler sentence.' },
   },
   required: ['gw_status_note', 'formation', 'lineup', 'instructions', 'subs', 'set_pieces', 'corner_tactics'],
   additionalProperties: false,
@@ -264,7 +264,7 @@ function formatLineupReply(d) {
   // Filter out the exact garbage shape isLineupReplyBroken() checks for — belt-and-suspenders
   // for the best-effort fallback path, where a still-broken reply gets rendered anyway after
   // retries run out rather than erroring outright.
-  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?' && p.slot.length <= 6 && p.player.length <= 60).forEach(p => {
+  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?' && p.slot.length <= 4 && p.player.length <= 60 && !PLACEHOLDER_RE.test(p.player)).forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
     const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
@@ -392,7 +392,13 @@ async function handleChat(request, env, cors) {
     // a whole run-on sentence of stray reasoning text instead of a real slot code (GK/RB/CB/...)
     // — valid non-empty strings, so the placeholder-style checks above didn't catch them. Real
     // slot codes and player names are always short; a wildly oversized one is corruption.
-    if (parsed.lineup.some(p => !p || !p.player || !p.slot || p.player === '?' || p.slot === '?' || !p.rating || !p.fitness_pct || p.slot.length > 6 || p.player.length > 60)) return true;
+    // 2026-07-29 (round 3): a *different* ghost 12th item ({slot:"CF-fix", player:"placeholder",
+    // rating:0, fitness_pct:0}) slipped past this same check — "CF-fix" is 6 chars, exactly at
+    // the old ">6" cutoff (off-by-one), and "placeholder" as a player NAME wasn't checked against
+    // PLACEHOLDER_RE at all (that regex was only ever applied to free-text reasoning fields).
+    // Real slot codes are always exactly 2 chars (GK/RB/CB/DM/CM/WM/AM/WF/CF/LB) — tightened the
+    // cap accordingly, and reused PLACEHOLDER_RE against the player name too.
+    if (parsed.lineup.some(p => !p || !p.player || !p.slot || p.player === '?' || p.slot === '?' || !p.rating || !p.fitness_pct || p.slot.length > 4 || p.player.length > 60 || PLACEHOLDER_RE.test(p.player))) return true;
     if (!Array.isArray(parsed.subs) || parsed.subs.length < 3) return true;
     const sp = parsed.set_pieces;
     if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
