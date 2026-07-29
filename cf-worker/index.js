@@ -119,7 +119,7 @@ const LINEUP_SCHEMA = {
           rating: { type: 'number', description: 'Their game-formula rating at this exact slot (own Rating if natural position, matching alt-position rating if not).' },
           fitness_pct: { type: 'number' },
           is_captain: { type: 'boolean' },
-          role: { enum: ROLE_ENUM, description: "Tactical role for this player, valid ONLY for their own base position (not whichever slot they're filling if playing out of position) — see the Player Roles list in the context's game mechanics reference." },
+          role: { enum: ROLE_ENUM, description: "Tactical role for this player, valid ONLY for their own base position (not whichever slot they're filling if playing out of position) — see the Player Roles list in the context's game mechanics reference. Must also fit the player's actual attributes (Speed/Dribbling for a pace-reliant wide role like Overlapper/Traditional Winger/Wide Playmaker — don't hand it to a player whose real strengths are Shooting/Heading/Strength), and should not duplicate another player's role on the same flank (e.g. an Overlapper full-back paired with another wide-running role in front of them competes for the same space — pair an Overlapper with an Inside Forward instead, which tucks infield)." },
         },
         required: ['slot', 'player', 'rating', 'fitness_pct', 'is_captain', 'role'],
         additionalProperties: false,
@@ -145,7 +145,7 @@ const LINEUP_SCHEMA = {
       // but it does structurally forbid the empty-array failure mode seen in live testing (the
       // model returning subs:[] , which is schema-valid with no minItems set at all).
       minItems: 1,
-      description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning". IMPORTANT: a sub\'s "plan" changes the team\'s overall mentality from that point on and persists until a later sub changes it again — it is not a description of that player. The 3 "any situation" subs should use the SAME plan as instructions.mentality (routine rotation shouldn\'t silently change the team\'s approach); only the "if winning" sub (step toward Defensive) and "if not winning" sub (step toward Attacking/Very Attacking) should actually change it. Any starter in the lineup array at meaningfully reduced fitness_pct (roughly under 70) needs an actual sub addressing them by name here — don\'t leave a tired starter with no plan. A player_in only counts as bringing "fresh legs" if their own fitness is genuinely higher than the player_out\'s — don\'t bring on another low-fitness player and call it fresh.',
+      description: 'Exactly 5 items — one per sub slot. Use this split unless the matchup gives a genuinely strong reason not to: 3 subs timed "any situation" (spread across the 46-60\' / 61-75\' / 76\'- windows), 1 timed "if winning", 1 timed "if not winning". IMPORTANT: a sub\'s "plan" changes the team\'s overall mentality from that point on and persists until a later sub changes it again — it is not a description of that player. The 3 "any situation" subs should use the SAME plan as instructions.mentality (routine rotation shouldn\'t silently change the team\'s approach); only the "if winning" sub (step toward Defensive) and "if not winning" sub (step toward Attacking/Very Attacking) should actually change it. Any starter in the lineup array at meaningfully reduced fitness_pct (roughly under 70) needs an actual sub addressing them by name here — don\'t leave a tired starter with no plan. A player_in only counts as bringing "fresh legs" if their own fitness is genuinely higher than the player_out\'s — don\'t bring on another low-fitness player and call it fresh. CRITICAL mechanic: a substitute always plays their OWN base position on the pitch — the game has no field for assigning them a different one, so "player_in for player_out" only records who comes off, it does NOT make player_in inherit player_out\'s slot. Only pair player_in/player_out across matching position families (GK-GK, RB/LB-FB, CB-CB, DM-DM, AM-AM, RW/LW-WF, CF-CF) unless a deliberate shape change is the actual point (state it if so) — pairing e.g. a DM in for a full-back does not add fullback cover, it adds a second DM and leaves that flank short. Also: do not bring off a player who only just came on in the immediately preceding window (a 61-75\' sub then hooked again at 76\'- is a nonsensical few-minute cameo) — each sub should target a different ORIGINAL starter unless there is a specific stated reason (injury risk, red-card reshuffle).',
       items: {
         type: 'object',
         properties: {
@@ -175,7 +175,7 @@ const LINEUP_SCHEMA = {
     },
     set_pieces: {
       type: 'object',
-      description: 'Pick each taker by comparing the Penalties / Free kicks / Corners attributes (from the squad table) independently across the whole XI — these are three different specialties and usually different players.',
+      description: 'Pick each taker by comparing the Penalties / Free kicks / Corners attributes (from the squad table) independently across the whole XI — these are three different specialties and usually different players, and NOT automatically the striker/top scorer just because they\'re the most prolific. Don\'t default to a name without checking the actual number.',
       properties: {
         // minLength rejects the exact empty-string garbage seen in live testing — a plain
         // `type: 'string'` has no floor, so "" passed schema validation while being
@@ -223,7 +223,8 @@ const LINEUP_SCHEMA = {
     lineup_reasoning: { type: 'string', description: 'Plain-language paragraph on fitness/condition tradeoffs and any off-natural-position calls, citing both rating numbers for any such call. Never use the literal term "AltPosFit". Must also explicitly name and explain every notable player who is NOT starting (any position, not just defense) — not just justify who was picked. For wide forwards, note each one\'s Foot (from the squad context) against their Role: an Inside Forward wants their stronger foot on the inside (cutting in), a Traditional Winger wants it on the outside (hugging the line) — check this per player, don\'t assume symmetric assignment.' },
     instructions_reasoning: { type: 'string', description: 'One short paragraph, but it must touch EVERY ONE of the 6 instructions individually (mentality, style, structure, defensive_line, attacking_focus, pressing) with a real reason each, tied to the specific opponent matchup identified in the breakdown. A moderate-sounding value ("Balanced", "Mixed", "Medium") needs its own real reason just as much as an extreme one ("Very Attacking", "High Press") — do not skip explaining a field just because its value sounds self-evident, and do not give a generic justification that could apply to any opponent.' },
     subs_overview: { type: 'string', description: 'Brief note on the overall substitution strategy for this match — why this split of timings/plans.' },
-    corner_reasoning: { type: 'string', description: 'If the opponent\'s own real corner zone assignments are available in context, name specific opposing players — a real aerial threat to mark on our defensive corner, a real weakness in their defensive-corner zones to target on our attacking corner. Otherwise omit this field entirely rather than writing a generic filler sentence.' },
+    set_pieces_reasoning: { type: 'string', description: 'One short line per taker (Penalty/Free-kick/Corner) naming the actual attribute number behind the pick AND the next-best XI candidate\'s number for that same attribute, e.g. "Penalty: Durán 76, next best Ødegaard 61" — so the pick is verifiable, not asserted. Never just restate the taker\'s name with no number.' },
+    corner_reasoning: { type: 'string', description: 'Two things, both required when the data is available: (1) if the opponent\'s own real corner zone assignments are available in context, name specific opposing players — a real aerial threat to mark on our defensive corner, a real weakness in their defensive-corner zones to target on our attacking corner; (2) name OUR OWN player(s) assigned to deal with it — who occupies the primary target zone on our attacking corner (using their Heading/"Hdg" attribute from the squad table to pick a real aerial threat, not just the corner taker), and who marks each key defensive-corner zone (near post/far post/penalty spot at minimum). Otherwise omit this field entirely rather than writing a generic filler sentence.' },
   },
   required: ['gw_status_note', 'formation', 'lineup', 'instructions', 'subs', 'set_pieces', 'corner_tactics'],
   additionalProperties: false,
@@ -300,6 +301,8 @@ function formatLineupReply(d) {
     `Free-kick: ${cleanText(sp.freekick) || '?'} (${sp.freekick_rating ?? '?'} FK)`,
     `Corner: ${cleanText(sp.corner) || '?'} (${sp.corner_rating ?? '?'} Cor)`,
   );
+  const setPiecesReasoning = cleanAndCap(d.set_pieces_reasoning, 500);
+  if (setPiecesReasoning) lines.push('', setPiecesReasoning);
   const ct = d.corner_tactics || {};
   lines.push('', '**Corner tactics**');
   lines.push(`Attacking corner — Delivery: ${ct.attacking_delivery || '?'}`);
@@ -407,7 +410,7 @@ async function handleChat(request, env, cors) {
     if (!sp || !sp.penalty || !sp.freekick || !sp.corner || !sp.penalty_rating || !sp.freekick_rating || !sp.corner_rating) return true;
     if (isOverlong(parsed.opponent_breakdown, 1500) || isOverlong(parsed.lineup_reasoning, 1500)
         || isOverlong(parsed.instructions_reasoning, 900) || isOverlong(parsed.subs_overview, 600)
-        || isOverlong(parsed.corner_reasoning, 600)) return true;
+        || isOverlong(parsed.set_pieces_reasoning, 500) || isOverlong(parsed.corner_reasoning, 600)) return true;
     if (Array.isArray(parsed.plan_b) && parsed.plan_b.some(pb => isOverlong(pb?.reason, 350))) return true;
     return false;
   }
