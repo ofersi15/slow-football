@@ -128,6 +128,37 @@ export const ROLE_ABBR = {
   'Traditional Winger':'TRW', 'Inside Forward':'INF', 'Wide Playmaker':'WPM',
   'Target Man':'TGM', 'Poacher':'POA', 'False 9':'F9', 'Complete Forward':'CPF',
 };
+// Football-literacy heuristic (NOT scraped game data, unlike PLAYER_ROLES/ROLE_ABBR above) — the
+// real attributes that make a Role a good fit for a given player, so the Assistant can check a
+// Role choice against actual attribute numbers instead of only "legal for this position". Used to
+// render a Role→attributes reference into the Assistant's context (buildChatContext in
+// src/methods/assistant.js) and isn't tied to any confirmed in-game formula.
+export const ROLE_ATTR_HINTS = {
+  'Shot Stopper': ['Reflexes', 'Handling'],
+  'Sweeper Keeper': ['Speed', 'Passing', 'Vision'],
+  'Box Commander': ['Strength', 'Handling', 'Heading'],
+  'Defensive Full Back': ['Tackling', 'Marking', 'Strength'],
+  'Inverted Full Back': ['Passing', 'Vision', 'Tackling'],
+  'Overlapper': ['Speed', 'Stamina', 'Dribbling'],
+  'Two-Way Full Back': ['Stamina', 'Tackling', 'Speed'],
+  'No-Nonsense CB': ['Tackling', 'Strength', 'Heading'],
+  'Ball Player': ['Passing', 'Vision', 'Dribbling'],
+  'Man Marker': ['Marking', 'Tackling', 'Speed'],
+  'Deep-Lying Playmaker': ['Passing', 'Vision'],
+  'Destroyer': ['Tackling', 'Strength', 'Marking'],
+  'Anchor': ['Marking', 'Tackling', 'Stamina'],
+  'Box-to-Box Midfielder': ['Stamina', 'Speed', 'Tackling', 'Passing'],
+  'Advanced Playmaker': ['Passing', 'Vision', 'Dribbling'],
+  'Shadow Striker': ['Shooting', 'Speed', 'Dribbling'],
+  'Trickster': ['Dribbling', 'Speed', 'Vision'],
+  'Traditional Winger': ['Speed', 'Dribbling', 'Passing'],
+  'Inside Forward': ['Shooting', 'Dribbling', 'Speed'],
+  'Wide Playmaker': ['Passing', 'Vision', 'Dribbling'],
+  'Target Man': ['Strength', 'Heading', 'Shooting'],
+  'Poacher': ['Shooting', 'Speed'],
+  'False 9': ['Passing', 'Vision', 'Dribbling'],
+  'Complete Forward': ['Shooting', 'Dribbling', 'Passing', 'Heading'],
+};
 
 // ── Plan B (scenario-triggered whole-team tactical shift, fires at most once per match) ──────
 export const PLAN_B_SCENARIOS = [
