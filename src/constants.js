@@ -138,6 +138,12 @@ export const PLAN_B_SCENARIOS = [
   { key: 'concede_in_first_ten',     label: 'Concede early' },
   { key: 'score_in_first_ten',       label: 'Score early' },
 ];
+// The fixed vocabulary of named Plans a manager assigns to each Plan B scenario — confirmed
+// directly from a real live submission (Liverpool, 2026-07-29), not a guess: their planBs array
+// used exactly these 6 of these 7 values. What's still NOT confirmed is the exact underlying
+// Mentality/Style/etc. change each named Plan triggers under the hood — so the assistant should
+// recommend one of these real names per scenario, but never invent what it numerically does.
+export const PLAN_B_NAMED_PLANS = ['Shut Up Shop', 'Sit Deeper', 'Hold Shape', 'Keep The Ball', 'Go Direct', 'Push On', 'Chase The Game'];
 
 // ── Chemistry constants ───────────────────────────────────────────────────────
 export const GAME_START = new Date("2025-08-23T00:00:00Z").getTime();
