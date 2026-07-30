@@ -131,7 +131,7 @@ export const ROLE_ABBR = {
 // Football-literacy heuristic (NOT scraped game data, unlike PLAYER_ROLES/ROLE_ABBR above) — the
 // real attributes that make a Role a good fit for a given player, so the Assistant can check a
 // Role choice against actual attribute numbers instead of only "legal for this position". Used to
-// render a Role→attributes reference into the Assistant's context (buildChatContext in
+// render a Role→attributes reference into the Assistant's context (buildStaticMechanicsContext in
 // src/methods/assistant.js) and isn't tied to any confirmed in-game formula.
 export const ROLE_ATTR_HINTS = {
   'Shot Stopper': ['Reflexes', 'Handling'],

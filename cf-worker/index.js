@@ -79,24 +79,39 @@ async function handleChat(request, env, cors) {
         .map(m => ({ role: m.role, content: sanitizeChatContent(m.content) }))
         .filter(m => m.content.length)
     : [];
-  const context = typeof body.context === 'string' ? body.context.slice(0, 120000) : '';
+  // staticContext (buildStaticMechanicsContext() — a pure function of constants.js, byte-identical
+  // across every session) and dynamicContext (buildDynamicChatContext() — squad/budget/targets/
+  // opponent tactics/etc., which actually varies per session) are two separate cache breakpoints
+  // below, so capped separately: the static block is small and never needs anywhere near 120k.
+  const staticContext = typeof body.staticContext === 'string' ? body.staticContext.slice(0, 20000) : '';
+  const dynamicContext = typeof body.dynamicContext === 'string' ? body.dynamicContext.slice(0, 120000) : '';
   if (!messages.length) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 
-  const systemText = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing. The user may attach images or files (screenshots, exported data) — factor them into your analysis.\n\n${context}`;
+  const fixedInstructions = `You are the personal fantasy-football assistant built into Ofer's Slow Football Analytics app for slowfootball.club. Ofer manages Arsenal. Give concise, direct, practical advice on transfers, tactics, squad building and youth scouting, grounded in the data provided below — don't pad with generic caveats. Use £ for money. If something isn't covered by the data, say so rather than guessing. The user may attach images or files (screenshots, exported data) — factor them into your analysis.`;
 
-  // Cache the system prompt (instructions + squad/budget/targets context): buildChatContext()
-  // is deterministic, so this is byte-identical across messages within a chat session — after
-  // the first turn, cached reads cost ~10% of the uncached price.
-  const system = [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }];
+  // Two cache breakpoints instead of one, so the first block's cache entry can stay warm across
+  // different chat sessions, not just within one:
+  // 1) fixed instructions + static mechanics reference — identical for every session (until
+  //    constants.js changes), so this can hit even on the first message of a brand-new session.
+  // 2) dynamic per-session context (squad/budget/targets/opponent tactics/etc.) — changes as live
+  //    game data changes, so it gets its own breakpoint rather than busting block 1's cache too.
+  // Both use the 1-hour TTL (not the 5-minute default): this app is used in short bursts with
+  // gaps well over 5 minutes between messages, so the 5-minute default was missing on most turns.
+  // Read cost stays 0.1x; only the write cost changes (1.25x -> 2x base), worth it for the higher
+  // hit rate here.
+  const system = [
+    { type: 'text', text: `${fixedInstructions}\n\n${staticContext}`, cache_control: { type: 'ephemeral', ttl: '1h' } },
+    { type: 'text', text: dynamicContext, cache_control: { type: 'ephemeral', ttl: '1h' } },
+  ];
 
   // Cache the growing conversation too: mark the last block of everything but the newest user
   // message so each new turn only pays full price for what's actually new.
   const cachedMessages = messages.map((m, i) => {
     if (i !== messages.length - 2 || !m.content.length) return m;
     const content = m.content.slice();
-    content[content.length - 1] = { ...content[content.length - 1], cache_control: { type: 'ephemeral' } };
+    content[content.length - 1] = { ...content[content.length - 1], cache_control: { type: 'ephemeral', ttl: '1h' } };
     return { role: m.role, content };
   });
 

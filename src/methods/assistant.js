@@ -13,6 +13,10 @@ const MAX_TEXT_FILE_CHARS = 20000;
 const TEXT_FILE_EXTS = /\.(json|csv|txt|md)$/i;
 const IMAGE_MAX_DIM = 1568;
 
+// Shared by buildStaticMechanicsContext() (the static bullet's formation-tier list) and
+// buildDynamicChatContext() (the live "unlocked at my club's level" fact) — same tiers, one place.
+const FORMATION_TIERS = { 1: ['442', '433', '4231', '532', '343'], 2: ['352', '541', '4411'], 3: ['4321', '451'], 4: ['4141', '442 D', '3421'], 5: ['3241', '4222', '4132'] };
+
 function blocksOf(content) {
   if (typeof content === 'string') return [{ type: 'text', text: content }];
   return Array.isArray(content) ? content : [];
@@ -323,8 +327,31 @@ export const assistantMethods = {
       this.sendChatMessage();
     }
   },
-  // Summarizes squad, budget and top transfer targets from already-loaded data — no extra API calls.
-  buildChatContext() {
+  // Truly static: rendered only from constants.js (PLAYER_ROLES, ROLE_ATTR_HINTS, PLAN_B_SCENARIOS,
+  // PLAN_B_NAMED_PLANS, FULL_ATTR_KEYS, FORMATION_TIERS) — byte-identical for every session and
+  // every user for as long as those constants don't change, so this is its own cache_control
+  // breakpoint in cf-worker's handleChat and can stay warm across sessions, not just within one.
+  // The one fact this used to embed inline — MY_CLUB's live Analytics Dept level — is genuinely
+  // per-session data and lives in buildDynamicChatContext() instead, so it can't bust this cache.
+  buildStaticMechanicsContext() {
+    const roleRef = Object.entries(PLAYER_ROLES).map(([pos, roles]) =>
+      `${pos}: ${roles.map(r => `${r} [wants ${(ROLE_ATTR_HINTS[r] || []).join('/')}]`).join(' / ')}`
+    ).join('; ');
+    const planBRef = PLAN_B_SCENARIOS.map(s => s.label).join(', ');
+    const planBNamedRef = PLAN_B_NAMED_PLANS.join(' / ');
+    return `Game mechanics reference (fixed game rules — these are the actual dropdown options in the live submission form, not opponent-specific data):
+- Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132. (My club's currently-unlocked formations are given separately below, alongside the rest of the live squad/session data.)
+- Match instructions (6 dropdowns): Mentality (Very Defensive / Defensive / Balanced / Attacking / Very Attacking), Style (Short / Mixed / Direct), Structure (Fluid / Balanced / Rigid), Defensive Line (Deep / Low / Medium / High), Attacking Focus (Left / Right / Central / Mixed), Pressing Intensity (High Press / Mid-Block / Low Block / Counter Press).
+- Set-piece takers (Captain, Penalty, Free-kick, Corner) are just player assignments — no extra tuning for penalties or free-kicks. Corners alone have dedicated instructions: Attacking corner — Delivery (Inswinger / Outswinger / Driven / Short Corner), Stay Back (1 or 2 players forward), 7 zone roles (Near Post, Far Post, Penalty Spot, Blockade, Edge of Box, Short Corner, Hold Back). Defensive corner — Scheme (Zonal / Man-to-Man / Hybrid), Press (Hold Shape / Press Taker), 6 zone roles (Near Post, Far Post, 6-Yard Box, Penalty Spot, Edge of Box, Counter Runner).
+- Corner Delivery has a FIXED target zone baked into the game engine — you don't choose delivery and target separately, picking the delivery type IS picking the target: Inswinger curves toward goal and rewards far-post runners, Outswinger curves away and sets up a near-post flick-on, Driven is flat and hard with the penalty spot as the target, Short Corner is a short lay-off that pulls a defender out wide. Reason about which zone you actually want the ball delivered to, then pick the Delivery that produces it.
+- Substitutions: 5 subs per match. Each sub has a Plan (the game's own field label is "Instruction" — same 5 mentality values above) and a Timing trigger = a window (Half-time / 46-60' / 61-75' / 76'-) plus a condition. Only the Half-time window offers "if losing" as a condition; the other three windows only offer "if winning" / "if not winning" / "any situation". **A substitute always plays their own BASE position on the pitch — there is no field anywhere in the submission for what position/slot a sub fills.** "Player IN for Player OUT" only records who comes off; it does NOT make the incoming player inherit the outgoing player's slot. A sub only functions as real like-for-like cover when the incoming player's own listed Position already matches the family of the slot being vacated (GK↔GK, RB/LB↔FB, CB↔CB, DM↔DM, AM↔AM, RW/LW↔WF, CF↔CF) — pairing a DM "for" a full-back doesn't add fullback cover, it puts a second DM on the pitch and leaves that flank uncovered, a real (and usually unintended) shape change. **Critically, a sub's Plan is not a description of that player — it changes the team's overall mentality from the moment that sub comes on, and that change persists (it becomes the new baseline) until a later sub sets a different one.** So picking "Balanced" for an early any-situation sub when the match started on "Attacking" is a real, active downgrade to a more conservative approach for the rest of the match, not a neutral label — and if the next two subs are also "Balanced", only the first one is actually doing anything; the other two are just re-stating what's already in effect. Default any-situation subs to the SAME Plan as the match's starting Mentality, so freshening legs doesn't silently drift the team's approach — save deliberate Plan changes for the "if winning" (step toward Defensive, to protect a lead) and "if not winning" (step toward Attacking/Very Attacking, to chase the game) subs, where a real mentality shift is exactly the point.
+- Player Roles: each starting XI player can also be given a tactical Role, gated by that player's own BASE position (not whichever slot they're filling if playing out of position) — the options are, each tagged with the real attributes it rewards (a football-literacy heuristic, not a confirmed in-game formula, but a reasonable guide for who actually suits it — cross-check against the squad table's "Attrs" column below, which lists ${FULL_ATTR_KEYS.join('/')} in that order): ${roleRef}. Only pick a role from the list for that player's own base position; never invent a role or borrow one from a different position's list. Legal-for-position is a floor, not a justification — pick the Role whichever of the player's actual attributes (ALL of them, not just pace) best support, see Section 2's role-selection guidance below for the full attribute-fit and role-interaction checks (with teammates AND, where it's a genuine point, the direct opponent).
+- Plan B: up to 6 scenario-triggered whole-team plan shifts, each firing at MOST ONCE per match and involving NO personnel changes (personnel changes are what the 5 subs above are for) — the fixed scenarios are: ${planBRef}. Each scenario a manager configures gets assigned ONE named Plan from a fixed, real vocabulary confirmed straight off a real live opponent submission — ${planBNamedRef} — so recommend a SPECIFIC named Plan per scenario you address (e.g. "Losing by 2+ → Chase The Game", "Winning by 2+ → Shut Up Shop or Hold Shape"), never a vague description instead of a real name. What's NOT confirmed is the exact underlying Mentality/Style/etc. value each named Plan triggers under the hood — so name the Plan, don't invent what it numerically does. Precedence, per the game's own on-page copy: a later sub's Instruction overrides an earlier Plan B, and vice versa — whichever one fires most recently wins and sets the team's approach from that point on.`;
+  },
+  // Per-session dynamic context: squad, budget, transfer targets, opponent tactics, my club's live
+  // Analytics Dept level, and everything else that actually depends on loaded game data — sent as
+  // the second (non-static) system-prompt cache breakpoint, right after buildStaticMechanicsContext().
+  buildDynamicChatContext() {
     const lines = [`My club: ${MY_CLUB}. Current game week: ~${this.asOfWeek || '?'}.`];
 
     if (this.clubBudget != null) {
@@ -429,24 +456,16 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
 
     lines.push(`\nTrade/negotiation guidance: when discussing a specific trade offer (my players vs. another club's players), weigh both sides on TrueVal and on "AltPosFit" — a player's rating at a different compatible position, using the same formula as their listed-position "Rating". A player can be a hidden bargain or a hidden overpay: e.g. a nominal fullback with an unusually high alternate-position rating elsewhere is worth more than their listed rating suggests, and vice versa. Call this out in plain language (what the numbers show), never by the literal column name "AltPosFit". If a player central to the discussion isn't showing up with full detail (Club/Age/Rating/TrueVal/AltPosFit) in the sections below, say so plainly instead of guessing at their attributes — don't invent numbers for a player you don't have data on.`);
 
-    const FORMATION_TIERS = { 1: ['442', '433', '4231', '532', '343'], 2: ['352', '541', '4411'], 3: ['4321', '451'], 4: ['4141', '442 D', '3421'], 5: ['3241', '4222', '4132'] };
+    // The one dynamic fact that used to live inline inside the (now fully static)
+    // buildStaticMechanicsContext()'s formation-tiers bullet — kept here, as its own line, so
+    // that block can stay a pure function of constants.js and cache across sessions.
     const analyticsLv = this.clubFacData?.levels?.analytics;
     const unlockedFormations = analyticsLv
       ? Object.keys(FORMATION_TIERS).filter(l => +l <= analyticsLv).flatMap(l => FORMATION_TIERS[l]).join(', ')
       : null;
-    const roleRef = Object.entries(PLAYER_ROLES).map(([pos, roles]) =>
-      `${pos}: ${roles.map(r => `${r} [wants ${(ROLE_ATTR_HINTS[r] || []).join('/')}]`).join(' / ')}`
-    ).join('; ');
-    const planBRef = PLAN_B_SCENARIOS.map(s => s.label).join(', ');
-    const planBNamedRef = PLAN_B_NAMED_PLANS.join(' / ');
-    lines.push(`\nGame mechanics reference (fixed game rules — these are the actual dropdown options in the live submission form, not opponent-specific data):
-- Formations are gated by Analytics Dept facility level, cumulative: Lv1 unlocks 442/433/4231/532/343, Lv2 adds 352/541/4411, Lv3 adds 4321/451, Lv4 adds 4141/442 D/3421, Lv5 adds 3241/4222/4132.${analyticsLv ? ` My club's Analytics Dept is level ${analyticsLv} → currently unlocked: ${unlockedFormations}.` : ' (My club\'s current Analytics Dept level isn\'t loaded this session — check the My Club tab.)'}
-- Match instructions (6 dropdowns): Mentality (Very Defensive / Defensive / Balanced / Attacking / Very Attacking), Style (Short / Mixed / Direct), Structure (Fluid / Balanced / Rigid), Defensive Line (Deep / Low / Medium / High), Attacking Focus (Left / Right / Central / Mixed), Pressing Intensity (High Press / Mid-Block / Low Block / Counter Press).
-- Set-piece takers (Captain, Penalty, Free-kick, Corner) are just player assignments — no extra tuning for penalties or free-kicks. Corners alone have dedicated instructions: Attacking corner — Delivery (Inswinger / Outswinger / Driven / Short Corner), Stay Back (1 or 2 players forward), 7 zone roles (Near Post, Far Post, Penalty Spot, Blockade, Edge of Box, Short Corner, Hold Back). Defensive corner — Scheme (Zonal / Man-to-Man / Hybrid), Press (Hold Shape / Press Taker), 6 zone roles (Near Post, Far Post, 6-Yard Box, Penalty Spot, Edge of Box, Counter Runner).
-- Corner Delivery has a FIXED target zone baked into the game engine — you don't choose delivery and target separately, picking the delivery type IS picking the target: Inswinger curves toward goal and rewards far-post runners, Outswinger curves away and sets up a near-post flick-on, Driven is flat and hard with the penalty spot as the target, Short Corner is a short lay-off that pulls a defender out wide. Reason about which zone you actually want the ball delivered to, then pick the Delivery that produces it.
-- Substitutions: 5 subs per match. Each sub has a Plan (the game's own field label is "Instruction" — same 5 mentality values above) and a Timing trigger = a window (Half-time / 46-60' / 61-75' / 76'-) plus a condition. Only the Half-time window offers "if losing" as a condition; the other three windows only offer "if winning" / "if not winning" / "any situation". **A substitute always plays their own BASE position on the pitch — there is no field anywhere in the submission for what position/slot a sub fills.** "Player IN for Player OUT" only records who comes off; it does NOT make the incoming player inherit the outgoing player's slot. A sub only functions as real like-for-like cover when the incoming player's own listed Position already matches the family of the slot being vacated (GK↔GK, RB/LB↔FB, CB↔CB, DM↔DM, AM↔AM, RW/LW↔WF, CF↔CF) — pairing a DM "for" a full-back doesn't add fullback cover, it puts a second DM on the pitch and leaves that flank uncovered, a real (and usually unintended) shape change. **Critically, a sub's Plan is not a description of that player — it changes the team's overall mentality from the moment that sub comes on, and that change persists (it becomes the new baseline) until a later sub sets a different one.** So picking "Balanced" for an early any-situation sub when the match started on "Attacking" is a real, active downgrade to a more conservative approach for the rest of the match, not a neutral label — and if the next two subs are also "Balanced", only the first one is actually doing anything; the other two are just re-stating what's already in effect. Default any-situation subs to the SAME Plan as the match's starting Mentality, so freshening legs doesn't silently drift the team's approach — save deliberate Plan changes for the "if winning" (step toward Defensive, to protect a lead) and "if not winning" (step toward Attacking/Very Attacking, to chase the game) subs, where a real mentality shift is exactly the point.
-- Player Roles: each starting XI player can also be given a tactical Role, gated by that player's own BASE position (not whichever slot they're filling if playing out of position) — the options are, each tagged with the real attributes it rewards (a football-literacy heuristic, not a confirmed in-game formula, but a reasonable guide for who actually suits it — cross-check against the squad table's "Attrs" column below, which lists ${FULL_ATTR_KEYS.join('/')} in that order): ${roleRef}. Only pick a role from the list for that player's own base position; never invent a role or borrow one from a different position's list. Legal-for-position is a floor, not a justification — pick the Role whichever of the player's actual attributes (ALL of them, not just pace) best support, see Section 2's role-selection guidance below for the full attribute-fit and role-interaction checks (with teammates AND, where it's a genuine point, the direct opponent).
-- Plan B: up to 6 scenario-triggered whole-team plan shifts, each firing at MOST ONCE per match and involving NO personnel changes (personnel changes are what the 5 subs above are for) — the fixed scenarios are: ${planBRef}. Each scenario a manager configures gets assigned ONE named Plan from a fixed, real vocabulary confirmed straight off a real live opponent submission — ${planBNamedRef} — so recommend a SPECIFIC named Plan per scenario you address (e.g. "Losing by 2+ → Chase The Game", "Winning by 2+ → Shut Up Shop or Hold Shape"), never a vague description instead of a real name. What's NOT confirmed is the exact underlying Mentality/Style/etc. value each named Plan triggers under the hood — so name the Plan, don't invent what it numerically does. Precedence, per the game's own on-page copy: a later sub's Instruction overrides an earlier Plan B, and vice versa — whichever one fires most recently wins and sets the team's approach from that point on.`);
+    lines.push(analyticsLv
+      ? `\nMy club's Analytics Dept is level ${analyticsLv} → currently unlocked formations: ${unlockedFormations}.`
+      : `\nMy club's current Analytics Dept level isn't loaded this session — check the My Club tab.`);
 
     const squad = (this.allPlayers || []).filter(p => p.Club === MY_CLUB);
     if (squad.length) {
@@ -655,7 +674,8 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const payload = {
-        context: this.buildChatContext(),
+        staticContext: this.buildStaticMechanicsContext(),
+        dynamicContext: this.buildDynamicChatContext(),
         messages: this.chatMessages
           .filter(m => m.role === 'user' || m.role === 'assistant')
           .map(m => ({ role: m.role, content: m.content })),
