@@ -265,11 +265,21 @@ function formatLineupReply(d) {
   // Filter out the exact garbage shape isLineupReplyBroken() checks for — belt-and-suspenders
   // for the best-effort fallback path, where a still-broken reply gets rendered anyway after
   // retries run out rather than erroring outright.
-  (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?' && p.slot.length <= 4 && p.player.length <= 60 && !PLACEHOLDER_RE.test(p.player)).forEach(p => {
+  const cleanLineup = (d.lineup || []).filter(p => p && p.player && p.player !== '?' && p.slot && p.slot !== '?' && p.slot.length <= 4 && p.player.length <= 60 && !PLACEHOLDER_RE.test(p.player));
+  cleanLineup.forEach(p => {
     const capt = p.is_captain ? ' (C)' : '';
     const role = cleanText(p.role) ? ` — Role: ${p.role}` : '';
     lines.push(`${p.slot || '?'}: ${p.player || '?'} (${p.rating ?? '?'}, ${p.fitness_pct ?? '?'}%)${capt}${role}`);
   });
+  // 2026-07-30: the retry budget is exhausted before this function ever runs on the broken path
+  // (isLineupReplyBroken already retried once and gave up) — a real live failure mode is a
+  // schema-valid array with far fewer than 11 real (non-garbage-shaped) entries, e.g. a single
+  // duplicated GK line, while every other section (subs, instructions, set pieces, corner
+  // tactics) comes back fully formed. Silently rendering that looks like a rendering bug rather
+  // than a degraded reply — flag it plainly instead so the reader knows to just re-ask.
+  if (cleanLineup.length < 11) {
+    lines.push('', `⚠️ Only ${cleanLineup.length} of 11 lineup slots came back this time — please ask again for a complete lineup.`);
+  }
   // Substitutions (+ Plan B) now renders right after the lineup and BEFORE match instructions —
   // reordered per owner feedback: the starting XI and sub plan are one decision, not two, and
   // should read that way.
