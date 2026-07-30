@@ -321,6 +321,30 @@ export const assistantMethods = {
     const altPositions = (SLOT_COMPAT[p.Position] || []).filter(pos => pos !== p.Position && pos !== 'GK');
     return altPositions.map(pos => `${pos}:${calcGameRating(p, pos) ?? '?'}`).join(',') || '-';
   },
+  // Text of the most recent user turn — what buildDynamicChatContext()'s section classifiers
+  // key off, since that's the actual question being asked right now (earlier turns are already
+  // covered by the always-on club/player-name scanning further below).
+  _lastUserMessageText() {
+    for (let i = this.chatMessages.length - 1; i >= 0; i--) {
+      const m = this.chatMessages[i];
+      if (m.role === 'user') {
+        return blocksOf(m.content).filter(b => b.type === 'text' && b.text).map(b => b.text).join(' ');
+      }
+    }
+    return '';
+  },
+  // Cheap client-side classifiers (regex/keyword, no LLM call — same style as the trade/
+  // negotiation club/player-name scanning below) used only to decide which LARGE, otherwise-
+  // always-included context sections are worth their token cost for THIS question. Deliberately
+  // biased toward false positives (include the section): missing data produces a wrong or evasive
+  // reply, an unneeded section just costs tokens — see buildDynamicChatContext()'s fallback when
+  // neither classifier matches.
+  _isTransferQuestion(text) {
+    return /\b(transfer\w*|sign(?:ing|ed)?|buy(?:ing)?|sell(?:ing)?|sold|bought|bid(?:ding|s)?|offer(?:s|ed|ing)?|loan(?:s|ed|ing)?|scout(?:ing)?|market|price(?:d|s|ing)?|worth|value(?:d)?|afford(?:able)?|budget|deal(?:s|ing)?|fee(?:s)?|negotiat\w*|target(?:s|ing)?|listing|listed|purchas\w*|acquir\w*|agent\w*|swap|trad(?:e|ing)|bargain\w*|gem\w*|overpaid|underpaid|overpriced|underpriced)\b/i.test(text);
+  },
+  _isTacticsQuestion(text) {
+    return /\b(line[\s-]?up|formation\w*|tactic\w*|match[\s-]?up|starting\s*xi|subs?\b|substitut\w*|corner\w*|set[\s-]?piece\w*|instruction\w*|mentality|press(?:ing)?|plan\s*b|opponent\w*|captain\w*|penalt\w*|free[\s-]?kick\w*|vs\.?|against|role\w*)\b/i.test(text);
+  },
   onChatKeydown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -401,7 +425,22 @@ export const assistantMethods = {
       return daysOff > 0 ? `stale, ${daysOff}d before this week` : `future, ${-daysOff}d after this week`;
     };
 
-    if (tactics.length) {
+    // Section gating: which of the large, otherwise-always-included blocks below (transfer
+    // targets/deals/listings, the full opponent-tactics summary + lineup-reply template/
+    // checklist) actually earn their token cost for THIS question. Squad, budget, match results,
+    // the static mechanics reference, and the named-club/player scoped enrichment further below
+    // are unconditional regardless of category — only these large, category-specific blocks gate.
+    // When a question doesn't clearly match either category, include both (today's behavior)
+    // rather than guess narrow — an unneeded section costs tokens, a missing one produces a wrong
+    // or evasive answer, and that asymmetry favors over-inclusion on ambiguous questions.
+    const lastUserText = this._lastUserMessageText();
+    const isTransferQ = this._isTransferQuestion(lastUserText);
+    const isTacticsQ = this._isTacticsQuestion(lastUserText);
+    const noCategoryMatched = !isTransferQ && !isTacticsQ;
+    const includeTransferSection = isTransferQ || noCategoryMatched;
+    const includeTacticsSection = isTacticsQ || noCategoryMatched;
+
+    if (tactics.length && includeTacticsSection) {
       lines.push(`\nResponse format for "how should I line up against X" questions: follow this template exactly, all 6 sections, every time, IN THIS ORDER — Opponent breakdown, Recommended lineup, Substitutions, Match instructions, Set pieces, Corner tactics. Note Substitutions now comes right after the lineup and BEFORE match instructions — never skip a section, and never invent extra headers or sub-groupings of your own.
 
 Before writing anything, work out the specific personnel matchups this game actually turns on — my RW vs their LB 1v1, my RB+RW combo against their LB+LW pairing, who wins the double-pivot battle, etc. — and let a coherent approach built around MY actual personnel (not a generic template) drive the whole reply: the breakdown, the instructions, the focus, even the subs. This matchup-driven reasoning must show up consistently in every reply, not just occasionally. Critically, the starting XI and the substitution plan are ONE decision, not two separate steps — think about the shape of the full 90 minutes as a package before finalizing either: sometimes the right answer is "start the fresher/more explosive option and bring the highest-rated player on as an impact sub against tiring opposition" rather than always starting whoever rates highest and using the alternative as a like-for-like replacement. Reason about this explicitly when it's a close call, don't default to rating order out of habit.
@@ -485,7 +524,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       .filter(p => p.Club && p.Club !== MY_CLUB && !this.vacantClubs?.has(p.Club) && (p._gameRating || 0) >= 78)
       .sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0))
       .slice(0, 25);
-    if (targets.length) {
+    if (targets.length && includeTransferSection) {
       lines.push(`\nTop-rated players elsewhere (potential transfer targets) — Name | Club | Pos | Age | Rating | TrueVal (source) | AltPosFit:`);
       targets.forEach(p => {
         lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(this.trueVal(p))} (${this.trueValSrc(p)}) | ${this._altFitStr(p)}`);
@@ -496,7 +535,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       .flatMap(p => (p._transferHistory || []).filter(t => t.isReal).map(t => ({ name: p.Player, ...t })))
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 20);
-    if (recentDeals.length) {
+    if (recentDeals.length && includeTransferSection) {
       lines.push(`\nRecent real completed transfers league-wide (most recent first) — Player | Fee | Seller → Buyer | Date:`);
       recentDeals.forEach(d => {
         lines.push(`${d.name} | ${fmtVal(d.amount)} | ${d.seller || '?'} → ${d.buyer || '?'} | ${d.date ? new Date(d.date).toLocaleDateString('en-GB') : '?'}`);
@@ -504,7 +543,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
     }
 
     const listed = (this.allPlayers || []).filter(p => p._transferListed && p._listingAsk);
-    if (listed.length) {
+    if (listed.length && includeTransferSection) {
       lines.push(`\nPlayers currently on the transfer list — Name | Club | Pos | Age | Rating | Asking price | Bids:`);
       listed.slice().sort((a, b) => (b._gameRating || 0) - (a._gameRating || 0)).forEach(p => {
         lines.push(`${p.Player} | ${p.Club} | ${p.Position} | ${p.Age} | ${p._gameRating || '?'} | ${fmtVal(p._listingAsk)} | ${p._listingBids || 0}`);
@@ -578,7 +617,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       }
     }
 
-    if (tactics.length) {
+    if (tactics.length && includeTacticsSection) {
       lines.push(`\nOpponent tactics — each club's most recently submitted lineup (this can be their plan for an upcoming, not-yet-played gameweek, so treat it as their likely XI/setup) — Club | Formation | Mentality | Style | GW status | Plan B configured | XI (with each player's own tactical Role in parens, where set):`);
       tactics.forEach(([club, s]) => {
         const xi = (s.xi || []).map(p => p.name ? (p.role ? `${p.name} (${p.role})` : p.name) : null).filter(Boolean).join(', ');
@@ -603,7 +642,7 @@ Defensive corner — Press: [Hold Shape/Press Taker]`);
       });
     }
 
-    if (tactics.length) {
+    if (tactics.length && includeTacticsSection) {
       lines.push(`\nBefore you send a reply to a "how should I line up against X" question, check it against this list — if any item is missing or wrong, fix it now, don't send an incomplete or inconsistent reply. Section order is: 1 Opponent breakdown, 2 Recommended lineup, 3 Substitutions (incl. Plan B), 4 Match instructions, 5 Set pieces, 6 Corner tactics.
 - Section 2 has a reasoning paragraph BEFORE the flat lineup list (not after), in plain language — the word "AltPosFit" never appears anywhere in the reply. The list itself is one-slot-per-line (SLOT: Player Name (rating, fitness%) — Role: Role Name), not grouped into "Back 4:"/"Midfield:" style headers, with "(C)" on the captain's line, a real rating AND fitness number on every line, and a Role valid for that player's own base position (see the Player Roles list in the game mechanics reference) — never a role from a different position's list.
 - Every player in Section 2 is at their natural/listed position UNLESS the paragraph above the list explicitly justified the move with both rating numbers — no unexplained position swaps, especially not two players trading places with each other. For AM/WF/CF, double check you checked EVERY attacking player's rating at the slot in question, not just whoever's listed Position already matches it — don't silently drop a flexible player just because they're not the obvious candidate. Same for the CB/FB/DM cluster — if you moved a player off their natural position there, check you weighed what it costs the position they're leaving, not just the rating they gain in the new one; that cost is real if they're one of the stronger options at their natural spot, and close to nothing if they're just squad depth there. Also verify: no CB/FB/DM player is playing a slot where their rating is actually lower than their own natural-position rating, and no higher-rated fit natural candidate for a slot is sitting unused without a stated reason.
