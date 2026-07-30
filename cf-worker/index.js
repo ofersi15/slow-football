@@ -471,8 +471,87 @@ async function handleChat(request, env, cors) {
         // if sent) — adaptive is the only on-mode, depth is tuned via output_config.effort.
         // Structured outputs (lineupMode) are documented as compatible with thinking.
         thinking: { type: 'adaptive' },
+        // 2026-07-30: switched to streaming after live testing showed repeated `error code: 524`
+        // (a Cloudflare edge-to-origin timeout — api.anthropic.com is itself Cloudflare-fronted)
+        // even during a window status.claude.com showed no active incident for this model.
+        // Root cause: a non-streaming call sends zero bytes back until the ENTIRE ~100-250s
+        // generation (heavy adaptive thinking + up to 16,000 output tokens) finishes server-side
+        // — any fixed idle/total timeout on an edge sitting between us and Anthropic's inference
+        // backend kills a slow-but-healthy generation exactly like it would a real outage, same
+        // error code either way. Streaming sends thinking/text deltas as they're produced, so the
+        // connection has continuous bytes flowing almost immediately instead of one long silence
+        // — this doesn't reduce actual generation time, but avoids the failure mode that looks
+        // identical to a timeout when the model is simply still thinking. See
+        // `readAnthropicStream()` below, which reconstructs the same {content, usage, stop_reason}
+        // shape the non-streaming API returned so none of the parsing/retry logic below it needed
+        // to change.
+        stream: true,
       }),
     });
+  }
+
+  // Reconstructs the same {content, usage, stop_reason} shape the non-streaming Messages API
+  // returns, from a `stream:true` SSE response — every existing content/usage/stop_reason
+  // reader below this function needed zero changes as a result. Thinking-block deltas
+  // (`thinking_delta`) are intentionally not accumulated — their text was never surfaced to the
+  // reply even in the non-streaming response (only `type:'text'` blocks are read downstream) —
+  // only `text_delta` (free-text and JSON-schema replies both stream as a `text` content block)
+  // is accumulated; `input_json_delta`/`partial_json` is also handled defensively in case a
+  // future schema/tool-use-style structured output streams that way instead.
+  async function readAnthropicStream(r) {
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    const blocks = [];
+    let usage = null;
+    let stopReason = null;
+    let streamError = null;
+
+    const processEvent = (dataStr) => {
+      let evt;
+      try { evt = JSON.parse(dataStr); } catch (e) { return; }
+      switch (evt.type) {
+        case 'message_start':
+          usage = evt.message?.usage || null;
+          break;
+        case 'content_block_start':
+          blocks[evt.index] = { type: evt.content_block?.type, text: '' };
+          break;
+        case 'content_block_delta':
+          if (blocks[evt.index] && evt.delta) {
+            if (evt.delta.type === 'text_delta') blocks[evt.index].text += evt.delta.text || '';
+            else if (evt.delta.type === 'input_json_delta') blocks[evt.index].text += evt.delta.partial_json || '';
+          }
+          break;
+        case 'message_delta':
+          if (evt.usage) usage = { ...(usage || {}), ...evt.usage };
+          if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
+          break;
+        case 'error':
+          streamError = evt.error || evt;
+          break;
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) !== -1) {
+        const chunk = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of chunk.split('\n')) {
+          if (line.startsWith('data:')) processEvent(line.slice(5).trim());
+        }
+      }
+    }
+    if (streamError) throw new Error(streamError.message || JSON.stringify(streamError));
+    return {
+      content: blocks.filter(Boolean).map(b => ({ type: b.type, text: b.text })),
+      usage,
+      stop_reason: stopReason,
+    };
   }
 
   try {
@@ -488,26 +567,38 @@ async function handleChat(request, env, cors) {
     const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const r = await callAnthropic();
-      const bodyText = await r.text();
+      if (!r.ok) {
+        // A non-2xx response is either a real Anthropic API error (JSON body) or a gateway-level
+        // failure (a Cloudflare 524 edge-timeout page, seen live, is plain text/HTML) — same
+        // distinction the non-streaming code made, just read directly since there's no stream to
+        // consume on an error status.
+        const errText = await r.text();
+        let errData;
+        try { errData = JSON.parse(errText); } catch (e) { errData = null; }
+        if (!errData) {
+          console.error('[chat] non-JSON error response from Anthropic (attempt', attempt, '):', errText.slice(0, 200));
+          if (attempt === maxAttempts) {
+            return new Response(JSON.stringify({ error: 'Anthropic API returned an invalid response (likely a transient gateway timeout) — please try again' }),
+              { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+          }
+          continue;
+        }
+        console.error('[chat] anthropic error:', r.status, JSON.stringify(errData).slice(0, 300));
+        return new Response(JSON.stringify({ error: errData?.error?.message || `Anthropic API error ${r.status}` }),
+          { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
       try {
-        data = JSON.parse(bodyText);
+        data = await readAnthropicStream(r);
       } catch (e) {
-        // A transient gateway timeout (Cloudflare 524) or similar infra hiccup between us and
-        // Anthropic returns a plain-text/HTML error page, not JSON — this used to throw straight
-        // past the whole retry loop into the outer catch, burning the request on attempt 1 even
-        // though the retry budget below exists for exactly this kind of transient failure.
-        // Treat it the same as any other broken-attempt case: retry once, then give up.
-        console.error('[chat] non-JSON response from Anthropic (attempt', attempt, '):', bodyText.slice(0, 200));
+        // The stream started (200 OK) but errored or was cut off mid-flight — still possible
+        // even with streaming, just less exposed than the old non-streaming call. Treat exactly
+        // like the old non-JSON-body case: retry once, then give up.
+        console.error('[chat] stream read failed (attempt', attempt, '):', e.message);
         if (attempt === maxAttempts) {
           return new Response(JSON.stringify({ error: 'Anthropic API returned an invalid response (likely a transient gateway timeout) — please try again' }),
             { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
         }
         continue;
-      }
-      if (!r.ok) {
-        console.error('[chat] anthropic error:', r.status, JSON.stringify(data).slice(0, 300));
-        return new Response(JSON.stringify({ error: data?.error?.message || `Anthropic API error ${r.status}` }),
-          { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
       if (data.usage) {
         console.log('[chat] usage (attempt', attempt, '):', JSON.stringify(data.usage), 'stop_reason:', data.stop_reason);
