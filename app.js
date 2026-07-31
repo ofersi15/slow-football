@@ -82,10 +82,11 @@ createApp({
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
       // Club tab — Finance
       financeLoading: false, financeMsg: '', financeLoaded: false,
-      clubFinance: null, clubSponsors: null, clubSeasonIncome: null,
-      financeCollapsed: {},
+      clubFinance: null, clubSponsors: null, clubSeasonIncome: null, clubFinHistory: null,
+      financeCollapsed: {}, finHistExpanded: {},
       // Club tab — Scenario Planner
       scenarioFacility: 'stadium', scenarioTargetLevel: null,
+      facExpanded: {},
       // Staff recruitment
       staffApplicants: null, staffApplicantsLoading: false, staffApplicantsMsg: '',
       staffWeek: null,

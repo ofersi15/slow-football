@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS, FACILITY_UPGRADE_COST, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED, FACILITY_MAX_LEVEL_UNCERTAIN, SCOUTING_QUALITY_BY_LEVEL } from '../constants.js'
+import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS, FACILITY_UPGRADE_COST, FACILITY_UPGRADE_COST_PROJECTED, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED, SCOUTING_JOB_STAGE_BOOST } from '../constants.js'
 import { serverCacheGet, serverCacheSet } from '../cache.js'
 
 export const youthMethods = {
@@ -359,56 +359,76 @@ export const youthMethods = {
       };
       return jk[key]?.[lv] || '';
     },
-    // Rebuilt 2026-07-31 from real, live-confirmed data (see FACILITY_LEVEL_FACTS/FACILITY_MAINTENANCE_RATES
-    // in constants.js) — the old version asserted per-level XP/quality/academy bonuses that turned out to be
-    // staff-driven, not facility-level-driven (a level-3 club with no coach hired shows the same 0% as level 1).
-    // Returns null where a level's real value has never been observed (never a guessed number).
+    // Rebuilt 2026-07-31 from the game's own client-bundle logic (TX/$X/MX/LX/AX/BS functions in the
+    // real Office → Facilities page) — see constants.js FACILITY_LEVEL_FACTS for the full source note.
     _fmtK(v) {
       const k = v / 1000;
       return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + 'k';
     },
+    facMaxLevel(key) {
+      return FACILITY_MAX_LEVEL_CONFIRMED[key] || 5;
+    },
+    // Primary "what this level gives you" line — mirrors the game's own Facilities-page wording.
     facRef(key, lv) {
-      lv = Math.max(1, Math.min(5, lv || 1));
+      lv = Math.max(1, Math.min(this.facMaxLevel(key), lv || 1));
+      const F = FACILITY_LEVEL_FACTS;
       if (key === 'stadium') {
-        const cap = FACILITY_LEVEL_FACTS.stadium.capacity[lv];
-        return cap ? cap.toLocaleString() + ' seats' : 'not yet observed';
+        const cap = F.stadium.capacity[lv];
+        const seats = cap.toLocaleString() + ' seats';
+        if (lv === 1) return seats;
+        return `${seats} · +£${F.stadium.ticketPriceBonus(lv)}/ticket · Shirts +${F.stadium.shirtRevenueBonusPct(lv)}% · Spon +${F.stadium.sponsorBonusPct(lv)}%`;
       }
       if (key === 'training') {
-        const r = FACILITY_MAINTENANCE_RATES.training[lv];
-        return `£${this._fmtK(r[0])}→£${this._fmtK(r[r.length-1])}/player upkeep`;
+        return `+${F.training.xpBoostCeilingPct(lv)}% XP ceiling`;
       }
       if (key === 'academy') {
-        const r = FACILITY_MAINTENANCE_RATES.academy[lv];
-        return `£${this._fmtK(r[0])}→£${this._fmtK(r[r.length-1])}/player upkeep`;
+        return `${F.academy.bigJumpPct[lv]}% big-jump · avg +${F.academy.expectedGainRoll[lv]}pt/plan`;
       }
       if (key === 'scouting') {
-        const slots = FACILITY_LEVEL_FACTS.scouting.maxActiveJobs[lv];
-        const upkeep = FACILITY_MAINTENANCE_RATES.scouting[lv];
-        return `${slots} job slot${slots===1?'':'s'} · £${this._fmtK(upkeep)}/wk`;
+        const slots = F.scouting.maxActiveJobs[lv];
+        return `${slots} job slot${slots===1?'':'s'} · ${lv>=3?'Improves quality (academy bigger)':'Little quality effect yet'}`;
       }
       if (key === 'medical') {
-        const inj = FACILITY_LEVEL_FACTS.medical.injuryMult[lv];
-        const rec = FACILITY_LEVEL_FACTS.medical.recoveryMult[lv];
-        if (inj == null) return 'not yet observed';
+        const inj = F.medical.injuryMult[lv], rec = F.medical.recoveryMult[lv];
         return `${inj===1?'Base':'-'+Math.round((1-inj)*100)+'% inj'} / +${Math.round((rec-1)*100)}% rehab`;
       }
       if (key === 'analytics') {
         const fms = {1:'442 433 4231 532 343',2:'+352 541 4411',3:'+4321 451',4:'+4141 442D 3421',5:'+3241 4222 4132'};
-        return fms[lv];
+        return `${F.analytics.scoutMissionsPerGW[lv]} scout mission${F.analytics.scoutMissionsPerGW[lv]===1?'':'s'}/gw · ${fms[lv]}`;
       }
+      return '';
+    },
+    // Secondary detail line — the extra context that doesn't fit facRef() (agent-offer terms for
+    // Analytics, unlock notes for Scouting) shown on hover / in the expanded level list.
+    facRefExtra(key, lv) {
+      lv = Math.max(1, Math.min(this.facMaxLevel(key), lv || 1));
+      if (key === 'analytics') return FACILITY_LEVEL_FACTS.analytics.agentOfferNote[lv];
+      if (key === 'scouting') return FACILITY_LEVEL_FACTS.scouting.unlocksNote[lv];
       return '';
     },
     facUpgradeCost(key, toLevel) {
       return FACILITY_UPGRADE_COST[key]?.[toLevel] ?? null;
     },
-    facMaxLevelUncertain(key) {
-      return FACILITY_MAX_LEVEL_UNCERTAIN.has(key);
+    facUpgradeCostProjected(key, toLevel) {
+      return !!FACILITY_UPGRADE_COST_PROJECTED[key]?.has(toLevel);
     },
     facScoutSlots(lv) {
       return FACILITY_LEVEL_FACTS.scouting.maxActiveJobs[Math.max(1, Math.min(5, lv || 1))];
     },
-    scoutQuality(lv) {
-      return SCOUTING_QUALITY_BY_LEVEL[Math.max(1, Math.min(5, lv || 1))];
+    scoutStageBoost(lv) {
+      return SCOUTING_JOB_STAGE_BOOST[Math.max(1, Math.min(5, lv || 1))];
+    },
+    scoutQualityNote(lv) {
+      return FACILITY_LEVEL_FACTS.scouting.prospectQualityNote[Math.max(1, Math.min(5, lv || 1))];
+    },
+    academyBigJumpPct(lv) {
+      return FACILITY_LEVEL_FACTS.academy.bigJumpPct[Math.max(1, Math.min(5, lv || 1))];
+    },
+    academyExpectedGain(lv) {
+      return FACILITY_LEVEL_FACTS.academy.expectedGainRoll[Math.max(1, Math.min(5, lv || 1))];
+    },
+    toggleFacExpand(key) {
+      this.facExpanded = { ...this.facExpanded, [key]: !this.facExpanded[key] };
     },
     facCurLv(key) {
       return this.clubFacData?.levels?.[key] || 0;
@@ -468,9 +488,12 @@ export const youthMethods = {
 
     // ── Club tab — Finance ──
     // Real endpoints scraped from the live app bundle (not documented in API.md):
-    //   /office/overview       — weekly wages/sponsorship/revenue/maintenance breakdown, stadium capacity/price/demand + next-fixture ticket preview
-    //   /office/sponsors       — active shirt/stadium/kit sponsor deals (weekly value, term)
-    //   /budgets/season-income — season-to-date income totals by category
+    //   /office/overview            — weekly wages/sponsorship/revenue/maintenance breakdown, stadium capacity/price/demand + next-fixture ticket preview
+    //   /office/sponsors            — active shirt/stadium/kit sponsor deals (weekly value, term)
+    //   /budgets/season-income      — season-to-date income totals by category
+    //   /budgets/public/history/:club — the real per-month transaction ledger (income+expenditure line
+    //     items, GW-labelled where weekly), going back ~10 months. This is what the game's own FAQ
+    //     means by "The Office page breaks down the mix, both monthly and across the season."
     async loadClubFinance(forceRefresh=false) {
       this.financeLoading = true; this.financeMsg = 'Loading finance data…';
       try {
@@ -484,29 +507,41 @@ export const youthMethods = {
               this.clubFinance = cached.overview;
               this.clubSponsors = cached.sponsors;
               this.clubSeasonIncome = cached.seasonIncome;
+              this.clubFinHistory = cached.history;
               this.financeLoaded = true; this.financeLoading = false; this.financeMsg = '';
               if (Date.now() - cached.savedAt > TTL) { setTimeout(() => this.loadClubFinance(true), 100); }
               return;
             }
           } catch(e) {}
         }
-        const [overview, sponsors, seasonIncome] = await Promise.all([
+        const [overview, sponsors, seasonIncome, history] = await Promise.all([
           fetch(`${API}/office/overview?club=${enc}`).then(r=>r.json()).catch(()=>null),
           fetch(`${API}/office/sponsors?club=${enc}`).then(r=>r.json()).catch(()=>null),
           fetch(`${API}/budgets/season-income?club=${enc}`).then(r=>r.json()).catch(()=>null),
+          fetch(`${API}/budgets/public/history/${enc}`).then(r=>r.json()).catch(()=>null),
         ]);
         this.clubFinance = overview;
         this.clubSponsors = sponsors;
         this.clubSeasonIncome = seasonIncome;
+        this.clubFinHistory = history;
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify({
-            savedAt: Date.now(), overview, sponsors, seasonIncome,
+            savedAt: Date.now(), overview, sponsors, seasonIncome, history,
           }));
         } catch(e) {}
         this.financeLoaded = true; this.financeMsg = '';
       } catch(e) {
         this.financeMsg = 'Error: ' + e.message;
       } finally { this.financeLoading = false; }
+    },
+    toggleFinHistMonth(month) {
+      this.finHistExpanded = { ...this.finHistExpanded, [month]: !this.finHistExpanded[month] };
+    },
+    finHistMonthLabel(month) {
+      if (!month || month === 'unknown') return 'Earlier';
+      const [y, m] = month.split('-');
+      const d = new Date(Number(y), Number(m) - 1, 1);
+      return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     },
     toggleFinanceCard(key) {
       this.financeCollapsed = { ...this.financeCollapsed, [key]: !this.financeCollapsed[key] };

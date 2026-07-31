@@ -149,21 +149,36 @@ export const youthComputed = {
     }
 
     if (key === 'stadium') {
-      const oldCap = FACILITY_LEVEL_FACTS.stadium.capacity[cur] || 0;
-      const newCap = FACILITY_LEVEL_FACTS.stadium.capacity[target];
-      if (newCap != null) {
-        const ticketPrice = this.clubFinance?.stadium?.ticketPrice || 0;
-        const capGain = newCap - oldCap;
-        out.capGain = capGain;
-        out.revenuePerHomeGame = capGain * ticketPrice;
-        // Rough model per the owner: revenue ≈ ticket price × capacity, ignoring demand/form/morale.
-        // Weekly figure assumes ~half of fixtures are home games (standard round-robin scheduling).
-        const avgWeeklyRevenue = out.revenuePerHomeGame * 0.5;
-        out.netWeekly = avgWeeklyRevenue - (out.upkeepDelta || 0);
-        out.paybackWeeks = out.netWeekly > 0 ? totalCost / out.netWeekly : null;
-      } else {
-        out.capacityUnknown = true;
-      }
+      const SF = FACILITY_LEVEL_FACTS.stadium;
+      const oldCap = SF.capacity[cur] || 0;
+      const newCap = SF.capacity[target];
+      const curTicketPrice = this.clubFinance?.stadium?.ticketPrice || 0;
+      // Confirmed formula (see constants.js): stadium level also raises the ticket price ceiling
+      // (+£3/level), shirt revenue (+6%/level) and sponsorship revenue (+4%/level) — not just capacity.
+      const oldTicketBonus = SF.ticketPriceBonus(cur), newTicketBonus = SF.ticketPriceBonus(target);
+      const projectedTicketPrice = curTicketPrice + (newTicketBonus - oldTicketBonus);
+      out.capGain = newCap - oldCap;
+      out.ticketPriceGain = newTicketBonus - oldTicketBonus;
+      // Owner's requested model: revenue ≈ ticket price × capacity, no occupancy/demand modeling.
+      out.revenuePerHomeGame = (newCap * projectedTicketPrice) - (oldCap * curTicketPrice);
+
+      // Shirt/sponsorship bonuses are cumulative from a level-1 baseline, and your current revenue
+      // already has the CURRENT level's bonus baked in — so back out the level-1 base first, then
+      // apply the target level's bonus, to isolate just the incremental gain (not double-counted).
+      const oldShirtPct = SF.shirtRevenueBonusPct(cur), newShirtPct = SF.shirtRevenueBonusPct(target);
+      const curShirtRevenue = this.clubFinance?.live?.revenueStreamsBreakdown?.shirts || 0;
+      const baseShirtRevenue = curShirtRevenue / (1 + oldShirtPct / 100);
+      out.shirtRevenueGainWeekly = baseShirtRevenue * (1 + newShirtPct / 100) - curShirtRevenue;
+
+      const oldSponPct = SF.sponsorBonusPct(cur), newSponPct = SF.sponsorBonusPct(target);
+      const curSponRevenue = this.clubFinance?.sponsorship || 0;
+      const baseSponRevenue = curSponRevenue / (1 + oldSponPct / 100);
+      out.sponsorRevenueGainWeekly = baseSponRevenue * (1 + newSponPct / 100) - curSponRevenue;
+
+      // Ticket revenue only lands on home weeks; shirt/sponsorship land every week regardless of fixture.
+      const avgWeeklyTicketRevenue = out.revenuePerHomeGame * 0.5; // assumes ~half of fixtures are home
+      out.netWeekly = avgWeeklyTicketRevenue + out.shirtRevenueGainWeekly + out.sponsorRevenueGainWeekly - (out.upkeepDelta || 0);
+      out.paybackWeeks = out.netWeekly > 0 ? totalCost / out.netWeekly : null;
     }
     return out;
   },
