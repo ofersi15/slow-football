@@ -436,6 +436,59 @@ export const youthMethods = {
       } finally { this.clubLoading = false; }
     },
 
+    // ── Club tab — Finance ──
+    // Real endpoints scraped from the live app bundle (not documented in API.md):
+    //   /office/overview       — weekly wages/sponsorship/revenue/maintenance breakdown, stadium capacity/price/demand + next-fixture ticket preview
+    //   /office/sponsors       — active shirt/stadium/kit sponsor deals (weekly value, term)
+    //   /budgets/season-income — season-to-date income totals by category
+    async loadClubFinance(forceRefresh=false) {
+      this.financeLoading = true; this.financeMsg = 'Loading finance data…';
+      try {
+        const enc = encodeURIComponent(MY_CLUB);
+        const CACHE_KEY = 'sf_club_finance_v1';
+        const TTL = 20 * 60 * 1000; // 20 min
+        if (!forceRefresh) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
+            if (cached) {
+              this.clubFinance = cached.overview;
+              this.clubSponsors = cached.sponsors;
+              this.clubSeasonIncome = cached.seasonIncome;
+              this.financeLoaded = true; this.financeLoading = false; this.financeMsg = '';
+              if (Date.now() - cached.savedAt > TTL) { setTimeout(() => this.loadClubFinance(true), 100); }
+              return;
+            }
+          } catch(e) {}
+        }
+        const [overview, sponsors, seasonIncome] = await Promise.all([
+          fetch(`${API}/office/overview?club=${enc}`).then(r=>r.json()).catch(()=>null),
+          fetch(`${API}/office/sponsors?club=${enc}`).then(r=>r.json()).catch(()=>null),
+          fetch(`${API}/budgets/season-income?club=${enc}`).then(r=>r.json()).catch(()=>null),
+        ]);
+        this.clubFinance = overview;
+        this.clubSponsors = sponsors;
+        this.clubSeasonIncome = seasonIncome;
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            savedAt: Date.now(), overview, sponsors, seasonIncome,
+          }));
+        } catch(e) {}
+        this.financeLoaded = true; this.financeMsg = '';
+      } catch(e) {
+        this.financeMsg = 'Error: ' + e.message;
+      } finally { this.financeLoading = false; }
+    },
+    toggleFinanceCard(key) {
+      this.financeCollapsed = { ...this.financeCollapsed, [key]: !this.financeCollapsed[key] };
+      try { localStorage.setItem('sf_finance_collapsed_v1', JSON.stringify(this.financeCollapsed)); } catch(e) {}
+    },
+    loadFinanceCollapsed() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('sf_finance_collapsed_v1')||'null');
+        if (saved) this.financeCollapsed = saved;
+      } catch(e) {}
+    },
+
     // ── Background auto-refresh (9am–11pm EST, incremental) ──
     // Refreshes scouts/academy/facilities/staff silently without showing a loading spinner.
     // History (all-clubs) is 24h TTL and is never auto-refreshed (too expensive).
