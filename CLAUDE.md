@@ -96,9 +96,17 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | `GET /api/agents/international-players` | International scouting pool |
 | `GET /api/tables/from-fixtures` | League tables |
 | `GET /api/managers` | All managers |
-| `GET /api/facilities?club=X` | Club facilities |
+| `GET /api/facilities?club=X` | Club facilities (levels + active upgrade project) |
+| `GET /api/facilities/quote?club=X&key=Y` | Cost/days to upgrade facility Y to its next level (works for any club, not just your own) |
 | `GET /api/staff/effects?club=X` | Staff effects |
 | `GET /api/academy?club=X` | Academy players |
+| `GET /api/office/overview?club=X` | Full weekly finance: wages, sponsorship, revenue streams, facility upkeep, net, stadium capacity/price/demand + next-fixture ticket preview |
+| `GET /api/office/sponsors?club=X` | Active shirt/stadium/kit sponsor deals |
+| `GET /api/budgets/season-income?club=X` | Season-to-date income totals by category |
+| `GET /api/maintenance/{stadium,training,scouting}/preview?club=X` | Full weekly upkeep rate table by level for that facility |
+| `GET /api/academy/maintenance/preview?club=X` | Same, for academy upkeep |
+
+The `/office/*` and `/maintenance/*` endpoints aren't in any official API doc — found by grepping the live app's JS bundle (`https://slowfootball.club/assets/index-*.js`) for `/api/` strings, same technique used for the AI Assistant's mechanics reference. `/facilities/quote` only returns the *next* level's cost from a club's current level, not a full tier table — the full cost/upkeep tables now live in `constants.js` (see below), built by sampling `/facilities/quote` and `/maintenance/*/preview` across ~65 clubs.
 
 ---
 
@@ -111,7 +119,7 @@ Logic files spread via `...xMethods`, computeds via `...xComputed` in `app.js`.
 | moneyball | Moneyball | Value analysis, gems, overperformers |
 | analysis | Analysis | Tactical matchup stats (6 cards) |
 | youth | Youth | Scouting jobs, academy, facilities, staff |
-| club | My Club | Facilities, staff, training |
+| club | My Club | Facilities, staff, finance dashboard, upgrade scenario/payback planner |
 | clubs | Clubs | All clubs — Latest XI pitch viz, Academy, History, Transfers |
 | espionage | Transfers | Opponent scouting, negotiations, auctions |
 | matches | Matches | Match archive, filters, rebuild/append |
@@ -158,6 +166,15 @@ The game mechanics reference (in `buildChatContext()`) now also covers Player Ro
 - The pre-existing "Roles" object (`submission.roles` — captain/penalty/freekick/corner set-piece takers) is now labeled "Set-Piece Roles" in the UI to disambiguate from the new per-player "Player Roles" above — same underlying field, no data-shape change.
 - A sub's `plan` field (`subs[].plan`) is still the 5-value Mentality scale per the owner (confirmed live) — **do not** treat it as the alternate `Fresh legs`/`Plan B`/`Shut up shop`/`Waste time`/`Chase the game` vocabulary found in a second, unconfirmed component in the live JS bundle (see `CHANGELOG.md` for the ambiguity, flagged for the game admin). The Clubs tab needed no change either way since it already renders `plan` as a bare string with no assumed vocabulary.
 - Plan B / sub-Instruction precedence, per the game's own on-page copy: "A later sub instruction overrides an earlier Plan B, and vice versa: the most recent call wins."
+
+---
+
+## My Club Tab — Finance & Facilities
+
+- **Finance section** (`loadClubFinance()` in `youth.js`, cache `sf_club_finance_v1`, 20min TTL): weekly income/expense breakdown, stadium/matchday, sponsorship deals, season income — all from the undocumented `/office/*` and `/budgets/season-income` endpoints above. Each card collapses independently, state persisted to `localStorage['sf_finance_collapsed_v1']`.
+- **Facility Level Reference** (`facRef()` in `youth.js`) was rebuilt 2026-07-31 from real sampled data, not formulas — the old version asserted per-level XP/quality/academy bonuses that turned out to be **staff-driven, not facility-level-driven** (a level-3 club with no coach hired shows the same 0% as level 1). Real facility-level-driven facts now live in `constants.js`: `FACILITY_UPGRADE_COST` (exact cost per level, sampled via `/facilities/quote` across ~65 clubs), `FACILITY_MAINTENANCE_RATES` (weekly upkeep rate tables), `FACILITY_LEVEL_FACTS` (stadium capacity, medical centre injury/recovery multipliers, scouting job-slot count), `SCOUTING_QUALITY_BY_LEVEL` (prospect quality boost — an exact `level×5%` formula — plus observed/typical rating-band ranges, not guaranteed ones). Levels never observed live are marked "cap unconfirmed" (`FACILITY_MAX_LEVEL_UNCERTAIN` — currently medical/stadium beyond level 5) rather than extrapolated. Academy facility level has **no confirmed link** to youth development quality (staff-driven instead) — stated explicitly in the UI rather than left silent.
+- **Upgrade Scenario Planner**: pick a facility + target level, see initial cost (with live CEO discount applied), weekly upkeep delta (only shown as a single number for flat-rate facilities — stadium/scouting/medical/analytics; training/academy scale by squad/academy headcount in bands plus an unconfirmed flat "lump" component, so that delta is deliberately not computed — see the reference table's per-player rates instead), and for stadium specifically a revenue/payback projection. Revenue model is deliberately simple per the owner's request: extra capacity × current ticket price, assuming ~half of fixtures are home games — explicitly labeled as a rough estimate, not accounting for demand/form/morale.
+- Research data behind all of the above (per-club facility levels, quotes, staff effects, scouting job samples) is cached in `exports/*.json` (gitignored) from a one-time 2026-07-31 gather — re-run a similar sample if the game changes these numbers.
 
 ---
 
