@@ -179,3 +179,65 @@ export const PLAN_B_NAMED_PLANS = ['Shut Up Shop', 'Sit Deeper', 'Hold Shape', '
 // ── Chemistry constants ───────────────────────────────────────────────────────
 export const GAME_START = new Date("2025-08-23T00:00:00Z").getTime();
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// ── Facility upgrade costs (My Club tab) ──────────────────────────────────────
+// Confirmed live via GET /api/facilities/quote?club=X&key=Y, sampled across all ~65 clubs in the
+// game (2026-07-31) — NOT hardcoded guesses. Each facility's baseCost-per-target-level is a clean
+// linear formula (fits every sampled from→to transition exactly), captured here as literal costs
+// rather than a formula so nothing beyond what was actually observed is asserted.
+// The final cost a club pays is baseCost * (1 - clubDiscount) — clubDiscount comes from
+// staff/effects.finances.facilityDiscount (a CEO effect), always fetched live per-club.
+// Max level: training/academy/scouting/analytics confirmed capped at 5 (the live quote endpoint
+// returns a same-level, £0 result for a level-5 club — i.e. there is no level 6 to buy).
+// medical/stadium: no club in the sample had reached level 5, so the 4→5 cost below IS confirmed,
+// but whether a level 6+ exists is NOT — stadium's maintenance rate table (see
+// FACILITY_MAINTENANCE_RATES below) lists rates up to level 8, which hints levels above 5 exist
+// for stadium specifically, but no upgrade cost for them has ever been observed.
+export const FACILITY_UPGRADE_COST = {
+  training:  { 2: 8000000,  3: 12000000, 4: 16000000, 5: 20000000 },
+  academy:   { 2: 6000000,  3: 9000000,  4: 12000000, 5: 15000000 },
+  scouting:  { 2: 4000000,  3: 6000000,  4: 8000000,  5: 10000000 },
+  medical:   { 2: 5000000,  3: 7500000,  4: 10000000, 5: 12500000 },
+  analytics: { 2: 3000000,  3: 4500000,  4: 6000000,  5: 7500000 },
+  stadium:   { 2: 25000000, 3: 40000000, 4: 55000000, 5: 70000000 },
+};
+export const FACILITY_MAX_LEVEL_CONFIRMED = { training: 5, academy: 5, scouting: 5, analytics: 5, medical: 5, stadium: 5 };
+export const FACILITY_MAX_LEVEL_UNCERTAIN = new Set(['medical', 'stadium']); // level 5 reached, but never confirmed as the true ceiling
+
+// Weekly running cost by level — confirmed via GET /api/maintenance/{key}/preview and
+// GET /api/academy/maintenance/preview (2026-07-31). training/academy scale with squad/academy
+// headcount (banded rates below are £/player at each band, not a flat total); scouting/stadium
+// are flat £/week by level. medical and analytics have NO weekly running cost (confirmed absent
+// from every /office/overview maintenance breakdown sampled).
+export const FACILITY_MAINTENANCE_RATES = {
+  stadium:  { 1: 20000, 2: 35000, 3: 60000, 4: 90000, 5: 130000, 6: 180000, 7: 240000, 8: 310000 },
+  scouting: { 1: 7500, 2: 20000, 3: 40000, 4: 65000, 5: 100000 },
+  // training bands: £/player for the 1st 10 players, then 11-20th, etc. (5 bands per level)
+  training: { 1: [1200, 2500, 3500, 5000, 7000], 2: [2500, 3500, 6000, 8500, 12000], 3: [3500, 6000, 9000, 12000, 18000], 4: [5000, 8500, 12000, 18000, 27000], 5: [7000, 12000, 18000, 27000, 40000] },
+  // academy bands: £/player for the 1st 4 academy players, then 5-8th, etc. (6 bands per level)
+  academy:  { 1: [5000, 10000, 20000, 35000, 50000, 75000], 2: [10000, 20000, 30000, 45000, 65000, 80000], 3: [15000, 25000, 40000, 55000, 75000, 100000], 4: [20000, 30000, 45000, 65000, 90000, 120000], 5: [25000, 40000, 60000, 90000, 125000, 150000] },
+};
+
+// What each facility level reliably delivers, confirmed by cross-referencing live data at that
+// exact level across multiple clubs (2026-07-31) — NOT the old per-level formulas (removed; those
+// asserted things like "+20% XP per level" that turned out to be flatly wrong, since training XP
+// bonus / scouting quality bump / academy youth development are actually STAFF-quality-driven, not
+// facility-level-driven — a level-3 club with no coach shows the same 0% bonus as a level-1 club).
+// Only genuinely level-driven facts are listed here.
+export const FACILITY_LEVEL_FACTS = {
+  // Stadium capacity — confirmed for levels 1-4 via live /office/overview across 4 clubs at each
+  // level. Level 5 capacity has never been observed (no level-5 stadium in the sampled clubs).
+  stadium: { capacity: { 1: 30000, 2: 40000, 3: 50000, 4: 60000 } },
+  // Medical Centre component of injury/recovery multipliers (the OTHER component comes from your
+  // physio's rating, not level) — confirmed for levels 1-4 across 4 clubs at each level.
+  medical: {
+    injuryMult:    { 1: 1.00, 2: 0.97, 3: 0.94, 4: 0.90 },   // lower is better (multiplies base injury risk)
+    recoveryMult:  { 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12 },   // higher is better (multiplies recovery speed)
+  },
+  // Active scouting job slots — confirmed across all 5 levels. Flat at 1 slot until level 5, which
+  // unlocks a 2nd. (The old reference claiming "3 base slots +1/+2 at high levels" was wrong.)
+  scouting: { maxActiveJobs: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 2 } },
+  // Formations unlocked by Analytics Dept level — this one WAS already accurate (scraped from the
+  // live /submit-team-v2 JS, see FORMATION_TIERS in assistant.js), kept here only as a pointer.
+  analytics: { formationTiersRef: 'FORMATION_TIERS in src/methods/assistant.js' },
+};

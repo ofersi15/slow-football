@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS } from '../constants.js'
+import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS, FACILITY_UPGRADE_COST, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED, FACILITY_MAX_LEVEL_UNCERTAIN } from '../constants.js'
 import { serverCacheGet, serverCacheSet } from '../cache.js'
 
 export const youthMethods = {
@@ -359,26 +359,53 @@ export const youthMethods = {
       };
       return jk[key]?.[lv] || '';
     },
+    // Rebuilt 2026-07-31 from real, live-confirmed data (see FACILITY_LEVEL_FACTS/FACILITY_MAINTENANCE_RATES
+    // in constants.js) — the old version asserted per-level XP/quality/academy bonuses that turned out to be
+    // staff-driven, not facility-level-driven (a level-3 club with no coach hired shows the same 0% as level 1).
+    // Returns null where a level's real value has never been observed (never a guessed number).
+    _fmtK(v) {
+      const k = v / 1000;
+      return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + 'k';
+    },
     facRef(key, lv) {
       lv = Math.max(1, Math.min(5, lv || 1));
-      if (key === 'training') return lv === 1 ? 'Base (no XP cap bonus)' : `+${(lv-1)*20}% XP cap`;
-      if (key === 'scouting') {
-        const slots = 3 + (lv >= 5 ? 2 : lv >= 4 ? 1 : 0);
-        const qual = lv >= 5 ? 2 : lv >= 3 ? 1 : 0;
-        const speed = lv * 5;
-        return slots + ' slots' + (qual ? ` · +${qual} rtg` : '') + ` · +${speed}% spd`;
+      if (key === 'stadium') {
+        const cap = FACILITY_LEVEL_FACTS.stadium.capacity[lv];
+        return cap ? cap.toLocaleString() + ' seats' : 'not yet observed';
       }
-      if (key === 'academy') return ['15.0','17.5','19.8','22.0','24.1'][lv-1] + '% big-jump';
+      if (key === 'training') {
+        const r = FACILITY_MAINTENANCE_RATES.training[lv];
+        return `£${this._fmtK(r[0])}→£${this._fmtK(r[r.length-1])}/player upkeep`;
+      }
+      if (key === 'academy') {
+        const r = FACILITY_MAINTENANCE_RATES.academy[lv];
+        return `£${this._fmtK(r[0])}→£${this._fmtK(r[r.length-1])}/player upkeep`;
+      }
+      if (key === 'scouting') {
+        const slots = FACILITY_LEVEL_FACTS.scouting.maxActiveJobs[lv];
+        const upkeep = FACILITY_MAINTENANCE_RATES.scouting[lv];
+        return `${slots} job slot${slots===1?'':'s'} · £${this._fmtK(upkeep)}/wk`;
+      }
       if (key === 'medical') {
-        const med = {1:'Base',2:'-3% inj / +4% rehab',3:'-6% inj / +8% rehab',4:'-10% inj / +12% rehab',5:'-14% inj / +16% rehab'};
-        return med[lv];
+        const inj = FACILITY_LEVEL_FACTS.medical.injuryMult[lv];
+        const rec = FACILITY_LEVEL_FACTS.medical.recoveryMult[lv];
+        if (inj == null) return 'not yet observed';
+        return `${inj===1?'Base':'-'+Math.round((1-inj)*100)+'% inj'} / +${Math.round((rec-1)*100)}% rehab`;
       }
       if (key === 'analytics') {
         const fms = {1:'442 433 4231 532 343',2:'+352 541 4411',3:'+4321 451',4:'+4141 442D 3421',5:'+3241 4222 4132'};
         return fms[lv];
       }
-      if (key === 'stadium') return ['30k','40k','50k','60k','80k'][lv-1] + ' seats';
       return '';
+    },
+    facUpgradeCost(key, toLevel) {
+      return FACILITY_UPGRADE_COST[key]?.[toLevel] ?? null;
+    },
+    facMaxLevelUncertain(key) {
+      return FACILITY_MAX_LEVEL_UNCERTAIN.has(key);
+    },
+    facScoutSlots(lv) {
+      return FACILITY_LEVEL_FACTS.scouting.maxActiveJobs[Math.max(1, Math.min(5, lv || 1))];
     },
     facCurLv(key) {
       return this.clubFacData?.levels?.[key] || 0;
