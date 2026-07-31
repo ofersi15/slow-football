@@ -80,6 +80,10 @@ createApp({
       // Club tab state (Facilities + Staff)
       clubLoading: false, clubLoaded: false, clubMsg: '', clubSubTab: 'facilities',
       clubFacData: null, clubFacQuotes: {}, clubStaff: {}, clubStaffEffects: {},
+      // Club tab — Finance
+      financeLoading: false, financeMsg: '', financeLoaded: false,
+      clubFinance: null, clubSponsors: null, clubSeasonIncome: null,
+      financeCollapsed: {},
       // Staff recruitment
       staffApplicants: null, staffApplicantsLoading: false, staffApplicantsMsg: '',
       staffWeek: null,
@@ -304,6 +308,7 @@ createApp({
         }
         if (v === 'club') {
           if (!this.clubLoaded && !this.clubLoading) this.loadClub();
+          if (!this.financeLoaded && !this.financeLoading) this.loadClubFinance();
         }
         if (v === 'espionage' || v === 'clubs') {
           if (!this.espionageLoaded && !this.espionageLoading) this.loadEspionage(false);
@@ -474,6 +479,7 @@ createApp({
         if (cfg.pct != null) this.mentalWeightPct = cfg.pct;
       }
     } catch(e) {}
+    this.loadFinanceCollapsed();
     // Defer loadData to AFTER the browser's first paint — prevents the 1940KB JSON.parse
     // from blocking the initial render and making the page appear frozen on slower machines.
     // Double-RAF: first fires before paint, second fires after paint.

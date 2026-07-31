@@ -1723,7 +1723,7 @@
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:15px;font-weight:700">🏟 {{myClub}}</div>
-        <button class="btn" style="font-size:11px" @click="loadClub(true)">🔄 Refresh</button>
+        <button class="btn" style="font-size:11px" @click="loadClub(true); loadClubFinance(true)">🔄 Refresh</button>
       </div>
 
       <!-- Active project banner -->
@@ -1736,6 +1736,168 @@
           </div>
           <div class="c-gray" style="font-size:11px;margin-left:auto">Complete: {{new Date(clubFacData.project.completeAt).toLocaleDateString()}}</div>
         </div>
+      </div>
+
+      <!-- ── FINANCE ── -->
+      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Finance</div>
+      <div v-if="financeLoading && !financeLoaded" class="card" style="text-align:center;padding:20px;margin-bottom:16px">
+        <div class="c-gray">{{financeMsg||'Loading finance data…'}}</div>
+      </div>
+      <div v-else-if="financeMsg && !financeLoaded" class="card" style="text-align:center;padding:20px;margin-bottom:16px;color:#ff7b72">⚠ {{financeMsg}}</div>
+      <div v-else-if="financeLoaded" style="margin-bottom:16px">
+
+        <!-- Weekly Finance -->
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinanceCard('weekly')">
+            <span style="font-weight:700;font-size:13px">💰 Weekly Finance <span class="c-gray" style="font-weight:400;font-size:11px">· wk {{clubFinance?.live?.week}}</span></span>
+            <span style="display:flex;align-items:center;gap:10px">
+              <span v-if="clubFinance" style="font-weight:700;font-size:13px" :class="(clubFinance.netWeekly||0)>=0?'c-green':'c-red'">
+                {{(clubFinance.netWeekly||0)>=0?'+':''}}{{fmtVal(clubFinance.netWeekly)}}/wk
+              </span>
+              <span class="c-gray" style="font-size:11px">{{financeCollapsed.weekly?'▸':'▾'}}</span>
+            </span>
+          </div>
+          <div v-show="!financeCollapsed.weekly" style="margin-top:12px" v-if="clubFinance">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+              <!-- Income -->
+              <div style="background:#161b22;border-radius:6px;padding:9px">
+                <div style="font-weight:700;color:#7ee787;font-size:12px;margin-bottom:7px">↑ Income</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Shirts</span><span>{{fmtVal(clubFinance.live?.revenueStreamsBreakdown?.shirts)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">TV</span><span>{{fmtVal(clubFinance.live?.revenueStreamsBreakdown?.tv)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Matchday (proj.)</span><span>{{fmtVal(clubFinance.live?.projectedTickets)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Prize (if won)</span><span>{{fmtVal(clubFinance.live?.revenueStreamsBreakdown?.prizeMax)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Sponsorship</span><span>{{fmtVal(clubFinance.sponsorship)}}</span></div>
+                  <div style="display:flex;justify-content:space-between;border-top:1px solid #21262d;padding-top:4px;margin-top:2px"><b>Total</b><b class="c-green">{{fmtVal(clubFinance.revenues)}}</b></div>
+                </div>
+              </div>
+              <!-- Expenses -->
+              <div style="background:#161b22;border-radius:6px;padding:9px">
+                <div style="font-weight:700;color:#ff7b72;font-size:12px;margin-bottom:7px">↓ Expenses</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Player wages</span><span>{{fmtVal(clubFinance.wages?.players)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Staff wages</span><span>{{fmtVal(clubFinance.wages?.staff)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Facility upkeep</span><span>{{fmtVal(clubFinance.live?.maintenance?.total)}}</span></div>
+                  <div style="display:flex;justify-content:space-between;border-top:1px solid #21262d;padding-top:4px;margin-top:2px"><b>Total</b><b class="c-red">{{fmtVal((clubFinance.wages?.total||0)+(clubFinance.live?.maintenance?.total||0))}}</b></div>
+                </div>
+              </div>
+              <!-- Facility upkeep breakdown -->
+              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.live?.maintenance">
+                <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🔧 Upkeep by facility</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <template v-for="fk in ['training','academy','scouting','stadium']" :key="fk">
+                    <div v-if="clubFinance.live.maintenance[fk]" style="display:flex;justify-content:space-between">
+                      <span class="c-gray" style="text-transform:capitalize">{{fk}} <span v-if="clubFinance.live.maintenance[fk].players!=null" style="font-size:10px">({{clubFinance.live.maintenance[fk].players}}p)</span></span>
+                      <span>{{fmtVal(clubFinance.live.maintenance[fk].total)}}</span>
+                    </div>
+                  </template>
+                  <div class="c-gray" style="font-size:10px;margin-top:2px">Medical &amp; Analytics have no weekly upkeep.</div>
+                </div>
+              </div>
+              <!-- Net -->
+              <div style="background:#161b22;border-radius:6px;padding:9px">
+                <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">📉 Net this week</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">If prize missed</span><span :class="(clubFinance.netWeekly||0)>=0?'c-green':'c-red'">{{fmtVal(clubFinance.netWeekly)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">If prize won (best case)</span><span :class="(clubFinance.live?.netMax||0)>=0?'c-green':'c-red'">{{fmtVal(clubFinance.live?.netMax)}}</span></div>
+                </div>
+              </div>
+            </div>
+            <div v-if="clubFinance.lastAdvance" class="c-gray" style="font-size:10px;margin-top:8px">
+              Last settled week ({{clubFinance.lastCompletedWeek}}): actual net {{fmtVal(clubFinance.lastAdvance.net)}} (income {{fmtVal(clubFinance.lastAdvance.income)}}, spent {{fmtVal(clubFinance.lastAdvance.spent)}})
+            </div>
+          </div>
+        </div>
+
+        <!-- Stadium & Matchday -->
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinanceCard('stadium')">
+            <span style="font-weight:700;font-size:13px">🏟 Stadium &amp; Matchday</span>
+            <span style="display:flex;align-items:center;gap:10px">
+              <span v-if="clubFinance?.stadium" class="c-gray" style="font-size:11px">{{clubFinance.stadium.capacity?.toLocaleString()}} seats · £{{clubFinance.stadium.ticketPrice}}/ticket</span>
+              <span class="c-gray" style="font-size:11px">{{financeCollapsed.stadium?'▸':'▾'}}</span>
+            </span>
+          </div>
+          <div v-show="!financeCollapsed.stadium" style="margin-top:12px" v-if="clubFinance?.stadium">
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+              <div style="background:#161b22;border-radius:6px;padding:9px">
+                <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">Ground</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Level</span><span>{{clubFinance.stadium.level}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Capacity</span><span>{{clubFinance.stadium.capacity?.toLocaleString()}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Your ticket price</span><span>£{{clubFinance.stadium.ticketPrice}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">League reference price</span><span>£{{clubFinance.stadium.referencePrice}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Demand</span><span :class="clubFinance.stadium.demand>=1?'c-green':clubFinance.stadium.demand>=0.8?'c-orange':'c-red'">{{Math.round((clubFinance.stadium.demand||0)*100)}}%</span></div>
+                </div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.stadium.morale">
+                <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">Form &amp; Morale</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Demand multiplier</span><span :class="clubFinance.stadium.morale.multiplier>=1?'c-green':'c-red'">{{clubFinance.stadium.morale.multiplier}}x ({{clubFinance.stadium.morale.pctDelta>=0?'+':''}}{{clubFinance.stadium.morale.pctDelta}}%)</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Last {{clubFinance.stadium.morale.sample}}</span><span>{{(clubFinance.stadium.morale.results||[]).join(' ')}}</span></div>
+                </div>
+              </div>
+              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.stadium.preview">
+                <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">Next fixture ({{clubFinance.stadium.preview.venue}} vs {{clubFinance.stadium.preview.opponent}})</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Projected attendance</span><span>{{clubFinance.stadium.preview.attendance?.toLocaleString()}} ({{clubFinance.stadium.preview.occupancy}}%)</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Projected ticket revenue</span><span class="c-green">{{fmtVal(clubFinance.stadium.preview.revenue)}}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sponsorship Deals -->
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinanceCard('sponsors')">
+            <span style="font-weight:700;font-size:13px">🤝 Sponsorship Deals</span>
+            <span class="c-gray" style="font-size:11px">{{financeCollapsed.sponsors?'▸':'▾'}}</span>
+          </div>
+          <div v-show="!financeCollapsed.sponsors" style="margin-top:10px">
+            <div v-if="clubSponsors?.active" style="overflow-x:auto"><table>
+              <thead><tr><th>Slot</th><th>Sponsor</th><th>£/week</th><th>Weeks left</th><th>Ends</th></tr></thead>
+              <tbody>
+                <template v-for="slot in ['shirt','stadium','kit']" :key="slot">
+                  <tr v-if="clubSponsors.active[slot]">
+                    <td style="text-transform:capitalize;font-weight:700;color:#79c0ff">{{slot}}</td>
+                    <td>{{clubSponsors.active[slot].name}}</td>
+                    <td class="c-green">£{{Math.round((clubSponsors.active[slot].weekly||0)/1000)}}k</td>
+                    <td :class="clubSponsors.active[slot].weeksRemaining<=2?'c-orange':'c-gray'">{{clubSponsors.active[slot].weeksRemaining}}</td>
+                    <td class="c-gray" style="font-size:11px">{{clubSponsors.active[slot].endsAt ? new Date(clubSponsors.active[slot].endsAt).toLocaleDateString() : '—'}}</td>
+                  </tr>
+                  <tr v-else>
+                    <td style="text-transform:capitalize;font-weight:700;color:#6e7681">{{slot}}</td>
+                    <td colspan="4" class="c-gray" style="font-style:italic">No active deal</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table></div>
+            <div v-else class="c-gray" style="font-size:11px;text-align:center;padding:8px">No sponsorship data</div>
+          </div>
+        </div>
+
+        <!-- Season Income -->
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinanceCard('season')">
+            <span style="font-weight:700;font-size:13px">📅 Season Income <span v-if="clubSeasonIncome" class="c-gray" style="font-weight:400;font-size:11px">· GW{{clubSeasonIncome.gameweekRange?.from}}-{{clubSeasonIncome.gameweekRange?.to}}</span></span>
+            <span style="display:flex;align-items:center;gap:10px">
+              <span v-if="clubSeasonIncome" class="c-green" style="font-weight:700;font-size:13px">{{fmtVal(clubSeasonIncome.grandTotal)}}</span>
+              <span class="c-gray" style="font-size:11px">{{financeCollapsed.season?'▸':'▾'}}</span>
+            </span>
+          </div>
+          <div v-show="!financeCollapsed.season" style="margin-top:10px" v-if="clubSeasonIncome?.totals">
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              <template v-for="(v,k) in clubSeasonIncome.totals" :key="k">
+                <div v-if="v" style="background:#161b22;border-radius:6px;padding:8px 12px;min-width:100px">
+                  <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em">{{k}}</div>
+                  <div style="font-weight:700;font-size:13px">{{fmtVal(v)}}</div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- ── FACILITIES ── -->
