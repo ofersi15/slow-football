@@ -1,4 +1,4 @@
-import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS, FACILITY_UPGRADE_COST, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED, FACILITY_MAX_LEVEL_UNCERTAIN } from '../constants.js'
+import { API, MY_CLUB, FULL_ATTR_KEYS, ATTR_KEYS_ENR, PLAYER_MERGE_ATTRS, FACILITY_UPGRADE_COST, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED, FACILITY_MAX_LEVEL_UNCERTAIN, SCOUTING_QUALITY_BY_LEVEL } from '../constants.js'
 import { serverCacheGet, serverCacheSet } from '../cache.js'
 
 export const youthMethods = {
@@ -406,6 +406,9 @@ export const youthMethods = {
     },
     facScoutSlots(lv) {
       return FACILITY_LEVEL_FACTS.scouting.maxActiveJobs[Math.max(1, Math.min(5, lv || 1))];
+    },
+    scoutQuality(lv) {
+      return SCOUTING_QUALITY_BY_LEVEL[Math.max(1, Math.min(5, lv || 1))];
     },
     facCurLv(key) {
       return this.clubFacData?.levels?.[key] || 0;

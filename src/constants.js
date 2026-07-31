@@ -241,3 +241,21 @@ export const FACILITY_LEVEL_FACTS = {
   // live /submit-team-v2 JS, see FORMATION_TIERS in assistant.js), kept here only as a pointer.
   analytics: { formationTiersRef: 'FORMATION_TIERS in src/methods/assistant.js' },
 };
+
+// Scouted prospect quality by Scouting Network level — confirmed via GET /api/scouting/jobs,
+// sampled across 30 active jobs from clubs at every level (2026-07-31). qualityBoostPct is an
+// exact formula (level × 5%) that matched all 30 samples with zero exceptions. ratingBand is NOT
+// a fixed function of level — it varies job-to-job by prospect/position — so only the observed
+// range and most-common ("typical") band across the sample are stored, never a guaranteed number.
+export const SCOUTING_QUALITY_BY_LEVEL = {
+  1: { qualityBoostPct: 5,  sampleSize: 4,  observedMin: 55, observedMax: 65, typicalBand: [60, 65] },
+  2: { qualityBoostPct: 10, sampleSize: 5,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  3: { qualityBoostPct: 15, sampleSize: 3,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  4: { qualityBoostPct: 20, sampleSize: 6,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  5: { qualityBoostPct: 25, sampleSize: 12, observedMin: 60, observedMax: 75, typicalBand: [70, 75] },
+};
+// Academy facility level, by contrast, has NO confirmed effect on youth development quality:
+// cross-referencing staff/effects.youthDevelopment (ceiling/meanMult) against academy level across
+// 5 clubs (2026-07-31) showed no monotonic trend at all — a level-4 club scored WORSE than a
+// level-1 club. That stat is staff (youth coach) driven, not facility-level driven. Academy level's
+// only confirmed effects are the upgrade cost and the weekly per-player upkeep band.

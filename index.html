@@ -1951,6 +1951,22 @@
                 </div>
                 <div v-else class="c-gray" style="font-size:11px">At today's ticket price the extra upkeep outweighs the estimated revenue gain — no payback under this rough model.</div>
               </div>
+
+              <!-- Scouting: prospect quality by level -->
+              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='scouting'">
+                <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">🎯 Prospect Quality</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Now (Lv{{clubScenario.cur}})</span><span>+{{scoutQuality(clubScenario.cur).qualityBoostPct}}% boost · typically {{scoutQuality(clubScenario.cur).typicalBand[0]}}-{{scoutQuality(clubScenario.cur).typicalBand[1]}} rtg</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">After (Lv{{clubScenario.target}})</span><b class="c-green">+{{scoutQuality(clubScenario.target).qualityBoostPct}}% boost · typically {{scoutQuality(clubScenario.target).typicalBand[0]}}-{{scoutQuality(clubScenario.target).typicalBand[1]}} rtg</b></div>
+                  <div class="c-gray" style="font-size:10px">Quality boost is an exact formula (confirmed). Rating band is the typical range observed across {{scoutQuality(clubScenario.target).sampleSize}} sampled clubs at that level — individual prospects vary, it's not a guarantee.</div>
+                </div>
+              </div>
+
+              <!-- Academy: explicit "no confirmed link" note, so this isn't silently missing -->
+              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='academy'">
+                <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">🎯 Youth Quality</div>
+                <div class="c-gray" style="font-size:11px">No confirmed link between Academy facility level and youth development quality — cross-checking live data across 5 clubs at different levels showed no trend (a level-4 club scored worse than a level-1 club). That's driven by your youth coach, not this facility. Upgrading only buys upkeep cost, not better prospects.</div>
+              </div>
             </div>
           </div>
         </div>
