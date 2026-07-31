@@ -181,34 +181,34 @@ export const GAME_START = new Date("2025-08-23T00:00:00Z").getTime();
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 // ── Facility upgrade costs (My Club tab) ──────────────────────────────────────
-// Confirmed live via GET /api/facilities/quote?club=X&key=Y, sampled across all ~65 clubs in the
-// game (2026-07-31) — NOT hardcoded guesses. Each facility's baseCost-per-target-level is a clean
-// linear formula (fits every sampled from→to transition exactly), captured here as literal costs
-// rather than a formula so nothing beyond what was actually observed is asserted.
-// The final cost a club pays is baseCost * (1 - clubDiscount) — clubDiscount comes from
-// staff/effects.finances.facilityDiscount (a CEO effect), always fetched live per-club.
-// Max level: training/academy/scouting/analytics confirmed capped at 5 (the live quote endpoint
-// returns a same-level, £0 result for a level-5 club — i.e. there is no level 6 to buy).
-// medical/stadium: no club in the sample had reached level 5, so the 4→5 cost below IS confirmed,
-// but whether a level 6+ exists is NOT — stadium's maintenance rate table (see
-// FACILITY_MAINTENANCE_RATES below) lists rates up to level 8, which hints levels above 5 exist
-// for stadium specifically, but no upgrade cost for them has ever been observed.
+// Source of truth 2026-07-31: the game's own client bundle (`https://slowfootball.club/assets/index-*.js`)
+// embeds the exact per-level formulas the Office → Facilities page itself renders (functions TX/$X/MX/LX/AX/BS
+// in the minified bundle) — these are not inferred from samples, they're the literal game logic. Costs are
+// the one exception: the Facilities page has no client-side cost formula either — it calls the same
+// `GET /api/facilities/quote?club=X&key=Y` this app already used, confirmed by reading its fetch call, so the
+// live-sampled FACILITY_UPGRADE_COST below (sampled across ~65 clubs) is exactly what the game itself shows.
+// Max level per facility, confirmed from the bundle's own `BS()` helper: stadium caps at 8, everything else at 5.
+export const FACILITY_MAX_LEVEL_CONFIRMED = { training: 5, academy: 5, scouting: 5, analytics: 5, medical: 5, stadium: 8 };
+
+// Upgrade cost per level (baseCost, before your CEO's facilityDiscount). Levels 2-5 (2-8 for stadium)
+// sampled live via /facilities/quote across ~65 clubs — a clean linear fit with zero exceptions, so
+// stadium levels 6-8 (never yet reached by any club, ours included) are safe to extend along the same
+// £15m/level line; they're marked `projected: true` below since they're formula-extended, not directly observed.
 export const FACILITY_UPGRADE_COST = {
   training:  { 2: 8000000,  3: 12000000, 4: 16000000, 5: 20000000 },
   academy:   { 2: 6000000,  3: 9000000,  4: 12000000, 5: 15000000 },
   scouting:  { 2: 4000000,  3: 6000000,  4: 8000000,  5: 10000000 },
   medical:   { 2: 5000000,  3: 7500000,  4: 10000000, 5: 12500000 },
   analytics: { 2: 3000000,  3: 4500000,  4: 6000000,  5: 7500000 },
-  stadium:   { 2: 25000000, 3: 40000000, 4: 55000000, 5: 70000000 },
+  stadium:   { 2: 25000000, 3: 40000000, 4: 55000000, 5: 70000000, 6: 85000000, 7: 100000000, 8: 115000000 },
 };
-export const FACILITY_MAX_LEVEL_CONFIRMED = { training: 5, academy: 5, scouting: 5, analytics: 5, medical: 5, stadium: 5 };
-export const FACILITY_MAX_LEVEL_UNCERTAIN = new Set(['medical', 'stadium']); // level 5 reached, but never confirmed as the true ceiling
+export const FACILITY_UPGRADE_COST_PROJECTED = { stadium: new Set([6, 7, 8]) };
 
 // Weekly running cost by level — confirmed via GET /api/maintenance/{key}/preview and
-// GET /api/academy/maintenance/preview (2026-07-31). training/academy scale with squad/academy
-// headcount (banded rates below are £/player at each band, not a flat total); scouting/stadium
-// are flat £/week by level. medical and analytics have NO weekly running cost (confirmed absent
-// from every /office/overview maintenance breakdown sampled).
+// GET /api/academy/maintenance/preview. training/academy scale with squad/academy headcount (banded
+// rates below are £/player at each band, not a flat total); scouting/stadium are flat £/week by
+// level. medical and analytics have NO weekly running cost (confirmed absent from every
+// /office/overview maintenance breakdown sampled).
 export const FACILITY_MAINTENANCE_RATES = {
   stadium:  { 1: 20000, 2: 35000, 3: 60000, 4: 90000, 5: 130000, 6: 180000, 7: 240000, 8: 310000 },
   scouting: { 1: 7500, 2: 20000, 3: 40000, 4: 65000, 5: 100000 },
@@ -218,44 +218,74 @@ export const FACILITY_MAINTENANCE_RATES = {
   academy:  { 1: [5000, 10000, 20000, 35000, 50000, 75000], 2: [10000, 20000, 30000, 45000, 65000, 80000], 3: [15000, 25000, 40000, 55000, 75000, 100000], 4: [20000, 30000, 45000, 65000, 90000, 120000], 5: [25000, 40000, 60000, 90000, 125000, 150000] },
 };
 
-// What each facility level reliably delivers, confirmed by cross-referencing live data at that
-// exact level across multiple clubs (2026-07-31) — NOT the old per-level formulas (removed; those
-// asserted things like "+20% XP per level" that turned out to be flatly wrong, since training XP
-// bonus / scouting quality bump / academy youth development are actually STAFF-quality-driven, not
-// facility-level-driven — a level-3 club with no coach shows the same 0% bonus as a level-1 club).
-// Only genuinely level-driven facts are listed here.
+// What each facility level delivers — decoded directly from the game's own bundle logic, not
+// inferred. Where a stat also depends on staff quality (training XP, medical), this is the
+// facility's CEILING/structural contribution; the live realized number (factoring in your actual
+// coach) is what `staff/effects` returns and what the facility cards above show.
 export const FACILITY_LEVEL_FACTS = {
-  // Stadium capacity — confirmed for levels 1-4 via live /office/overview across 4 clubs at each
-  // level. Level 5 capacity has never been observed (no level-5 stadium in the sampled clubs).
-  stadium: { capacity: { 1: 30000, 2: 40000, 3: 50000, 4: 60000 } },
-  // Medical Centre component of injury/recovery multipliers (the OTHER component comes from your
-  // physio's rating, not level) — confirmed for levels 1-4 across 4 clubs at each level.
-  medical: {
-    injuryMult:    { 1: 1.00, 2: 0.97, 3: 0.94, 4: 0.90 },   // lower is better (multiplies base injury risk)
-    recoveryMult:  { 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12 },   // higher is better (multiplies recovery speed)
+  stadium: {
+    capacity: { 1: 30000, 2: 40000, 3: 50000, 4: 60000, 5: 70000, 6: 80000, 7: 90000, 8: 100000 },
+    // Confirmed formula (bundle `EX()`, stadium branch): +£3/ticket, +6% shirts, +4% sponsorship per
+    // level above 1 — applies on top of the capacity increase, not instead of it.
+    ticketPriceBonus:     lv => 3 * (Math.max(1, lv) - 1),
+    shirtRevenueBonusPct: lv => 6 * (Math.max(1, lv) - 1),
+    sponsorBonusPct:      lv => 4 * (Math.max(1, lv) - 1),
   },
-  // Active scouting job slots — confirmed across all 5 levels. Flat at 1 slot until level 5, which
-  // unlocks a 2nd. (The old reference claiming "3 base slots +1/+2 at high levels" was wrong.)
-  scouting: { maxActiveJobs: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 2 } },
-  // Formations unlocked by Analytics Dept level — this one WAS already accurate (scraped from the
-  // live /submit-team-v2 JS, see FORMATION_TIERS in assistant.js), kept here only as a pointer.
-  analytics: { formationTiersRef: 'FORMATION_TIERS in src/methods/assistant.js' },
+  training: {
+    // Confirmed formula (bundle `TX()`): the CEILING training-XP bonus this level unlocks. Your
+    // actual realized bonus (staff/effects.training.xpMult) also depends on your coach's rating —
+    // a level 2 ground with no coach hired won't show +20%.
+    xpBoostCeilingPct: lv => 20 * (Math.max(1, Math.min(5, lv)) - 1),
+  },
+  academy: {
+    // Confirmed formula (bundle `$X()`): chance of a "big jump" (extra 2-point attribute boost) on
+    // completing an academy plan, and the average total attribute gain per completed plan (2-5 pt
+    // scale). The game's own UI copy for this panel literally says "Biggest factor in prospect
+    // quality" — Academy level is the dominant lever, not Scouting (see scouting note below).
+    bigJumpPct:      { 1: 15.0, 2: 17.48, 3: 19.81, 4: 22.02, 5: 24.11 },
+    expectedGainRoll:{ 1: 2.63, 2: 2.68,  3: 2.73,  4: 2.77,  5: 2.81 },
+  },
+  scouting: {
+    maxActiveJobs: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 2 },
+    // Confirmed exact copy from the game's own Facilities page (bundle `EX()`, scouting branch).
+    // Deliberately included verbatim — it's the game itself telling you Academy matters more here.
+    prospectQualityNote: { 1: 'Little effect on prospect quality yet', 2: 'Little effect on prospect quality yet', 3: 'Improves prospect quality (academy is the bigger factor)', 4: 'Improves prospect quality (academy is the bigger factor)', 5: 'Improves prospect quality (academy is the bigger factor)' },
+    unlocksNote: { 1: 'No shortlist insights • No market opportunities', 2: '1 scout insight per shortlisted player', 3: '1 scout insight per shortlisted player • Market Opportunities unlocked', 4: '2 scout insights per shortlisted player • Market Opportunities', 5: '3 scout insights per shortlisted player • Market Opportunities' },
+  },
+  analytics: {
+    scoutMissionsPerGW: { 1: 1, 2: 1, 3: 1, 4: 2, 5: 3 },
+    // Agent-offer (international scouting pool) discount and recruitment-brief chance — confirmed
+    // exact copy from the game's own bundle (`AX` table), a benefit this app previously missed
+    // entirely (it only tracked Analytics' formation-unlock effect).
+    agentOfferNote: { 1: 'Agent offers: 5% discount • No recruitment brief', 2: 'Agent offers: 10% discount • No recruitment brief', 3: 'Agent offers: 15% discount • Position preference • 60% brief-led chance', 4: 'Agent offers: 20% discount • Position + age preferences • 75% brief-led chance', 5: 'Agent offers: 25% discount • Position + age + attribute preferences • 90% brief-led chance' },
+    // Formations unlocked by Analytics Dept level — already accurate (scraped from the live
+    // /submit-team-v2 JS, see FORMATION_TIERS in assistant.js), kept here only as a pointer.
+    formationTiersRef: 'FORMATION_TIERS in src/methods/assistant.js',
+  },
+  medical: {
+    // Confirmed exact copy from the game's own bundle (EX() medical branch) — matches what was
+    // independently sampled live via staff/effects.medical.medicalCentre* multipliers.
+    injuryMult:   { 1: 1.00, 2: 0.97, 3: 0.94, 4: 0.90, 5: 0.86 },
+    recoveryMult: { 1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.16 },
+  },
 };
 
-// Scouted prospect quality by Scouting Network level — confirmed via GET /api/scouting/jobs,
-// sampled across 30 active jobs from clubs at every level (2026-07-31). qualityBoostPct is an
-// exact formula (level × 5%) that matched all 30 samples with zero exceptions. ratingBand is NOT
-// a fixed function of level — it varies job-to-job by prospect/position — so only the observed
-// range and most-common ("typical") band across the sample are stored, never a guaranteed number.
-export const SCOUTING_QUALITY_BY_LEVEL = {
-  1: { qualityBoostPct: 5,  sampleSize: 4,  observedMin: 55, observedMax: 65, typicalBand: [60, 65] },
-  2: { qualityBoostPct: 10, sampleSize: 5,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
-  3: { qualityBoostPct: 15, sampleSize: 3,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
-  4: { qualityBoostPct: 20, sampleSize: 6,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
-  5: { qualityBoostPct: 25, sampleSize: 12, observedMin: 60, observedMax: 75, typicalBand: [70, 75] },
+// Per the game's own FAQ ("Walk me through the Development process..."): "When you run a youth
+// scout, the quality of the prospects you're shown is determined by three things: your Technical
+// Director's rating, your Scouting Facilities level, and your Academy level." The scouting facility
+// page's own copy (FACILITY_LEVEL_FACTS.scouting.prospectQualityNote above) confirms Academy is the
+// bigger of the two facility levers. Best possible youth-scouted prospect is a 70 overall, requiring
+// top-tier staff AND top-tier facilities together (also per FAQ).
+//
+// Separately, live sampling of GET /api/scouting/jobs (30 active jobs across all 5 scouting levels,
+// 2026-07-31) found a `stageBoostPct` field that matches an exact level×5% formula, and an observed
+// (not guaranteed — it varies job to job) typical prospect-rating range per level. This looks like a
+// scouting-job progress/stage-speed stat, NOT the "prospect quality" the FAQ describes above — kept
+// separate so the two aren't conflated.
+export const SCOUTING_JOB_STAGE_BOOST = {
+  1: { stageBoostPct: 5,  sampleSize: 4,  observedMin: 55, observedMax: 65, typicalBand: [60, 65] },
+  2: { stageBoostPct: 10, sampleSize: 5,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  3: { stageBoostPct: 15, sampleSize: 3,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  4: { stageBoostPct: 20, sampleSize: 6,  observedMin: 60, observedMax: 70, typicalBand: [65, 70] },
+  5: { stageBoostPct: 25, sampleSize: 12, observedMin: 60, observedMax: 75, typicalBand: [70, 75] },
 };
-// Academy facility level, by contrast, has NO confirmed effect on youth development quality:
-// cross-referencing staff/effects.youthDevelopment (ceiling/meanMult) against academy level across
-// 5 clubs (2026-07-31) showed no monotonic trend at all — a level-4 club scored WORSE than a
-// level-1 club. That stat is staff (youth coach) driven, not facility-level driven. Academy level's
-// only confirmed effects are the upgrade cost and the weekly per-player upkeep band.

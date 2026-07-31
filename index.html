@@ -1739,7 +1739,7 @@
       </div>
 
       <!-- ── FINANCE ── -->
-      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Finance</div>
+      <div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d">💰 Finance</div>
       <div v-if="financeLoading && !financeLoaded" class="card" style="text-align:center;padding:20px;margin-bottom:16px">
         <div class="c-gray">{{financeMsg||'Loading finance data…'}}</div>
       </div>
@@ -1760,7 +1760,7 @@
           <div v-show="!financeCollapsed.weekly" style="margin-top:12px" v-if="clubFinance">
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
               <!-- Income -->
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#7ee787;font-size:12px;margin-bottom:7px">↑ Income</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Shirts</span><span>{{fmtVal(clubFinance.live?.revenueStreamsBreakdown?.shirts)}}</span></div>
@@ -1772,7 +1772,7 @@
                 </div>
               </div>
               <!-- Expenses -->
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#ff7b72;font-size:12px;margin-bottom:7px">↓ Expenses</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Player wages</span><span>{{fmtVal(clubFinance.wages?.players)}}</span></div>
@@ -1782,7 +1782,7 @@
                 </div>
               </div>
               <!-- Facility upkeep breakdown -->
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.live?.maintenance">
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubFinance.live?.maintenance">
                 <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🔧 Upkeep by facility</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <template v-for="fk in ['training','academy','scouting','stadium']" :key="fk">
@@ -1795,7 +1795,7 @@
                 </div>
               </div>
               <!-- Net -->
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">📉 Net this week</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">If prize missed</span><span :class="(clubFinance.netWeekly||0)>=0?'c-green':'c-red'">{{fmtVal(clubFinance.netWeekly)}}</span></div>
@@ -1820,7 +1820,7 @@
           </div>
           <div v-show="!financeCollapsed.stadium" style="margin-top:12px" v-if="clubFinance?.stadium">
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">Ground</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Level</span><span>{{clubFinance.stadium.level}}</span></div>
@@ -1830,18 +1830,27 @@
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Demand</span><span :class="clubFinance.stadium.demand>=1?'c-green':clubFinance.stadium.demand>=0.8?'c-orange':'c-red'">{{Math.round((clubFinance.stadium.demand||0)*100)}}%</span></div>
                 </div>
               </div>
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.stadium.morale">
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubFinance.stadium.morale">
                 <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">Form &amp; Morale</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Demand multiplier</span><span :class="clubFinance.stadium.morale.multiplier>=1?'c-green':'c-red'">{{clubFinance.stadium.morale.multiplier}}x ({{clubFinance.stadium.morale.pctDelta>=0?'+':''}}{{clubFinance.stadium.morale.pctDelta}}%)</span></div>
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Last {{clubFinance.stadium.morale.sample}}</span><span>{{(clubFinance.stadium.morale.results||[]).join(' ')}}</span></div>
                 </div>
               </div>
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubFinance.stadium.preview">
-                <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">Next fixture ({{clubFinance.stadium.preview.venue}} vs {{clubFinance.stadium.preview.opponent}})</div>
-                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubFinance.stadium.preview">
+                <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">
+                  Next fixture: {{clubFinance.stadium.preview.venue==='away'?'Away at':'Home vs'}} {{clubFinance.stadium.preview.opponent}}
+                </div>
+                <div v-if="clubFinance.stadium.preview.venue==='away'" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Their capacity</span><span>{{clubFinance.stadium.preview.hostCapacity?.toLocaleString()}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Your allocation</span><span>{{clubFinance.stadium.preview.allocation?.toLocaleString()}} seats</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Your fans sold</span><span>{{clubFinance.stadium.preview.awaySold?.toLocaleString()}} ({{clubFinance.stadium.preview.allocationFillPct}}%)</span></div>
+                  <div style="display:flex;justify-content:space-between;border-top:1px solid #21262d;padding-top:4px"><b>Your ticket revenue</b><b class="c-green">{{fmtVal(clubFinance.stadium.preview.revenue)}}</b></div>
+                  <div class="c-gray" style="font-size:10px">Total match attendance ({{clubFinance.stadium.preview.attendance?.toLocaleString()}}) is mostly the home crowd — this revenue is your away allocation only ({{clubFinance.stadium.preview.awaySold?.toLocaleString()}} × £{{clubFinance.stadium.preview.ticketPrice}}).</div>
+                </div>
+                <div v-else style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Projected attendance</span><span>{{clubFinance.stadium.preview.attendance?.toLocaleString()}} ({{clubFinance.stadium.preview.occupancy}}%)</span></div>
-                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Projected ticket revenue</span><span class="c-green">{{fmtVal(clubFinance.stadium.preview.revenue)}}</span></div>
+                  <div style="display:flex;justify-content:space-between;border-top:1px solid #21262d;padding-top:4px"><b>Projected ticket revenue</b><b class="c-green">{{fmtVal(clubFinance.stadium.preview.revenue)}}</b></div>
                 </div>
               </div>
             </div>
@@ -1858,7 +1867,7 @@
             <div v-if="clubSponsors?.active" style="overflow-x:auto"><table>
               <thead><tr><th>Slot</th><th>Sponsor</th><th>£/week</th><th>Weeks left</th><th>Ends</th></tr></thead>
               <tbody>
-                <template v-for="slot in ['shirt','stadium','kit']" :key="slot">
+                <template v-for="slot in ['shirt','stadium','kit','global']" :key="slot">
                   <tr v-if="clubSponsors.active[slot]">
                     <td style="text-transform:capitalize;font-weight:700;color:#79c0ff">{{slot}}</td>
                     <td>{{clubSponsors.active[slot].name}}</td>
@@ -1874,6 +1883,9 @@
               </tbody>
             </table></div>
             <div v-else class="c-gray" style="font-size:11px;text-align:center;padding:8px">No sponsorship data</div>
+            <div v-if="clubSponsors?.effects?.stadiumPenaltyPct" class="c-orange" style="font-size:10px;margin-top:6px">
+              ⚠ Stadium sponsor penalty active: -{{Math.round(clubSponsors.effects.stadiumPenaltyPct*100)}}%{{clubSponsors.active?.stadium?.extra?.gamesPenaltyRemaining!=null?' for '+clubSponsors.active.stadium.extra.gamesPenaltyRemaining+' more game(s)':''}} — usually from a stadium requirement you haven't met yet.
+            </div>
           </div>
         </div>
 
@@ -1889,12 +1901,54 @@
           <div v-show="!financeCollapsed.season" style="margin-top:10px" v-if="clubSeasonIncome?.totals">
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <template v-for="(v,k) in clubSeasonIncome.totals" :key="k">
-                <div v-if="v" style="background:#161b22;border-radius:6px;padding:8px 12px;min-width:100px">
+                <div v-if="v" style="background:#0d1117;border-radius:6px;padding:8px 12px;min-width:100px">
                   <div class="c-gray" style="font-size:10px;text-transform:uppercase;letter-spacing:.03em">{{k}}</div>
                   <div style="font-weight:700;font-size:13px">{{fmtVal(v)}}</div>
                 </div>
               </template>
             </div>
+          </div>
+        </div>
+
+        <!-- Finance History (real per-month ledger — the game's own FAQ calls this "monthly and across the season") -->
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinanceCard('history')">
+            <span style="font-weight:700;font-size:13px">📜 Finance History</span>
+            <span class="c-gray" style="font-size:11px">{{financeCollapsed.history?'▸':'▾'}}</span>
+          </div>
+          <div v-show="!financeCollapsed.history" style="margin-top:10px">
+            <div v-if="clubFinHistory?.history?.length" style="display:flex;flex-direction:column;gap:6px">
+              <div v-for="m in clubFinHistory.history" :key="m.month" style="background:#0d1117;border-radius:6px;padding:8px 10px">
+                <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" @click="toggleFinHistMonth(m.month)">
+                  <span style="font-weight:700;font-size:12px">{{finHistMonthLabel(m.month)}}</span>
+                  <span style="display:flex;gap:10px;align-items:center;font-size:11px">
+                    <span class="c-green">+{{fmtVal(m.totalIncome)}}</span>
+                    <span class="c-red">-{{fmtVal(m.totalExpenditure)}}</span>
+                    <b :class="(m.totalIncome-m.totalExpenditure)>=0?'c-green':'c-red'">{{fmtVal(m.totalIncome-m.totalExpenditure)}}</b>
+                    <span class="c-gray">{{finHistExpanded[m.month]?'▴':'▾'}}</span>
+                  </span>
+                </div>
+                <div v-show="finHistExpanded[m.month]" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+                  <div>
+                    <div class="c-gray" style="font-size:10px;text-transform:uppercase;margin-bottom:4px">Income ({{m.income.length}})</div>
+                    <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+                      <div v-for="(it,i) in m.income" :key="i" style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-bottom:1px solid #21262d;gap:8px">
+                        <span class="c-gray">{{it.label}}</span><span class="c-green" style="white-space:nowrap">+{{fmtVal(it.amount)}}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="c-gray" style="font-size:10px;text-transform:uppercase;margin-bottom:4px">Expenditure ({{m.expenditure.length}})</div>
+                    <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+                      <div v-for="(it,i) in m.expenditure" :key="i" style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;border-bottom:1px solid #21262d;gap:8px">
+                        <span class="c-gray">{{it.label}}</span><span class="c-red" style="white-space:nowrap">-{{fmtVal(it.amount)}}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="c-gray" style="font-size:11px;text-align:center;padding:8px">No history data</div>
           </div>
         </div>
 
@@ -1917,55 +1971,61 @@
 
             <div v-if="!clubScenario" class="c-gray" style="font-size:11px;padding:8px">Already at max confirmed level for this facility.</div>
             <div v-else style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">💵 Initial Cost</div>
                 <div v-if="clubScenario.missingCost" class="c-gray" style="font-size:11px">Cost beyond confirmed levels — not enough live data to project this jump.</div>
                 <div v-else style="font-size:12px;display:flex;flex-direction:column;gap:4px">
-                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Lv {{clubScenario.cur}}→{{clubScenario.target}}</span><b>{{fmtVal(clubScenario.totalCost)}}</b></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Lv {{clubScenario.cur}}→{{clubScenario.target}}</span><b>{{fmtVal(clubScenario.totalCost)}}<span v-if="facUpgradeCostProjected(clubScenario.key,clubScenario.target)" class="c-orange" style="font-size:9px"> (proj.)</span></b></div>
                   <div class="c-gray" style="font-size:10px">Includes your current {{Math.round(clubScenario.discount*100)}}% CEO discount</div>
                 </div>
               </div>
-              <div style="background:#161b22;border-radius:6px;padding:9px">
+              <div style="background:#0d1117;border-radius:6px;padding:9px">
                 <div style="font-weight:700;color:#79c0ff;font-size:12px;margin-bottom:7px">📆 Weekly Upkeep</div>
                 <div v-if="clubScenario.flatUpkeep" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Now</span><span>{{fmtVal(clubScenario.oldUpkeep)}}/wk</span></div>
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">After</span><span>{{fmtVal(clubScenario.newUpkeep)}}/wk</span></div>
                   <div style="display:flex;justify-content:space-between;border-top:1px solid #21262d;padding-top:4px"><b>Change</b><b :class="clubScenario.upkeepDelta>0?'c-red':'c-gray'">{{clubScenario.upkeepDelta>0?'+':''}}{{fmtVal(clubScenario.upkeepDelta)}}/wk</b></div>
                 </div>
-                <div v-else class="c-gray" style="font-size:11px">Scales with squad/academy headcount — see the per-player rates in the Reference table below rather than a single number here.</div>
+                <div v-else class="c-gray" style="font-size:11px">Scales with squad/academy headcount — see "All {{facMaxLevel(clubScenario.key)}} levels" on the {{facTitle(clubScenario.key)}} card below for the per-player rates.</div>
               </div>
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='stadium'">
-                <div style="font-weight:700;color:#7ee787;font-size:12px;margin-bottom:7px">🎟 Matchday Revenue</div>
-                <div v-if="clubScenario.capacityUnknown" class="c-gray" style="font-size:11px">Capacity at Lv {{clubScenario.target}} has never been observed live — no club sampled has reached it.</div>
-                <div v-else style="font-size:12px;display:flex;flex-direction:column;gap:4px">
-                  <div style="display:flex;justify-content:space-between"><span class="c-gray">+{{clubScenario.capGain?.toLocaleString()}} seats @ £{{clubFinance?.stadium?.ticketPrice}}</span><b class="c-green">+{{fmtVal(clubScenario.revenuePerHomeGame)}}/home game</b></div>
-                  <div class="c-gray" style="font-size:10px">Rough estimate (ticket price × extra capacity) — actual attendance still depends on demand, form and morale, which this doesn't model.</div>
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubScenario.key==='stadium'">
+                <div style="font-weight:700;color:#7ee787;font-size:12px;margin-bottom:7px">🎟 Matchday & Sponsorship Revenue</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">+{{clubScenario.capGain?.toLocaleString()}} seats, +£{{clubScenario.ticketPriceGain}}/ticket</span><b class="c-green">+{{fmtVal(clubScenario.revenuePerHomeGame)}}/home game</b></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Shirts (+6%/lvl)</span><b :class="clubScenario.shirtRevenueGainWeekly>=0?'c-green':'c-gray'">+{{fmtVal(clubScenario.shirtRevenueGainWeekly)}}/wk</b></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Sponsorship (+4%/lvl)</span><b :class="clubScenario.sponsorRevenueGainWeekly>=0?'c-green':'c-gray'">+{{fmtVal(clubScenario.sponsorRevenueGainWeekly)}}/wk</b></div>
+                  <div class="c-gray" style="font-size:10px">Ticket revenue = price × capacity (no demand/form/occupancy modeling, per your request). Ticket price, shirt and sponsorship bonuses are the exact confirmed per-level formulas.</div>
                 </div>
               </div>
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='stadium' && !clubScenario.capacityUnknown">
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubScenario.key==='stadium'">
                 <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">⏱ Payback</div>
                 <div v-if="clubScenario.paybackWeeks" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Net gain</span><span :class="clubScenario.netWeekly>=0?'c-green':'c-red'">{{fmtVal(clubScenario.netWeekly)}}/wk avg</span></div>
                   <div style="display:flex;justify-content:space-between"><span class="c-gray">Break-even</span><b>~{{Math.round(clubScenario.paybackWeeks)}} weeks</b></div>
-                  <div class="c-gray" style="font-size:10px">Assumes ~half your fixtures are home games, at today's ticket price — not a guarantee.</div>
+                  <div class="c-gray" style="font-size:10px">Ticket-revenue side assumes ~half your fixtures are home games; shirts/sponsorship land every week regardless of fixtures.</div>
                 </div>
-                <div v-else class="c-gray" style="font-size:11px">At today's ticket price the extra upkeep outweighs the estimated revenue gain — no payback under this rough model.</div>
+                <div v-else class="c-gray" style="font-size:11px">At today's ticket price the extra upkeep outweighs the estimated revenue gain — no payback under this model.</div>
               </div>
 
-              <!-- Scouting: prospect quality by level -->
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='scouting'">
+              <!-- Scouting: what the facility page itself says about quality -->
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubScenario.key==='scouting'">
                 <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">🎯 Prospect Quality</div>
                 <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
-                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Now (Lv{{clubScenario.cur}})</span><span>+{{scoutQuality(clubScenario.cur).qualityBoostPct}}% boost · typically {{scoutQuality(clubScenario.cur).typicalBand[0]}}-{{scoutQuality(clubScenario.cur).typicalBand[1]}} rtg</span></div>
-                  <div style="display:flex;justify-content:space-between"><span class="c-gray">After (Lv{{clubScenario.target}})</span><b class="c-green">+{{scoutQuality(clubScenario.target).qualityBoostPct}}% boost · typically {{scoutQuality(clubScenario.target).typicalBand[0]}}-{{scoutQuality(clubScenario.target).typicalBand[1]}} rtg</b></div>
-                  <div class="c-gray" style="font-size:10px">Quality boost is an exact formula (confirmed). Rating band is the typical range observed across {{scoutQuality(clubScenario.target).sampleSize}} sampled clubs at that level — individual prospects vary, it's not a guarantee.</div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Now (Lv{{clubScenario.cur}})</span><span>{{scoutQualityNote(clubScenario.cur)}}</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">After (Lv{{clubScenario.target}})</span><b class="c-green">{{scoutQualityNote(clubScenario.target)}}</b></div>
+                  <div style="border-top:1px solid #21262d;padding-top:4px;display:flex;justify-content:space-between"><span class="c-gray">Also unlocks</span><span>{{facRefExtra('scouting',clubScenario.target)}}</span></div>
+                  <div class="c-gray" style="font-size:10px">Per the game's own FAQ, Academy level and your Technical Director's rating matter more to prospect quality than Scouting level does (see the Academy scenario below). Separately, live-sampled jobs at Lv{{clubScenario.target}} typically show a {{scoutStageBoost(clubScenario.target).typicalBand[0]}}-{{scoutStageBoost(clubScenario.target).typicalBand[1]}} rating band ({{scoutStageBoost(clubScenario.target).sampleSize}} jobs sampled) — not guaranteed, individual prospects vary.</div>
                 </div>
               </div>
 
-              <!-- Academy: explicit "no confirmed link" note, so this isn't silently missing -->
-              <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubScenario.key==='academy'">
-                <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">🎯 Youth Quality</div>
-                <div class="c-gray" style="font-size:11px">No confirmed link between Academy facility level and youth development quality — cross-checking live data across 5 clubs at different levels showed no trend (a level-4 club scored worse than a level-1 club). That's driven by your youth coach, not this facility. Upgrading only buys upkeep cost, not better prospects.</div>
+              <!-- Academy: the real, confirmed quality mechanic — "biggest factor" per the game's own copy -->
+              <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubScenario.key==='academy'">
+                <div style="font-weight:700;color:#d2a8ff;font-size:12px;margin-bottom:7px">🎯 Youth Quality — biggest lever</div>
+                <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">Now (Lv{{clubScenario.cur}})</span><span>{{academyBigJumpPct(clubScenario.cur)}}% big-jump · avg +{{academyExpectedGain(clubScenario.cur)}}pt/plan</span></div>
+                  <div style="display:flex;justify-content:space-between"><span class="c-gray">After (Lv{{clubScenario.target}})</span><b class="c-green">{{academyBigJumpPct(clubScenario.target)}}% big-jump · avg +{{academyExpectedGain(clubScenario.target)}}pt/plan</b></div>
+                  <div class="c-gray" style="font-size:10px">Per the game's own FAQ, scouted-prospect quality comes from three things: your Technical Director's rating, Scouting level, and Academy level — and the Facilities page calls Academy "the biggest factor". These numbers are the exact big-jump chance / average attribute gain per completed academy plan.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1974,7 +2034,7 @@
       </div>
 
       <!-- ── FACILITIES ── -->
-      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facilities</div>
+      <div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.06em;margin-top:22px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d">🏗 Facilities</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;margin-bottom:16px">
         <div v-for="key in ['training','scouting','academy','medical','analytics','stadium']" :key="key"
           class="card" style="position:relative;padding:11px">
@@ -1995,8 +2055,8 @@
 
           <!-- Level dots -->
           <div style="display:flex;gap:3px;margin-bottom:6px">
-            <div v-for="i in 5" :key="i"
-              :style="{width:'26px',height:'5px',borderRadius:'3px',
+            <div v-for="i in facMaxLevel(key)" :key="i"
+              :style="{flex:1,height:'5px',borderRadius:'3px',
                 background:i<=(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)?'#238636':'#21262d',
                 border:'1px solid #30363d'}"></div>
           </div>
@@ -2066,13 +2126,38 @@
               </span>
             </div>
           </div>
-          <div v-else-if="(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)>=5"
+          <div v-else-if="(clubFacData&&clubFacData.levels?clubFacData.levels[key]:0)>=facMaxLevel(key)"
             style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px;font-size:11px;color:#238636">✓ Max level</div>
+
+          <!-- All-levels expand -->
+          <div style="border-top:1px solid #21262d;margin-top:6px;padding-top:6px">
+            <div style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#79c0ff" @click="toggleFacExpand(key)">
+              <span>All {{facMaxLevel(key)}} levels</span>
+              <span>{{facExpanded[key]?'▴':'▾'}}</span>
+            </div>
+            <div v-show="facExpanded[key]" style="margin-top:6px;display:flex;flex-direction:column;gap:5px;max-height:280px;overflow-y:auto">
+              <div v-for="lv in facMaxLevel(key)" :key="lv"
+                :style="{padding:'6px 8px',borderRadius:'5px',fontSize:'11px',
+                  background: facCurLv(key)===lv?'rgba(35,134,54,.15)':'rgba(255,255,255,.03)',
+                  border: facCurLv(key)===lv?'1px solid rgba(126,231,135,.3)':'1px solid transparent'}">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+                  <b :style="{color: facCurLv(key)===lv?'#7ee787':'#8b949e'}">Lv {{lv}}</b>
+                  <span v-if="facCurLv(key)===lv" class="c-orange" style="font-size:9px;text-transform:uppercase;font-weight:700">Current</span>
+                  <span v-else-if="facUpgradeCost(key,lv)" class="c-gray" style="font-size:10px;white-space:nowrap">£{{(facUpgradeCost(key,lv)/1e6).toFixed(1)}}m{{facUpgradeCostProjected(key,lv)?' (proj.)':''}}</span>
+                </div>
+                <div style="color:#e6edf3;margin-top:2px">{{facRef(key,lv)}}</div>
+                <div v-if="facRefExtra(key,lv)" class="c-gray" style="font-size:10px;margin-top:1px">{{facRefExtra(key,lv)}}</div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+      <div class="c-gray" style="font-size:10px;margin-top:-8px;margin-bottom:16px">
+        Per-level facts decoded directly from the game's own Facilities page logic, not guessed — training XP and medical injury/recovery show the facility's <i>ceiling</i>; your realized number (blended with staff quality) is in the live effects above each card.
       </div>
 
       <!-- ── STAFF ── -->
-      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Staff</div>
+      <div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.06em;margin-top:22px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d">👥 Staff</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
 
         <!-- Roster + Responsibilities -->
@@ -2118,10 +2203,10 @@
         <div class="card" style="flex:1.5;min-width:300px">
           <div style="font-weight:700;margin-bottom:10px">📈 Staff Effects</div>
           <div v-if="clubStaffEffects && Object.keys(clubStaffEffects).length"
-            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:8px">
+            style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
 
             <!-- Training -->
-            <div style="background:#161b22;border-radius:6px;padding:9px">
+            <div style="background:#0d1117;border-radius:6px;padding:9px">
               <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">⚽ Training</div>
               <div v-if="clubStaffEffects.training" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                 <div style="display:flex;justify-content:space-between">
@@ -2137,7 +2222,7 @@
             </div>
 
             <!-- Technical Director / Scouting -->
-            <div style="background:#161b22;border-radius:6px;padding:9px">
+            <div style="background:#0d1117;border-radius:6px;padding:9px">
               <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🔭 Technical Director</div>
               <div v-if="clubStaffEffects.scouting" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                 <div style="display:flex;justify-content:space-between">
@@ -2154,7 +2239,7 @@
             </div>
 
             <!-- Medical -->
-            <div style="background:#161b22;border-radius:6px;padding:9px">
+            <div style="background:#0d1117;border-radius:6px;padding:9px">
               <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🏥 Medical</div>
               <div v-if="clubStaffEffects.medical" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                 <div style="display:flex;justify-content:space-between">
@@ -2172,7 +2257,7 @@
             </div>
 
             <!-- CEO / Finances -->
-            <div style="background:#161b22;border-radius:6px;padding:9px">
+            <div style="background:#0d1117;border-radius:6px;padding:9px">
               <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">💰 CEO</div>
               <div v-if="clubStaffEffects.finances" style="font-size:12px;display:flex;flex-direction:column;gap:4px">
                 <div style="display:flex;justify-content:space-between">
@@ -2188,7 +2273,7 @@
             </div>
 
             <!-- Automation -->
-            <div style="background:#161b22;border-radius:6px;padding:9px" v-if="clubStaffEffects.automation">
+            <div style="background:#0d1117;border-radius:6px;padding:9px" v-if="clubStaffEffects.automation">
               <div style="font-weight:700;color:#ffa657;font-size:12px;margin-bottom:7px">🤖 Automation</div>
               <div style="font-size:11px;display:flex;flex-direction:column;gap:3px">
                 <div v-for="(val, k) in (clubStaffEffects.automation||{})" :key="k" style="display:flex;justify-content:space-between">
@@ -2205,10 +2290,9 @@
       </div>
 
       <!-- ── STAFF RECRUITMENT ── -->
-      <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;margin-top:4px">Staff Recruitment</div>
+      <div style="font-size:12px;font-weight:700;color:#e6edf3;text-transform:uppercase;letter-spacing:.06em;margin-top:18px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #21262d">📣 Staff Recruitment</div>
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <span style="font-weight:700;font-size:13px">📣 Staff Recruitment</span>
           <span v-if="staffWeek" style="font-size:10px;color:#6e7681">wk{{staffWeek}}</span>
           <button class="btn" style="font-size:11px" :disabled="staffApplicantsLoading || staffGenLoading" @click="loadApplicants()">
             {{staffApplicantsLoading ? '⟳ Loading…' : '⟳ Load Applicants'}}
@@ -2244,46 +2328,6 @@
           </div>
         </div>
         <div v-else-if="!staffGenLoading && !staffApplicantsLoading" class="c-gray" style="font-size:11px">To get fresh candidates: unpost any ad in the game, then click <b style="color:#e6edf3">Generate New</b>. Or click <b style="color:#e6edf3">Load Applicants</b> to see existing ones.</div>
-      </div>
-
-      <!-- ── FACILITY LEVEL REFERENCE ── -->
-      <div style="margin-top:20px">
-        <div style="font-size:11px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Facility Level Reference</div>
-        <div class="c-gray" style="font-size:10px;margin-bottom:8px">
-          Rebuilt from real live data (cost quotes + effects sampled across ~65 clubs), not guesses. Training/Academy XP and youth-development quality are driven by <b>who you hire</b>, not facility level — see Staff Effects above. What's shown here is only what the <b>level itself</b> reliably changes.
-        </div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead>
-              <tr style="color:#8b949e;border-bottom:1px solid #21262d">
-                <th style="text-align:left;padding:5px 8px;font-weight:600">Lv</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">🏋️ Training</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">🔭 Scouting</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">🎓 Academy</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">🏥 Medical</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">📊 Analytics</th>
-                <th style="text-align:left;padding:5px 8px;font-weight:600">🏟️ Stadium</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="lv in [1,2,3,4,5]" :key="lv" style="border-bottom:1px solid #21262d">
-                <td style="padding:5px 8px;font-weight:700;color:#e6edf3">{{lv}}</td>
-                <td v-for="fk in ['training','scouting','academy','medical','analytics','stadium']" :key="fk"
-                  :style="{padding:'5px 8px',verticalAlign:'top',
-                    background: facCurLv(fk)===lv ? '#1c2d1e' : (clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv) ? '#2d1f0e' : 'transparent',
-                    fontWeight: facCurLv(fk)===lv ? '700' : '400',
-                    color: fk==='training'?'#7ee787':fk==='scouting'?'#79c0ff':fk==='academy'?'#d2a8ff':fk==='stadium'?'#8b949e':'#ffa657'}">
-                  <div>{{facRef(fk,lv)}}<span v-if="lv===5 && facMaxLevelUncertain(fk)" class="c-gray" style="font-weight:400" title="Never observed live — no club sampled has reached level 5 here, so we can't confirm this is the true cap"> (cap unconfirmed)</span></div>
-                  <div v-if="facUpgradeCost(fk,lv)" class="c-gray" style="font-weight:400;font-size:10px;margin-top:1px">£{{(facUpgradeCost(fk,lv)/1e6).toFixed(1)}}m to reach</div>
-                  <span v-if="clubFacData&&clubFacData.project&&clubFacData.project.key===fk&&clubFacData.project.to===lv" style="font-size:9px;margin-left:3px;color:#ffa657">▲ upgrading</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="font-size:10px;color:#6e7681;margin-top:5px">
-          Current level highlighted green · ▲ = upgrade in progress · £ = base cost to reach that level (before your CEO's facility discount, applied live in the cards above)
-        </div>
       </div>
 
     </div>
