@@ -1,4 +1,10 @@
+import { FACILITY_UPGRADE_COST, FACILITY_MAINTENANCE_RATES, FACILITY_LEVEL_FACTS, FACILITY_MAX_LEVEL_CONFIRMED } from '../constants.js'
+
 const HIST_PAGE_SIZE = 50;
+// Facilities with a confirmed flat (non-banded) weekly upkeep, safe to diff level-to-level.
+// Training/Academy upkeep is banded by squad/academy headcount plus an unconfirmed flat "lump"
+// component (seen once, £15k, never isolated from level) — not modeled here to avoid guessing.
+const FLAT_UPKEEP_KEYS = new Set(['stadium', 'scouting', 'medical', 'analytics']);
 
 // Shared sort ladder for the youth-history views. `youthFilteredHistory` (compact, sorts raw
 // job rows) and `youthHistFiltered` (full, sorts youthHistJobsEnriched rows) both drive off the
@@ -97,5 +103,68 @@ export const youthComputed = {
   },
   youthHistTotalPages() {
     return Math.max(1, Math.ceil(this.youthHistFiltered.length / HIST_PAGE_SIZE));
+  },
+
+  // ── Club tab — Scenario Planner ──
+  clubScenarioCurLevel() {
+    return this.facCurLv(this.scenarioFacility);
+  },
+  clubScenarioLevels() {
+    const cur = this.clubScenarioCurLevel;
+    const max = FACILITY_MAX_LEVEL_CONFIRMED[this.scenarioFacility] || 5;
+    const arr = [];
+    for (let l = cur + 1; l <= max; l++) arr.push(l);
+    return arr;
+  },
+  // get/set computed so the <select> always shows a valid option, defaulting to "current+1"
+  // whenever scenarioTargetLevel is unset or stale (e.g. right after switching facility).
+  scenarioTargetLevelModel: {
+    get() {
+      const levels = this.clubScenarioLevels;
+      if (this.scenarioTargetLevel && levels.includes(this.scenarioTargetLevel)) return this.scenarioTargetLevel;
+      return levels[0] ?? null;
+    },
+    set(v) { this.scenarioTargetLevel = v; },
+  },
+  clubScenario() {
+    const key = this.scenarioFacility;
+    const cur = this.clubScenarioCurLevel;
+    const target = this.scenarioTargetLevelModel;
+    if (!target || target <= cur) return null;
+
+    const discount = this.clubStaffEffects?.finances?.facilityDiscount || 0;
+    let totalCost = 0, missingCost = false;
+    for (let l = cur + 1; l <= target; l++) {
+      const base = FACILITY_UPGRADE_COST[key]?.[l];
+      if (base == null) { missingCost = true; break; }
+      totalCost += base * (1 - discount);
+    }
+
+    const out = { key, cur, target, totalCost, missingCost, discount, flatUpkeep: FLAT_UPKEEP_KEYS.has(key) };
+    if (FLAT_UPKEEP_KEYS.has(key)) {
+      const rates = FACILITY_MAINTENANCE_RATES[key] || {};
+      out.oldUpkeep = rates[cur] || 0;
+      out.newUpkeep = rates[target] || 0;
+      out.upkeepDelta = out.newUpkeep - out.oldUpkeep;
+    }
+
+    if (key === 'stadium') {
+      const oldCap = FACILITY_LEVEL_FACTS.stadium.capacity[cur] || 0;
+      const newCap = FACILITY_LEVEL_FACTS.stadium.capacity[target];
+      if (newCap != null) {
+        const ticketPrice = this.clubFinance?.stadium?.ticketPrice || 0;
+        const capGain = newCap - oldCap;
+        out.capGain = capGain;
+        out.revenuePerHomeGame = capGain * ticketPrice;
+        // Rough model per the owner: revenue ≈ ticket price × capacity, ignoring demand/form/morale.
+        // Weekly figure assumes ~half of fixtures are home games (standard round-robin scheduling).
+        const avgWeeklyRevenue = out.revenuePerHomeGame * 0.5;
+        out.netWeekly = avgWeeklyRevenue - (out.upkeepDelta || 0);
+        out.paybackWeeks = out.netWeekly > 0 ? totalCost / out.netWeekly : null;
+      } else {
+        out.capacityUnknown = true;
+      }
+    }
+    return out;
   },
 };

@@ -84,6 +84,8 @@ createApp({
       financeLoading: false, financeMsg: '', financeLoaded: false,
       clubFinance: null, clubSponsors: null, clubSeasonIncome: null,
       financeCollapsed: {},
+      // Club tab — Scenario Planner
+      scenarioFacility: 'stadium', scenarioTargetLevel: null,
       // Staff recruitment
       staffApplicants: null, staffApplicantsLoading: false, staffApplicantsMsg: '',
       staffWeek: null,
