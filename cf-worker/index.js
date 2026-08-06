@@ -85,6 +85,15 @@ async function handleChat(request, env, cors) {
   // below, so capped separately: the static block is small and never needs anywhere near 120k.
   const staticContext = typeof body.staticContext === 'string' ? body.staticContext.slice(0, 20000) : '';
   const dynamicContext = typeof body.dynamicContext === 'string' ? body.dynamicContext.slice(0, 120000) : '';
+  // TEMP DIAGNOSTIC (2026-08-06) — remove once the "assistant ignores squad data" report is
+  // root-caused. Logs shape of what the client actually sent, nothing sensitive.
+  console.log('CHAT_DEBUG', JSON.stringify({
+    dynLen: dynamicContext.length,
+    staticLen: staticContext.length,
+    hasSquadBlock: dynamicContext.includes('My squad ('),
+    hasTacticsBlock: dynamicContext.includes('Opponent tactics'),
+    dynPreview: dynamicContext.slice(0, 300),
+  }));
   if (!messages.length) {
     return new Response(JSON.stringify({ error: 'No messages provided' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
