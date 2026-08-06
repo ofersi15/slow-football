@@ -672,6 +672,16 @@ Corners, highest to lowest (top 10): ${rankBy('Corners')}`);
   async sendChatMessage() {
     const text = (this.chatInput || '').trim();
     if ((!text && !this.chatAttachments.length) || this.chatLoading) return;
+    // Guard: buildDynamicChatContext() silently omits the squad/tactics sections when
+    // this.allPlayers isn't loaded yet (page just opened, or the load failed) — with no
+    // sections to work from, the model has no way to know data is missing and falls back to
+    // asking generic clarifying questions, which looks like a broken assistant rather than a
+    // data-loading problem. Fail loudly here instead of sending an empty-context request.
+    if (!(this.allPlayers || []).some(p => p.Club === MY_CLUB)) {
+      this.chatError = 'Squad data hasn’t loaded yet, so the assistant has nothing to work from — wait a few seconds and try again. If this keeps happening, check the sidebar for a "Cache not saving" warning.';
+      return;
+    }
+    this.chatError = '';
     const sessionId = this.activeChatSessionId;
     const content = [];
     if (text) content.push({ type: 'text', text });
@@ -684,6 +694,10 @@ Corners, highest to lowest (top 10): ${rankBy('Corners')}`);
   // Pops the last assistant reply and re-requests one for the same conversation so far.
   async regenerateLastResponse() {
     if (this.chatLoading) return;
+    if (!(this.allPlayers || []).some(p => p.Club === MY_CLUB)) {
+      this.chatError = 'Squad data hasn’t loaded yet, so the assistant has nothing to work from — wait a few seconds and try again. If this keeps happening, check the sidebar for a "Cache not saving" warning.';
+      return;
+    }
     const sessionId = this.activeChatSessionId;
     let idx = -1;
     for (let i = this.chatMessages.length - 1; i >= 0; i--) {
